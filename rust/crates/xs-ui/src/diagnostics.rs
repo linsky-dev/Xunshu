@@ -395,16 +395,18 @@ mod tests {
 
     #[test]
     fn missing_path_diagnoser_identifies_scope_and_extension_mismatch() {
+        let base = std::env::temp_dir().join("xunshu-diagnostics-synthetic");
+        assert!(base.is_absolute());
+        let docs = base.join("docs");
         let mut settings = Settings::default();
         settings.roots.push(xs_platform::Scope {
-            path: "/synthetic/docs".into(),
+            path: docs.to_string_lossy().into_owned(),
             extensions: Some(vec!["pdf".into()]),
             smart_excludes: true,
         });
-        let outside = diagnose_missing_path(Path::new("/synthetic/other/a.pdf"), Some(&settings));
+        let outside = diagnose_missing_path(&base.join("other").join("a.pdf"), Some(&settings));
         assert!(outside.iter().any(|line| line.contains("不在任何已勾选")));
-        let wrong_ext =
-            diagnose_missing_path(Path::new("/synthetic/docs/note.txt"), Some(&settings));
+        let wrong_ext = diagnose_missing_path(&docs.join("note.txt"), Some(&settings));
         assert!(wrong_ext.iter().any(|line| line.contains(".txt")));
     }
 }
