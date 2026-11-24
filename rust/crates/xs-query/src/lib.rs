@@ -726,9 +726,24 @@ fn literal_score(text: &str, needle: &str, finder: &memchr::memmem::Finder<'_>) 
         }
         return Some(1500);
     }
-    let position = text[..at].chars().count().min(200) as i64;
-    let previous = text[..at].chars().next_back();
-    if previous.is_some_and(|c| !c.is_alphanumeric()) {
+    let prefix = &text[..at];
+    // Count bytes only for ASCII prefixes; preserve Unicode character
+    // counts and boundaries for mixed filenames.
+    let (position, boundary) = if prefix.is_ascii() {
+        (
+            at.min(200) as i64,
+            !prefix.as_bytes()[at - 1].is_ascii_alphanumeric(),
+        )
+    } else {
+        (
+            prefix.chars().count().min(200) as i64,
+            prefix
+                .chars()
+                .next_back()
+                .is_some_and(|c| !c.is_alphanumeric()),
+        )
+    };
+    if boundary {
         return Some(1100 - position);
     }
     Some(800 - position)
@@ -931,6 +946,7 @@ mod literal_finder_tests {
     #[test]
     fn prepared_literal_finder_preserves_unicode_and_exact_scores() {
         let long_name = format!("{}报告.txt", "甲".repeat(220));
+        let long_ascii = format!("{}-budget.txt", "x".repeat(220));
         for name in [
             "",
             "budget",
@@ -944,6 +960,10 @@ mod literal_finder_tests {
             "e\u{301}.pdf",
             "😀报告.pdf",
             &long_name,
+            &long_ascii,
+            "ascii_报告.txt",
+            "abcébudget.txt",
+            "abc😀budget.txt",
         ] {
             for needle in [
                 "", "budget", "meeting", ".", "报告", "甲", "😀", "e\u{301}", "é", "absent",

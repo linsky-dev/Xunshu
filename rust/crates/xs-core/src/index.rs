@@ -325,15 +325,22 @@ fn visit_postings(
             previous = last as u32;
             continue;
         }
-        for _ in 0..run {
-            if found.is_multiple_of(1024) {
-                if let Some(budget) = budget {
-                    budget.check()?;
-                }
+        // Check at the same 1024-ID boundaries, but keep the inner run
+        // expansion free of per-ID budget branches (including long RLE runs).
+        let budget = budget.expect("budget checked above");
+        let mut remaining = run;
+        while remaining != 0 {
+            let offset = found % 1024;
+            if offset == 0 {
+                budget.check()?;
             }
-            previous += gap;
-            visit(previous);
-            found += 1;
+            let chunk = remaining.min(1024 - offset);
+            for _ in 0..chunk {
+                previous += gap;
+                visit(previous);
+            }
+            found += chunk;
+            remaining -= chunk;
         }
     }
     ensure!(found == count, "truncated posting list");
@@ -2286,24 +2293,26 @@ fn intersect_sorted(left: &[u32], right: &[u32], budget: &SearchBudget<'_>) -> R
     Ok(result)
 }
 fn union_sorted(left: &[u32], right: &[u32], budget: &SearchBudget<'_>) -> Result<Vec<u32>> {
-    let mut a = 0;
-    let mut b = 0;
+    // Both inputs are sorted and unique. Avoid over-reserving heavily
+    // overlapping postings; the remaining tails can be copied in bulk.
     let mut result = Vec::with_capacity(left.len().max(right.len()));
-    while a < left.len() || b < right.len() {
-        if result.len().is_multiple_of(1024) {
-            budget.check()?;
+    let (mut a, mut b) = (0, 0);
+    while a < left.len() && b < right.len() {
+        budget.check()?;
+        // Bound cancellation latency without a modulo/length test on each ID.
+        for _ in 0..1024 {
+            if a == left.len() || b == right.len() {
+                break;
+            }
+            let (x, y) = (left[a], right[b]);
+            result.push(x.min(y));
+            a += usize::from(x <= y);
+            b += usize::from(y <= x);
         }
-        if b == right.len() || (a < left.len() && left[a] < right[b]) {
-            result.push(left[a]);
-            a += 1;
-        } else if a == left.len() || right[b] < left[a] {
-            result.push(right[b]);
-            b += 1;
-        } else {
-            result.push(left[a]);
-            a += 1;
-            b += 1;
-        }
+    }
+    for chunk in left[a..].chunks(1024).chain(right[b..].chunks(1024)) {
+        budget.check()?;
+        result.extend_from_slice(chunk);
     }
     Ok(result)
 }
@@ -2503,6 +2512,65 @@ mod tests {
 #[cfg(test)]
 mod intersect_tests {
     use super::*;
+
+    #[test]
+    fn chunked_union_matches_ordered_set_for_overlap_and_long_tails() {
+        let budget = SearchBudget {
+            start: Instant::now(),
+            milliseconds: 5000,
+            cancel: None,
+        };
+        for (left, right) in [
+            (vec![], (0..5000).collect::<Vec<_>>()),
+            (
+                (0..5000).step_by(2).collect(),
+                (1..6000).step_by(2).collect(),
+            ),
+            ((0..5000).collect(), (2500..8000).collect()),
+            ((0..5000).collect(), (0..5000).collect()),
+        ] {
+            let expected = left
+                .iter()
+                .chain(&right)
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            assert_eq!(union_sorted(&left, &right, &budget).unwrap(), expected);
+            assert_eq!(union_sorted(&right, &left, &budget).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn long_posting_and_union_keep_cancellation_bounded() {
+        let cancelled = AtomicBool::new(false);
+        let budget = SearchBudget {
+            start: Instant::now(),
+            milliseconds: 5000,
+            cancel: Some(&cancelled),
+        };
+        let mut encoded = Vec::new();
+        for value in [0, 0, 8191, 1] {
+            put_varint(value, &mut encoded);
+        }
+        let mut seen = 0;
+        let error = visit_postings(&encoded, 8192, 8192, true, Some(&budget), |_| {
+            seen += 1;
+            if seen == 1025 {
+                cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        })
+        .unwrap_err();
+        assert!(error.is::<SearchInterrupted>());
+        assert_eq!(seen, 2048);
+        let long = (0..5000).collect::<Vec<_>>();
+        assert!(union_sorted(&[], &long, &budget)
+            .unwrap_err()
+            .is::<SearchInterrupted>());
+        assert!(union_sorted(&long, &long, &budget)
+            .unwrap_err()
+            .is::<SearchInterrupted>());
+    }
 
     #[test]
     fn galloping_and_linear_intersection_match_exactly() {
