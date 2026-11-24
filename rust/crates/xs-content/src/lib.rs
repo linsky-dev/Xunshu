@@ -565,8 +565,8 @@ fn rebuild_inner(
                         unchanged_document(&db, &entry.path, &current)?
                     {
                         ensure!(
-                            FileRevision::at_path(&path)? == current,
-                            "复用正文索引期间文件已变更，请重试"
+                            content_revision_readable(&path, current),
+                            "复用正文索引期间文件已变更或不可读取，请重试"
                         );
                         db.execute(
                             "INSERT OR IGNORE INTO scanned(path) VALUES (?1)",
@@ -1060,6 +1060,18 @@ fn load_db(mut snapshot: OpenSnapshot, cancel: &AtomicBool, writable: bool) -> R
     })
 }
 
+/// Metadata-only access is not a proof of current content-read permission.
+/// Never expose a cached snippet without reopening the guarded local object;
+/// check both the opened handle and its current pathname without reading bytes.
+fn content_revision_readable(path: &Path, expected: FileRevision) -> bool {
+    let Ok(file) = xs_platform::open_local_read(path) else {
+        return false;
+    };
+    !is_cloud_placeholder(&file)
+        && FileRevision::from_file(&file).ok() == Some(expected)
+        && FileRevision::at_path(path).ok() == Some(expected)
+}
+
 pub fn validate_response(dir: &Path, response: &SearchResponse) -> Result<()> {
     let policy = Policy::load(dir)?;
     ensure!(
@@ -1076,7 +1088,7 @@ pub fn validate_response(dir: &Path, response: &SearchResponse) -> Result<()> {
     );
     for hit in &response.hits {
         let path = Path::new(&hit.path);
-        if !policy.allows(dir, path)? || FileRevision::at_path(path).ok() != Some(hit.revision) {
+        if !policy.allows(dir, path)? || !content_revision_readable(path, hit.revision) {
             bail!("正文结果中的文件已移动、更改或撤权，请重新搜索");
         }
     }
@@ -1102,4 +1114,71 @@ fn is_cloud_placeholder(file: &File) -> bool {
 #[cfg(not(windows))]
 fn is_cloud_placeholder(_file: &File) -> bool {
     false
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod readability_tests {
+    use super::*;
+    use std::os::unix::{fs::PermissionsExt, process::CommandExt};
+
+    #[test]
+    fn metadata_access_is_not_content_read_permission() -> Result<()> {
+        const CHILD_PATH: &str = "XS_TEST_READABILITY_PATH";
+        if let Some(path) = std::env::var_os(CHILD_PATH) {
+            let path = PathBuf::from(path);
+            let revision = FileRevision::at_path(&path)?;
+            assert!(matches!(
+                File::open(&path),
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied
+            ));
+            assert!(!content_revision_readable(&path, revision));
+            return Ok(());
+        }
+        // Root can read mode-000 files. For that case run the same assertion
+        // under an unprivileged UID in a separate process, with a synthetic file.
+        if unsafe { libc::geteuid() } == 0 {
+            let temp = tempfile::Builder::new()
+                .prefix("xs-readability-")
+                .tempdir_in("/dev/shm")?;
+            std::fs::set_permissions(temp.path(), std::fs::Permissions::from_mode(0o755))?;
+            let path = temp.path().join("private.txt");
+            std::fs::write(&path, "synthetic content")?;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+            let revision = FileRevision::at_path(&path)?;
+            assert!(content_revision_readable(&path, revision));
+            let child = std::process::Command::new(std::env::current_exe()?)
+                .args([
+                    "--exact",
+                    "readability_tests::metadata_access_is_not_content_read_permission",
+                    "--nocapture",
+                ])
+                .env(CHILD_PATH, &path)
+                .uid(65534)
+                .gid(65534)
+                .output()?;
+            assert!(
+                child.status.success()
+                    && String::from_utf8_lossy(&child.stdout).contains("1 passed"),
+                "{}\n{}",
+                String::from_utf8_lossy(&child.stdout),
+                String::from_utf8_lossy(&child.stderr)
+            );
+            assert_eq!(FileRevision::at_path(&path)?, revision);
+        } else {
+            let temp = tempfile::tempdir()?;
+            let path = temp.path().join("private.txt");
+            std::fs::write(&path, "synthetic content")?;
+            let before = FileRevision::at_path(&path)?;
+            assert!(content_revision_readable(&path, before));
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000))?;
+            let denied = FileRevision::at_path(&path)?;
+            assert!(!content_revision_readable(&path, denied));
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+            assert!(content_revision_readable(
+                &path,
+                FileRevision::at_path(&path)?
+            ));
+        }
+        Ok(())
+    }
 }

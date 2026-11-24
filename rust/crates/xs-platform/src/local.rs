@@ -942,10 +942,11 @@ pub(crate) mod imp {
     use windows_sys::Win32::Storage::FileSystem::{
         FileDispositionInfo, FileRenameInfo, GetDriveTypeW, GetFileInformationByHandle,
         MoveFileExW, SetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, DELETE,
-        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_INFO,
-        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
-        FILE_RENAME_INFO, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_OFFLINE, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
+        FILE_ATTRIBUTE_RECALL_ON_OPEN, FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_INFO,
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_NO_RECALL, FILE_FLAG_OPEN_REPARSE_POINT,
+        FILE_READ_ATTRIBUTES, FILE_RENAME_INFO, FILE_SHARE_DELETE, FILE_SHARE_READ,
+        FILE_SHARE_WRITE, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
     };
     pub(crate) struct Guard {
         pub handles: Vec<File>,
@@ -1043,15 +1044,32 @@ pub(crate) mod imp {
     pub fn open_read(path: &Path) -> Result<File> {
         // Ancestors remain locked against mutation until the content handle opens.
         // The returned file itself denies sharing for writes/deletes and is pinned.
-        let _guard = guard(path, false)?;
+        let held = guard(path, false)?;
+        let metadata = held
+            .handles
+            .last()
+            .ok_or_else(|| PlatformError::InvalidPath("No verified file handle".into()))?;
+        const RECALL_MASK: u32 = FILE_ATTRIBUTE_OFFLINE
+            | FILE_ATTRIBUTE_RECALL_ON_OPEN
+            | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS;
+        if file_info(metadata, path)?.dwFileAttributes & (RECALL_MASK | FILE_ATTRIBUTE_DIRECTORY)
+            != 0
+        {
+            return Err(PlatformError::InvalidPath(
+                "Offline placeholder or directory refused".into(),
+            ));
+        }
         let file = OpenOptions::new()
             .read(true)
             .share_mode(FILE_SHARE_READ)
-            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_OPEN_NO_RECALL)
             .open(path)
             .map_err(|e| io_error(path, e))?;
         let info = file_info(&file, path)?;
-        if info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | 0x10) != 0 {
+        if info.dwFileAttributes
+            & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY | RECALL_MASK)
+            != 0
+        {
             return Err(PlatformError::InvalidPath("Regular file required".into()));
         }
         Ok(file)

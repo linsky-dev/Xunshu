@@ -776,7 +776,7 @@ fn collect_hits(
             })?;
         let revision = serde_json::from_str(&revision)?;
         let file = Path::new(&path);
-        if !policy.allows(dir, file)? || FileRevision::at_path(file).ok() != Some(revision) {
+        if !policy.allows(dir, file)? || !crate::content_revision_readable(file, revision) {
             response.omitted_stale += 1;
             continue;
         }
