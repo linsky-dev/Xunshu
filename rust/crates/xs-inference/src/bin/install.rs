@@ -159,6 +159,7 @@ fn manifest(root: &Path, expected: &str) -> Result<(Manifest, Vec<u8>)> {
         "安装清单版本、平台或文件数量无效"
     );
     let mut names = BTreeSet::new();
+    let mut directories = BTreeMap::<String, String>::new();
     for (name, entry) in &manifest.files {
         let folded = name.to_ascii_lowercase();
         ensure!(
@@ -171,7 +172,30 @@ fn manifest(root: &Path, expected: &str) -> Result<(Manifest, Vec<u8>)> {
                 && entry.bytes <= 512 * 1024 * 1024,
             "安装载荷路径或摘要无效：{name}"
         );
+        let mut parent = Path::new(name).parent();
+        while let Some(relative) = parent {
+            if relative.as_os_str().is_empty() {
+                break;
+            }
+            let spelling = relative
+                .to_str()
+                .context("无效的载荷目录")?
+                .replace('\\', "/");
+            let key = spelling.to_ascii_lowercase();
+            if let Some(existing) = directories.get(&key) {
+                ensure!(existing == &spelling, "安装目录大小写冲突：{name}");
+            } else {
+                directories.insert(key, spelling);
+            }
+            parent = relative.parent();
+        }
     }
+    ensure!(
+        directories
+            .keys()
+            .all(|key| !names.contains(key) && key != MANIFEST),
+        "安装清单文件与目录路径冲突"
+    );
     for name in PROGRAMS.map(executable).into_iter().chain([
         "resources/inference.json".to_owned(),
         "resources/fonts/NotoSansSC-Regular.otf".to_owned(),
@@ -214,8 +238,54 @@ fn checked_file(path: &Path, entry: &Entry, mut output: impl Write) -> Result<()
     Ok(())
 }
 
+// Do not allow an unlisted DLL, executable, or other file in an installed
+// release. The release owner marker is metadata, not an executable asset.
+fn verify_release_tree(root: &Path, manifest: &Manifest) -> Result<()> {
+    let mut directories = BTreeSet::new();
+    for name in manifest.files.keys() {
+        let mut parent = Path::new(name).parent();
+        while let Some(relative) = parent {
+            if relative.as_os_str().is_empty() {
+                break;
+            }
+            directories.insert(root.join(relative));
+            parent = relative.parent();
+        }
+    }
+    let files: BTreeSet<_> = manifest.files.keys().map(|name| root.join(name)).collect();
+    let mut pending = vec![root.to_owned()];
+    while let Some(directory) = pending.pop() {
+        xs_platform::validate_local_path(&directory, false)?;
+        for entry in std::fs::read_dir(&directory)? {
+            let entry = entry?;
+            let path = entry.path();
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                ensure!(
+                    directories.contains(&path),
+                    "安装目录包含未登记目录：{}",
+                    path.display()
+                );
+                pending.push(path);
+            } else {
+                ensure!(
+                    kind.is_file()
+                        && (files.contains(&path)
+                            || path == root.join(MANIFEST)
+                            || path == root.join(RELEASE_OWNER)),
+                    "安装目录包含未登记文件或链接：{}",
+                    path.display()
+                );
+                xs_platform::validate_local_path(&path, false)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify(root: &Path, expected: &str) -> Result<()> {
     let (manifest, _) = manifest(root, expected)?;
+    verify_release_tree(root, &manifest)?;
     for (name, entry) in manifest.files {
         checked_file(&root.join(name), &entry, io::sink())?;
     }
@@ -257,26 +327,45 @@ fn validate_state(root: &Path, state: &State) -> Result<()> {
     let mut retained = BTreeSet::new();
     for version in &state.retained {
         version_root(root, version)?;
-        ensure!(retained.insert(&version.directory), "安装状态包含重复版本");
+        ensure!(
+            retained.insert(version.directory.to_ascii_lowercase()),
+            "安装状态包含重复版本"
+        );
     }
     for version in [&state.active, &state.previous].into_iter().flatten() {
         version_root(root, version)?;
         if let Some(entry) = state
             .retained
             .iter()
-            .find(|v| v.directory == version.directory)
+            .find(|v| v.directory.eq_ignore_ascii_case(&version.directory))
         {
             ensure!(
-                entry.manifest_sha256 == version.manifest_sha256,
+                entry.directory == version.directory
+                    && entry.manifest_sha256 == version.manifest_sha256,
                 "安装状态版本摘要冲突"
             );
         }
     }
     ensure!(
-        !matches!((&state.active, &state.previous), (Some(a), Some(b)) if a.directory == b.directory),
+        !matches!((&state.active, &state.previous), (Some(a), Some(b)) if a.directory.eq_ignore_ascii_case(&b.directory)),
         "当前和回退版本不能相同"
     );
     Ok(())
+}
+
+// Older state files may not list the active and previous versions in retained.
+// Preserve those identities before changing a pointer so later cleanup can
+// account for every version, including the displaced previous release.
+fn retain_pointer_versions(state: &mut State) {
+    for version in [&state.active, &state.previous].into_iter().flatten() {
+        if !state
+            .retained
+            .iter()
+            .any(|v| v.directory == version.directory)
+        {
+            state.retained.push(version.clone());
+        }
+    }
 }
 
 fn save_state(root: &Path, state: &State) -> Result<()> {
@@ -461,6 +550,7 @@ fn install(root: &Path, payload: &Path, expected: &str, state: &mut State) -> Re
     )?;
     // 先持久化新版本归属，支持安装中断后的 Cleanup 补偿回收。
     let result = (|| -> Result<()> {
+        retain_pointer_versions(state);
         state.retained.push(version.clone());
         save_state(root, state)?;
         // Commit the exact manifest before copying payload files. A crash now
@@ -662,13 +752,9 @@ fn run() -> Result<()> {
         Action::Launch { data_dir, folder } => {
             let version = state.active.as_ref().context("寻枢尚未安装")?;
             let directory = version_root(&root, version)?;
+            verify(&directory, &version.manifest_sha256)?;
             policy(&directory, "verify")?;
-            let (manifest, _) = manifest(&directory, &version.manifest_sha256)?;
-            let ui = executable("xs-ui");
-            let program = directory.join(&ui);
-            for name in PROGRAMS.map(executable) {
-                checked_file(&directory.join(&name), &manifest.files[&name], io::sink())?;
-            }
+            let program = directory.join(executable("xs-ui"));
             let mut command = Command::new(program);
             if let Some(data) = data_dir {
                 let data = std::path::absolute(data)?;
@@ -766,6 +852,99 @@ mod lifecycle_tests {
         );
         state.active.as_mut().unwrap().manifest_sha256 = "not-a-hash".into();
         assert!(validate_state(root, &state).is_err());
+    }
+
+    #[test]
+    fn legacy_pointer_versions_are_retained_before_upgrade() {
+        let a = version();
+        let mut b = a.clone();
+        b.directory = "release-test-456".into();
+        let mut state = State {
+            active: Some(a.clone()),
+            previous: Some(b.clone()),
+            retained: vec![],
+        };
+        retain_pointer_versions(&mut state);
+        retain_pointer_versions(&mut state);
+        assert_eq!(state.retained.len(), 2);
+        assert_eq!(state.retained[0].directory, a.directory);
+        assert_eq!(state.retained[1].directory, b.directory);
+        assert!(validate_state(Path::new("/test"), &state).is_ok());
+        state.previous.as_mut().unwrap().directory = a
+            .directory
+            .to_ascii_uppercase()
+            .replace("RELEASE-", "release-");
+        assert!(validate_state(Path::new("/test"), &state).is_err());
+    }
+
+    #[test]
+    fn release_tree_rejects_unlisted_files_and_manifest_path_conflicts() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-tree-test-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let result = (|| -> Result<()> {
+            let mut files = serde_json::Map::new();
+            let entry = serde_json::json!({"bytes": 0, "sha256": digest(b"")});
+            for name in PROGRAMS.map(executable).into_iter().chain([
+                "resources/inference.json".to_owned(),
+                "resources/fonts/NotoSansSC-Regular.otf".to_owned(),
+                "self-test/image.png".to_owned(),
+                "self-test/scanned.pdf".to_owned(),
+            ]) {
+                let path = root.join(&name);
+                xs_platform::create_local_dir_all(path.parent().unwrap())?;
+                std::fs::write(path, [])?;
+                files.insert(name, entry.clone());
+            }
+            let write_manifest =
+                |files: &serde_json::Map<String, serde_json::Value>| -> Result<String> {
+                    let bytes = serde_json::to_vec(&serde_json::json!({
+                        "schema":1, "version":"test", "platform":std::env::consts::OS, "files":files
+                    }))?;
+                    std::fs::write(root.join(MANIFEST), &bytes)?;
+                    Ok(digest(&bytes))
+                };
+            let sha = write_manifest(&files)?;
+            let (valid, _) = manifest(&root, &sha)?;
+            verify_release_tree(&root, &valid)?;
+            let unknown = root.join("resources/unlisted.dll");
+            std::fs::write(&unknown, b"synthetic unknown")?;
+            assert!(verify_release_tree(&root, &valid).is_err());
+            assert_eq!(std::fs::read(&unknown)?, b"synthetic unknown");
+            std::fs::remove_file(unknown)?;
+            std::fs::create_dir(root.join("unlisted"))?;
+            assert!(verify_release_tree(&root, &valid).is_err());
+            std::fs::remove_dir(root.join("unlisted"))?;
+            #[cfg(unix)]
+            {
+                let path = root.join("unlisted-link");
+                std::os::unix::fs::symlink(root.join(MANIFEST), &path)?;
+                assert!(verify_release_tree(&root, &valid).is_err());
+                std::fs::remove_file(path)?;
+            }
+            verify_release_tree(&root, &valid)?;
+            let model = root.join("resources/inference.json");
+            std::fs::write(&model, b"tampered")?;
+            assert!(
+                checked_file(&model, &valid.files["resources/inference.json"], io::sink()).is_err()
+            );
+            std::fs::write(&model, [])?;
+            for conflict in [
+                "Resources/other.bin",
+                "resources",
+                "release.json/child",
+                "resources/inference.json/child",
+            ] {
+                let mut invalid = files.clone();
+                invalid.insert(conflict.to_owned(), entry.clone());
+                let sha = write_manifest(&invalid)?;
+                assert!(manifest(&root, &sha).is_err(), "accepted {conflict}");
+            }
+            Ok(())
+        })();
+        std::fs::remove_dir_all(&root)?;
+        result
     }
 
     #[cfg(target_os = "linux")]
