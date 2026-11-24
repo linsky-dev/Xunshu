@@ -141,6 +141,18 @@ jobs:
         run: |
           python scripts/verify-recovery.py --bin-dir target/release --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/recovery.json"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native filename watcher restart and revocation (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify-watch-restart.py --cli target/release/xunshu --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/watch-restart.json"
+      - name: Native filename watcher restart and revocation (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/verify-watch-restart.py --cli target/release/xunshu.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/watch-restart.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Linux native window smoke
         if: runner.os == 'Linux'
         shell: bash

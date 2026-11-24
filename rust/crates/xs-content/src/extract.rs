@@ -6,7 +6,7 @@ use quick_xml::{events::Event, Reader, XmlVersion};
 use scraper::{Html, Node};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     io::{Cursor, Read},
     sync::atomic::AtomicBool,
 };
@@ -270,6 +270,144 @@ fn load_ocr(recognizer: &mut Option<Ocr>) -> Result<&mut Ocr> {
     recognizer.as_mut().context("OCR 未就绪")
 }
 
+// PDF resources are inheritable, and images may be drawn inside Form XObjects.
+// Resolve only actually invoked objects, not unused resource dictionary entries.
+fn page_resources(
+    document: &lopdf::Document,
+    page: lopdf::ObjectId,
+) -> Result<Option<&lopdf::Dictionary>> {
+    let mut node = page;
+    let mut seen = BTreeSet::new();
+    loop {
+        ensure!(
+            seen.len() < 64 && seen.insert(node),
+            "PDF 页面资源继承循环或超出深度限制"
+        );
+        let dict = document.get_dictionary(node)?;
+        if dict.has(b"Resources") {
+            return Ok(Some(document.get_dict_in_dict(dict, b"Resources")?));
+        }
+        if !dict.has(b"Parent") {
+            return Ok(None);
+        }
+        node = dict.get(b"Parent")?.as_reference()?;
+    }
+}
+
+fn decoded_stream(stream: &lopdf::Stream) -> Result<Vec<u8>> {
+    // A malformed Filter must not be interpreted as an uncompressed stream.
+    let bytes = if stream.dict.has(b"Filter") {
+        stream.filters()?;
+        stream.decompressed_content()?
+    } else {
+        stream.content.clone()
+    };
+    ensure!(bytes.len() <= MAX_EXPANDED as usize, "PDF 内容流超出预算");
+    Ok(bytes)
+}
+
+#[derive(Default)]
+struct DrawnImages {
+    images: Vec<lopdf::ObjectId>,
+    seen: BTreeSet<lopdf::ObjectId>,
+    forms: BTreeSet<lopdf::ObjectId>,
+    operations: usize,
+    decoded_bytes: usize,
+}
+
+impl DrawnImages {
+    fn visit<'a>(
+        &mut self,
+        document: &'a lopdf::Document,
+        bytes: &[u8],
+        resources: Option<&'a lopdf::Dictionary>,
+    ) -> Result<()> {
+        self.decoded_bytes = self
+            .decoded_bytes
+            .checked_add(bytes.len())
+            .context("PDF 内容流预算溢出")?;
+        ensure!(
+            self.decoded_bytes <= MAX_EXPANDED as usize,
+            "PDF 页面内容流累计超出预算"
+        );
+        let content = lopdf::content::Content::decode_strict(bytes)?;
+        self.operations = self
+            .operations
+            .checked_add(content.operations.len())
+            .context("PDF 操作预算溢出")?;
+        ensure!(self.operations <= 250_000, "PDF 页面绘制操作过多");
+        for op in content.operations {
+            // The parser can identify inline images but their rendering is not
+            // implemented here. Fail explicitly instead of reporting full OCR.
+            ensure!(op.operator != "BI", "暂不支持 PDF 内联图像 OCR");
+            if op.operator != "Do" {
+                continue;
+            }
+            ensure!(op.operands.len() == 1, "PDF XObject 绘制参数无效");
+            let name = op.operands[0].as_name()?;
+            let resources = resources.context("PDF 绘制对象缺少资源字典")?;
+            let objects = document.get_dict_in_dict(resources, b"XObject")?;
+            let (id, object) = document.dereference(objects.get(name)?)?;
+            let id = id.context("PDF XObject 缺少间接对象标识")?;
+            let stream = object.as_stream()?;
+            match stream.dict.get(b"Subtype")?.as_name()? {
+                b"Image" => {
+                    if self.seen.insert(id) {
+                        ensure!(self.images.len() < 64, "扫描 PDF 单页图像过多");
+                        self.images.push(id);
+                    }
+                }
+                b"Form" => {
+                    ensure!(
+                        self.forms.len() < 32 && self.forms.insert(id),
+                        "PDF Form 循环或超出深度限制"
+                    );
+                    let nested = if stream.dict.has(b"Resources") {
+                        Some(document.get_dict_in_dict(&stream.dict, b"Resources")?)
+                    } else {
+                        Some(resources)
+                    };
+                    self.visit(document, &decoded_stream(stream)?, nested)?;
+                    self.forms.remove(&id);
+                }
+                _ => bail!("暂不支持 PDF XObject 绘制类型"),
+            }
+        }
+        Ok(())
+    }
+}
+
+fn drawn_images(document: &lopdf::Document, page: lopdf::ObjectId) -> Result<Vec<lopdf::ObjectId>> {
+    let dict = document.get_dictionary(page)?;
+    let Some(contents) = dict.get(b"Contents").ok() else {
+        return Ok(Vec::new());
+    };
+    let (_, contents) = document.dereference(contents)?;
+    let streams: Vec<&lopdf::Object> = match contents {
+        lopdf::Object::Array(items) => {
+            ensure!(items.len() <= 4096, "PDF 页面内容流数量超出预算");
+            items.iter().collect()
+        }
+        lopdf::Object::Stream(_) => vec![contents],
+        _ => bail!("PDF 页面内容流类型无效"),
+    };
+    // Contents arrays form a single logical content stream.
+    let mut bytes = Vec::new();
+    for object in streams {
+        let (_, object) = document.dereference(object)?;
+        let part = decoded_stream(object.as_stream()?)?;
+        ensure!(
+            bytes.len().saturating_add(part.len()).saturating_add(1) <= MAX_EXPANDED as usize,
+            "PDF 页面内容流累计超出预算"
+        );
+        bytes.extend(part);
+        bytes.push(b'\n');
+    }
+    let mut drawn = DrawnImages::default();
+    drawn.visit(document, &bytes, page_resources(document, page)?)?;
+    Ok(drawn.images)
+}
+
 fn scan_page(
     document: &lopdf::Document,
     page: lopdf::ObjectId,
@@ -277,20 +415,10 @@ fn scan_page(
     recognizer: &mut Option<Ocr>,
     result: &mut Segments,
 ) -> Result<()> {
-    // 空白页没有 XObject。资源图像由读取进程的内存与时限共同限制。
-    if document
-        .get_dictionary(page)
-        .and_then(|page| document.get_dict_in_dict(page, b"Resources"))
-        .and_then(|resources| document.get_dict_in_dict(resources, b"XObject"))
-        .is_err()
-    {
-        return Ok(());
-    }
-    let images = document.get_page_images(page)?;
-    ensure!(images.len() <= 64, "扫描 PDF 单页图像过多");
-    for (index, image) in images.into_iter().enumerate() {
-        let width = u32::try_from(image.width)?;
-        let height = u32::try_from(image.height)?;
+    for (index, id) in drawn_images(document, page)?.into_iter().enumerate() {
+        let image = document.get_object(id)?.as_stream()?;
+        let width = u32::try_from(image.dict.get(b"Width")?.as_i64()?)?;
+        let height = u32::try_from(image.dict.get(b"Height")?.as_i64()?)?;
         let pixels = u64::from(width) * u64::from(height);
         ensure!(
             width > 0 && height > 0 && pixels <= 32 * 1024 * 1024,
@@ -298,31 +426,28 @@ fn scan_page(
         );
         let recognizer = load_ocr(recognizer)?;
         let cancel = AtomicBool::new(false);
-        let filters = image.filters.as_deref().unwrap_or_default();
-        let lines = if matches!(filters, [filter] if filter == "DCTDecode") {
-            recognizer.recognize(image.content, &cancel)?
+        let filters = if image.dict.has(b"Filter") {
+            image.filters()?
         } else {
-            let bytes = document
-                .get_object(image.id)?
-                .as_stream()?
-                .get_plain_content()?;
+            Vec::new()
+        };
+        let lines = if matches!(filters.as_slice(), [filter] if *filter == b"DCTDecode") {
+            recognizer.recognize(&image.content, &cancel)?
+        } else {
+            let bytes = decoded_stream(image)?;
             ensure!(
-                image.bits_per_component == Some(8),
+                image.dict.get(b"BitsPerComponent")?.as_i64()? == 8,
                 "不支持此扫描 PDF 图像位深"
             );
-            let source = match image.color_space.as_deref() {
-                Some("DeviceGray") if bytes.len() as u64 == pixels => {
-                    image::DynamicImage::ImageLuma8(
-                        image::GrayImage::from_raw(width, height, bytes)
-                            .context("扫描 PDF 灰度像素无效")?,
-                    )
-                }
-                Some("DeviceRGB") if bytes.len() as u64 == pixels * 3 => {
-                    image::DynamicImage::ImageRgb8(
-                        image::RgbImage::from_raw(width, height, bytes)
-                            .context("扫描 PDF RGB 像素无效")?,
-                    )
-                }
+            let source = match image.dict.get(b"ColorSpace")?.as_name()? {
+                b"DeviceGray" if bytes.len() as u64 == pixels => image::DynamicImage::ImageLuma8(
+                    image::GrayImage::from_raw(width, height, bytes)
+                        .context("扫描 PDF 灰度像素无效")?,
+                ),
+                b"DeviceRGB" if bytes.len() as u64 == pixels * 3 => image::DynamicImage::ImageRgb8(
+                    image::RgbImage::from_raw(width, height, bytes)
+                        .context("扫描 PDF RGB 像素无效")?,
+                ),
                 _ => bail!("不支持此扫描 PDF 图像颜色空间或像素布局"),
             };
             recognizer.recognize_image(source, &cancel)?
@@ -706,4 +831,126 @@ fn a1(row: u32, col: u32) -> String {
     }
     let label: String = letters.into_iter().rev().collect();
     format!("{label}{}", u64::from(row) + 1)
+}
+
+#[cfg(test)]
+mod pdf_image_tests {
+    use super::*;
+    use lopdf::{dictionary, Dictionary, Document, Object, ObjectId, Stream};
+
+    fn image(doc: &mut Document) -> ObjectId {
+        doc.add_object(Stream::new(
+            dictionary! {
+                "Type" => "XObject", "Subtype" => "Image", "Width" => 1, "Height" => 1,
+                "ColorSpace" => "DeviceGray", "BitsPerComponent" => 8,
+            },
+            vec![255],
+        ))
+    }
+
+    fn fixture() -> (Document, ObjectId, ObjectId, ObjectId, ObjectId) {
+        let mut doc = Document::with_version("1.7");
+        let pages = doc.new_object_id();
+        let direct = image(&mut doc);
+        let nested = image(&mut doc);
+        let unused = image(&mut doc);
+        let form = doc.add_object(Stream::new(dictionary! {
+            "Type" => "XObject", "Subtype" => "Form", "BBox" => vec![0.into(),0.into(),1.into(),1.into()],
+            "Resources" => dictionary! { "XObject" => dictionary! { "Inner" => nested } },
+        }, b"/Inner Do /Inner Do".to_vec()));
+        let resources = doc.add_object(dictionary! { "XObject" => dictionary! {
+            "Direct" => direct, "Form" => form, "Unused" => unused,
+        }});
+        let first = doc.add_object(Stream::new(Dictionary::new(), b"q /Direct Do".to_vec()));
+        let mut second = Stream::new(Dictionary::new(), b"/Form Do /Direct Do Q".to_vec());
+        // Exercise the compressed content stream as well as multiple streams.
+        second.compress().unwrap();
+        let second = doc.add_object(second);
+        let page = doc.add_object(dictionary! { "Type" => "Page", "Parent" => pages,
+        "Contents" => vec![Object::Reference(first), Object::Reference(second)] });
+        doc.objects.insert(pages, Object::Dictionary(dictionary! {"Type" => "Pages", "Count" => 1,
+            "Kids" => vec![Object::Reference(page)], "MediaBox" => vec![0.into(),0.into(),100.into(),100.into()],
+            "Resources" => resources }));
+        let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages });
+        doc.trailer.set("Root", catalog);
+        (doc, page, direct, nested, form)
+    }
+
+    #[test]
+    fn inherited_and_nested_images_roundtrip_pdf_excludes_unused_and_duplicates() {
+        let (mut doc, _, direct, nested, _) = fixture();
+        let mut pdf = Vec::new();
+        doc.save_to(&mut pdf).unwrap();
+        let loaded = Document::load_mem(&pdf).unwrap();
+        let page = loaded.get_pages()[&1];
+        assert_eq!(drawn_images(&loaded, page).unwrap(), vec![direct, nested]);
+    }
+
+    #[test]
+    fn local_resources_replace_inherited_resources() {
+        let (mut doc, page, direct, _, form) = fixture();
+        let replacement = image(&mut doc);
+        doc.get_dictionary_mut(page).unwrap().set(
+            "Resources",
+            dictionary! {
+                "XObject" => dictionary! { "Direct" => replacement, "Form" => form },
+            },
+        );
+        let found = drawn_images(&doc, page).unwrap();
+        assert_eq!(found[0], replacement);
+        assert!(!found.contains(&direct));
+    }
+
+    #[test]
+    fn rejects_missing_resources_and_corrupt_content() {
+        let (mut doc, page, _, _, _) = fixture();
+        doc.get_dictionary_mut(page)
+            .unwrap()
+            .set("Resources", Dictionary::new());
+        assert!(drawn_images(&doc, page).is_err());
+        let broken = doc.add_object(Stream::new(dictionary! { "Filter" => 42 }, b"q Q".to_vec()));
+        doc.get_dictionary_mut(page)
+            .unwrap()
+            .set("Contents", broken);
+        assert!(drawn_images(&doc, page).is_err());
+        let broken = doc.add_object(Stream::new(Dictionary::new(), b"q Q [".to_vec()));
+        doc.get_dictionary_mut(page)
+            .unwrap()
+            .set("Contents", broken);
+        assert!(drawn_images(&doc, page).is_err());
+    }
+
+    #[test]
+    fn rejects_form_and_page_inheritance_cycles() {
+        let (mut doc, page, _, _, form) = fixture();
+        let stream = doc.get_object_mut(form).unwrap().as_stream_mut().unwrap();
+        stream.dict.set(
+            "Resources",
+            dictionary! { "XObject" => dictionary! { "Loop" => form } },
+        );
+        stream.set_content(b"/Loop Do".to_vec());
+        assert!(drawn_images(&doc, page)
+            .unwrap_err()
+            .to_string()
+            .contains("Form"));
+        doc.get_dictionary_mut(page).unwrap().set("Parent", page);
+        assert!(drawn_images(&doc, page)
+            .unwrap_err()
+            .to_string()
+            .contains("继承循环"));
+    }
+
+    #[test]
+    fn unsupported_inline_image_is_not_silently_counted_as_complete() {
+        let (mut doc, page, _, _, _) = fixture();
+        let inline = doc.add_object(Stream::new(
+            Dictionary::new(),
+            b"BI /W 1 /H 1 /BPC 8 /CS /G ID x EI ".to_vec(),
+        ));
+        doc.get_dictionary_mut(page)
+            .unwrap()
+            .set("Contents", inline);
+        let err = drawn_images(&doc, page).unwrap_err().to_string();
+        assert!(err.contains("内联图像"), "{err}");
+    }
 }

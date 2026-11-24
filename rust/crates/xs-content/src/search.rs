@@ -236,7 +236,7 @@ impl ContentReader {
         let catalog = self.cached.as_mut().expect("正文库已加载");
         ensure!(
             catalog.scope_token == policy.token,
-            "正文范围或检索功能开关已更改，请重建正文索引"
+            "正文索引版本、范围或检索功能开关已更改，请重建正文索引"
         );
         let mut cached_page = None;
         let vectors = if matches!(mode, SearchMode::Semantic | SearchMode::Hybrid) {
