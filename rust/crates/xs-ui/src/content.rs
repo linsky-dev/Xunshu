@@ -21,6 +21,27 @@ use crate::{desktop, ACCENT, BACKGROUND, BORDER, ERROR, INK, MUTED};
 
 const PAGE_SIZE: usize = 30;
 const MAX_REPLY_BYTES: usize = 8 * 1024 * 1024;
+const VALIDATION_INTERVAL: Duration = Duration::from_millis(500);
+const VALIDATION_TIMEOUT: Duration = Duration::from_secs(2);
+
+struct Validation {
+    id: u64,
+    deadline: Instant,
+    receiver: Receiver<bool>,
+}
+
+impl Validation {
+    fn poll(&self, now: Instant) -> Option<bool> {
+        if now >= self.deadline {
+            return Some(false);
+        }
+        match self.receiver.try_recv() {
+            Ok(valid) => Some(valid),
+            Err(TryRecvError::Disconnected) => Some(false),
+            Err(TryRecvError::Empty) => None,
+        }
+    }
+}
 
 fn sibling(name: &str) -> Result<PathBuf> {
     let path =
@@ -231,7 +252,7 @@ pub struct Pane {
     build: Option<(Arc<AtomicBool>, Receiver<BuildResult>)>,
     watch_status: Option<Receiver<(bool, String)>>,
     next_validation: Option<Instant>,
-    validation: Option<Receiver<(u64, bool)>>,
+    validation: Option<Validation>,
     mode: SearchMode,
     last_mode: SearchMode,
     model_check: Option<Receiver<bool>>,
@@ -269,6 +290,7 @@ impl Pane {
         self.pending = None;
         self.results = None;
         self.validation = None;
+        self.next_validation = None;
     }
 
     pub fn cancel_build(&self) {
@@ -305,6 +327,8 @@ impl Pane {
         }
         self.id = self.id.wrapping_add(1).max(2);
         self.results = None;
+        self.validation = None;
+        self.next_validation = None;
         self.error = None;
         self.selected = 0;
         self.pending = Some(SearchRequest {
@@ -514,16 +538,13 @@ impl Pane {
             }
         }
         if let Some(validation) = &self.validation {
-            match validation.try_recv() {
-                Ok((id, valid)) => {
-                    self.validation = None;
-                    if id == self.id && !valid {
-                        self.results = None;
-                        self.error = Some("正文授权、文件或索引已变化，请重新搜索".into());
-                    }
+            if let Some(valid) = validation.poll(Instant::now()) {
+                let id = validation.id;
+                self.validation = None;
+                if id == self.id && !valid {
+                    self.results = None;
+                    self.error = Some("正文授权、文件或索引复核失败或超时，请重新搜索".into());
                 }
-                Err(TryRecvError::Disconnected) => self.validation = None,
-                Err(TryRecvError::Empty) => {}
             }
         }
         if let Some(response) = self.results.as_ref().filter(|_| {
@@ -537,18 +558,20 @@ impl Pane {
             let ctx = ctx.clone();
             let id = self.id;
             let (tx, rx) = mpsc::channel();
-            self.validation = Some(rx);
-            self.next_validation = Some(Instant::now() + Duration::from_millis(500));
+            let now = Instant::now();
+            self.validation = Some(Validation {
+                id,
+                deadline: now + VALIDATION_TIMEOUT,
+                receiver: rx,
+            });
+            self.next_validation = Some(now + VALIDATION_INTERVAL);
             thread::spawn(move || {
-                let _ = tx.send((
-                    id,
-                    xs_content::validate_response(&profile, &response).is_ok(),
-                ));
+                let _ = tx.send(xs_content::validate_response(&profile, &response).is_ok());
                 ctx.request_repaint();
             });
         }
         if self.results.is_some() {
-            ctx.request_repaint_after(Duration::from_millis(500));
+            ctx.request_repaint_after(VALIDATION_INTERVAL);
         }
     }
 
@@ -889,4 +912,36 @@ fn preview(hit: &ContentHit) -> egui::text::LayoutJob {
     }
     job.append(&hit.snippet[end..], 0.0, normal);
     job
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    #[test]
+    fn preview_validation_fails_closed_on_timeout_or_disconnect() {
+        let now = Instant::now();
+        let (tx, rx) = mpsc::channel();
+        let validation = Validation {
+            id: 7,
+            deadline: now + VALIDATION_TIMEOUT,
+            receiver: rx,
+        };
+        assert_eq!(validation.poll(now), None);
+        assert_eq!(validation.poll(now + VALIDATION_TIMEOUT), Some(false));
+        tx.send(true).unwrap();
+        // Even a late success cannot extend the authorization deadline.
+        assert_eq!(validation.poll(now + VALIDATION_TIMEOUT), Some(false));
+        assert_eq!(validation.poll(now), Some(true));
+        drop(tx);
+        assert_eq!(validation.poll(now), Some(false));
+        let (tx, rx) = mpsc::channel();
+        let denied = Validation {
+            id: 8,
+            deadline: now + VALIDATION_TIMEOUT,
+            receiver: rx,
+        };
+        tx.send(false).unwrap();
+        assert_eq!(denied.poll(now), Some(false));
+    }
 }
