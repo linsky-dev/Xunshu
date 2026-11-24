@@ -479,6 +479,76 @@ mod tests {
         Ok(())
     }
 
+    // Test real kernel write refusal without filling a shared disk or changing
+    // the test runner's process-wide resource limits. EFBIG is not ENOSPC.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn kernel_file_size_limit_preserves_published_snapshot() -> Result<()> {
+        const CHILD_PATH: &str = "XS_TEST_FSIZE_SNAPSHOT_PATH";
+        const CHILD_DELTA: &str = "XS_TEST_FSIZE_SNAPSHOT_DELTA";
+        let cancel = AtomicBool::new(false);
+        let initial = vec![12; BLOCK * 16];
+        if let Some(path) = std::env::var_os(CHILD_PATH) {
+            let path = std::path::PathBuf::from(path);
+            let delta = std::env::var_os(CHILD_DELTA).is_some();
+            let mut updated = initial.clone();
+            updated[BLOCK + 10] = 23;
+            // SAFETY: this branch runs in the isolated test child; the limit
+            // affects only this process. SIG_IGN lets write report EFBIG.
+            unsafe {
+                assert_ne!(libc::signal(libc::SIGXFSZ, libc::SIG_IGN), libc::SIG_ERR);
+                let limit = libc::rlimit {
+                    rlim_cur: 8192,
+                    rlim_max: 8192,
+                };
+                assert_eq!(libc::setrlimit(libc::RLIMIT_FSIZE, &limit), 0);
+            }
+            let error = publish(&path, &updated, 2, delta, &cancel, || Ok(())).unwrap_err();
+            assert!(
+                error.chain().any(|cause| cause
+                    .downcast_ref::<io::Error>()
+                    .is_some_and(|e| e.raw_os_error() == Some(libc::EFBIG))),
+                "{error:#}"
+            );
+            return Ok(());
+        }
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join(super::super::CONTENT_DB);
+        publish(&path, &initial, 1, false, &cancel, || Ok(()))?;
+        let before = OpenSnapshot::open(&path)?.stamp;
+        let file_count = fs::read_dir(dir.path())?.count();
+        for delta in [false, true] {
+            let mut command = std::process::Command::new(std::env::current_exe()?);
+            command
+                .args([
+                    "--exact",
+                    "snapshot::tests::kernel_file_size_limit_preserves_published_snapshot",
+                    "--nocapture",
+                ])
+                .env(CHILD_PATH, &path)
+                .env_remove(CHILD_DELTA);
+            if delta {
+                command.env(CHILD_DELTA, "1");
+            }
+            let result = command.output()?;
+            assert!(
+                result.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&result.stdout),
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert!(String::from_utf8_lossy(&result.stdout).contains("1 passed"));
+            before.verify(&path)?;
+            assert_eq!(read(&path)?, initial);
+            assert_eq!(fs::read_dir(dir.path())?.count(), file_count);
+        }
+        let mut updated = initial;
+        updated[BLOCK + 10] = 23;
+        publish(&path, &updated, 2, true, &cancel, || Ok(()))?;
+        assert_eq!(read(&path)?, updated);
+        Ok(())
+    }
+
     #[test]
     fn interrupted_compaction_preserves_current_snapshot() -> Result<()> {
         let dir = tempfile::tempdir()?;
