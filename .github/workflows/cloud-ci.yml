@@ -100,29 +100,30 @@ jobs:
           cargo test --workspace --locked --offline --no-fail-fast 2>&1 | Tee-Object -FilePath (Join-Path $ev 'tests.log')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native release build
+        id: release_build
         run: cargo build --workspace --release --locked --offline
       - name: Linux direct ELF ABI inventory
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/xunshu-evidence"
           python scripts/audit-linux-abi.py target/release/xunshu target/release/xs-ui target/release/xs-install target/release/xs-content-worker target/release/xs-model-worker | tee "$RUNNER_TEMP/xunshu-evidence/linux-abi.json"
       - name: Native installer negative contracts (Linux)
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/xunshu-evidence"
           python scripts/verify-install-negative.py --installer target/release/xs-install --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
       - name: Native installer negative contracts (Windows)
-        if: runner.os == 'Windows'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Windows'"
         shell: pwsh
         run: |
           python scripts/verify-install-negative.py --installer target/release/xs-install.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Linux isolated ENOSPC installer fault (opt-in)
-        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && inputs.fault_validation
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && inputs.fault_validation"
         shell: bash
         run: |
           set -euo pipefail
@@ -130,52 +131,54 @@ jobs:
           trap 'rmdir "$d"' EXIT
           unshare -Ur -m bash -c 'set -eu; mount --make-rprivate /; mount -t tmpfs -o size=1m,mode=0700 tmpfs "$1"; python scripts/verify-install-enospc.py --installer target/release/xs-install --empty-mount "$1" --payload-temp-root "$RUNNER_TEMP"' _ "$d" | tee "$RUNNER_TEMP/xunshu-evidence/installer-enospc.json"
       - name: Linux recovery contracts
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           python scripts/verify-recovery.py --bin-dir target/release --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/recovery.json"
       - name: Windows recovery contracts
-        if: runner.os == 'Windows'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Windows'"
         shell: pwsh
         run: |
           python scripts/verify-recovery.py --bin-dir target/release --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/recovery.json"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native filename watcher restart and revocation (Linux)
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           python scripts/verify-watch-restart.py --cli target/release/xunshu --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/watch-restart.json"
       - name: Native filename watcher restart and revocation (Windows)
-        if: runner.os == 'Windows'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Windows'"
         shell: pwsh
         run: |
           python scripts/verify-watch-restart.py --cli target/release/xunshu.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/watch-restart.json"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Linux native window smoke
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           xvfb-run -a timeout 60s target/release/xs-ui --smoke-test --data-dir "$RUNNER_TEMP/xunshu-ui-smoke" 2>&1 | tee "$RUNNER_TEMP/xunshu-evidence/ui-smoke.log"
           grep -F 'XS_UI_SMOKE_OK' "$RUNNER_TEMP/xunshu-evidence/ui-smoke.log"
       - name: Real model conversion dependencies (opt-in)
-        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        id: model_dependencies
+        if: "!cancelled() && steps.release_build.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.model_validation"
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
           python -m pip install transformers==4.51.3 onnx==1.17.0 onnxruntime==1.20.1 PyYAML==6.0.2 Pillow==11.3.0
       - name: Offline model and packaging integrity contracts (opt-in)
-        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        id: model_integrity
+        if: "!cancelled() && steps.model_dependencies.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.model_validation"
         shell: bash
         run: |
           set -euo pipefail
           python scripts/test-prepare-models.py
           python scripts/test-make-install-payload.py
       - name: Model, OCR and installation acceptance (opt-in)
-        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        if: "!cancelled() && steps.model_integrity.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.model_validation"
         shell: bash
         run: |
           set -euo pipefail
