@@ -42,9 +42,18 @@ def evaluate(report):
             errors.append(f"Incorrect or incomplete result: {query}")
         if type(row.get("verified_samples")) is not int or row["verified_samples"] != read.get("iterations"):
             errors.append(f"Missing per-iteration verification: {query}")
+        if type(row.get("oracle_verified_samples")) is not int or row["oracle_verified_samples"] != read.get("iterations"):
+            errors.append(f"Missing independent ranked truth verification: {query}")
+        samples = row.get("samples_ms")
+        if (not isinstance(samples, list) or len(samples) != read.get("iterations") or not samples
+                or any(type(x) not in (int, float) or not math.isfinite(x) or x < 0 for x in samples)):
+            errors.append(f"Invalid raw latency samples: {query}")
+            continue
+        ordered = sorted(samples)
         values = [row.get(key) for key in ("p50_ms", "p95_ms", "p99_ms")]
-        if any(type(x) not in (int, float) or not math.isfinite(x) or x < 0 for x in values) or values != sorted(values):
-            errors.append(f"Invalid percentile evidence: {query}")
+        actual = [ordered[math.ceil(len(ordered) * q) - 1] for q in (0.5, 0.95, 0.99)]
+        if any(type(x) not in (int, float) or not math.isfinite(x) or x < 0 for x in values) or values != actual:
+            errors.append(f"Percentiles do not match raw latency samples: {query}")
             continue
         if values[1] > 50:
             targets.append({"query": query, "p95_ms": values[1], "target_ms": 50})

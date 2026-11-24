@@ -195,6 +195,8 @@ enum Command {
         snapshot: PathBuf,
         #[arg(long, default_value_t = 20)]
         iterations: usize,
+        #[arg(long)]
+        synthetic_entries: Option<usize>,
     },
 }
 fn absolute(path: PathBuf) -> Result<PathBuf> {
@@ -573,7 +575,8 @@ fn run() -> Result<()> {
         Command::BenchmarkRead {
             snapshot,
             iterations,
-        } => benchmark_read(&snapshot, iterations)?,
+            synthetic_entries,
+        } => benchmark_read(&snapshot, iterations, synthetic_entries)?,
     };
     print_json(&value)
 }
@@ -688,7 +691,13 @@ fn benchmark(dir: &Path, entries: usize, iterations: usize) -> Result<Value> {
     let size = fs::metadata(&snapshot)?.len();
     let build_memory = memory();
     let output = std::process::Command::new(std::env::current_exe()?)
-        .args(["benchmark-read", "--iterations", &iterations.to_string()])
+        .args([
+            "benchmark-read",
+            "--iterations",
+            &iterations.to_string(),
+            "--synthetic-entries",
+            &entries.to_string(),
+        ])
         .arg(&snapshot)
         .output()?;
     ensure!(
@@ -743,7 +752,80 @@ fn verify_benchmark_sample(
     Ok(())
 }
 
-fn benchmark_read(snapshot: &Path, iterations: usize) -> Result<Value> {
+// Independent truth for the built-in dataset: arithmetic progression of IDs,
+// not the search evaluator or inverted index. Rank scores are derived from the
+// fixed query/name forms and four path separators. Only the requested page is
+// materialized, so verification does not scan millions of records per sample.
+fn synthetic_truth(query: &str, entries: usize) -> Result<(usize, Vec<(u32, i64)>)> {
+    ensure!(
+        (1..=10_000_000).contains(&entries),
+        "invalid synthetic truth size"
+    );
+    let limit = SearchOptions::default().limit;
+    let mut hits = Vec::new();
+    let mut total = 0;
+    let mut add = |first: usize, step: usize, score: i64| {
+        let count = if first < entries {
+            (entries - 1 - first) / step + 1
+        } else {
+            0
+        };
+        total += count;
+        hits.extend((0..count.min(limit)).map(|n| ((first + n * step) as u32, score)));
+    };
+    match query {
+        "never_present_xyz" | "预算决算不存在" | "name:report ext:pdf" => {}
+        "0001234" => add(1234, entries, 1132),
+        "干部" => add(0, 5, 1546),
+        "project_budget_final_0000121" => add(121, entries, 1846),
+        "readme ext:rs" => add(3, 5, 1546),
+        "budget | meeting" => {
+            add(4, 5, 1546);
+            add(1, 5, 1138);
+        }
+        _ => anyhow::bail!("unknown synthetic truth query"),
+    }
+    hits.sort_unstable_by_key(|&(id, score)| (std::cmp::Reverse(score), id));
+    hits.truncate(limit);
+    Ok((total, hits))
+}
+
+fn verify_synthetic_truth(
+    response: &xs_core::SearchResponse,
+    entries: usize,
+    truth: &(usize, Vec<(u32, i64)>),
+) -> Result<()> {
+    ensure!(
+        response.index_entries == entries
+            && response.total == truth.0
+            && response.results.len() == truth.1.len(),
+        "synthetic truth count mismatch"
+    );
+    for (hit, &(id, score)) in response.results.iter().zip(&truth.1) {
+        let i = id as usize;
+        let name = match i % 5 {
+            0 => format!("干部任免报告_{i:07}.docx"),
+            1 => format!("project_budget_final_{i:07}.pdf"),
+            2 => format!("photo_archive_{i:07}.jpg"),
+            3 => format!("readme_source_{i:07}.rs"),
+            _ => format!("meeting_notes_{i:07}.txt"),
+        };
+        let path = format!(
+            "/synthetic/department_{:03}/year_{}/{}",
+            (i / 1000) % 1000,
+            2020 + i % 7,
+            name
+        );
+        ensure!(hit.id == id && hit.score == score && hit.name == name && hit.path == path && hit.source == "offline:benchmark" && !hit.is_dir && hit.size == (i as u64 * 7919) % 10_000_000 && hit.modified == 1700000000 + (i % 86400) as i64, "synthetic ranked result mismatch at ID {id}: actual {} score {} expected score {score}", hit.id, hit.score);
+    }
+    Ok(())
+}
+
+fn benchmark_read(
+    snapshot: &Path,
+    iterations: usize,
+    synthetic_entries: Option<usize>,
+) -> Result<Value> {
     ensure!((1..=100).contains(&iterations), "iterations must be 1..100");
     let before = memory();
     let start = Instant::now();
@@ -779,6 +861,9 @@ fn benchmark_read(snapshot: &Path, iterations: usize) -> Result<Value> {
         }
         preview_times.sort_by(f64::total_cmp);
         first_screen.push(json!({"query":query,"p50_ms":percentile(&preview_times,0.5),"p95_ms":percentile(&preview_times,0.95),"p99_ms":percentile(&preview_times,0.99),"partial_samples":partial_samples}));
+        let truth = synthetic_entries
+            .map(|entries| synthetic_truth(query, entries))
+            .transpose()?;
         let mut times = Vec::new();
         let mut summary = None;
         for _ in 0..iterations {
@@ -791,12 +876,16 @@ fn benchmark_read(snapshot: &Path, iterations: usize) -> Result<Value> {
                 None,
             )?;
             verify_benchmark_sample(&response, summary.as_ref())?;
+            if let (Some(entries), Some(truth)) = (synthetic_entries, &truth) {
+                verify_synthetic_truth(&response, entries, truth)?;
+            }
             times.push(response.elapsed_ms);
             summary = Some(response);
         }
+        let samples = times.clone();
         times.sort_by(f64::total_cmp);
         let s = summary.unwrap();
-        rows.push(json!({"query":query,"p50_ms":percentile(&times,0.5),"p95_ms":percentile(&times,0.95),"p99_ms":percentile(&times,0.99),"verified_samples":iterations,"total":s.total,"candidates":s.candidate_count,"examined":s.examined,"complete":s.complete}));
+        rows.push(json!({"query":query,"p50_ms":percentile(&times,0.5),"p95_ms":percentile(&times,0.95),"p99_ms":percentile(&times,0.99),"verified_samples":iterations,"oracle_verified_samples":if truth.is_some() { iterations } else { 0 },"samples_ms":samples,"total":s.total,"candidates":s.candidate_count,"examined":s.examined,"complete":s.complete}));
     }
     Ok(
         json!({"mapped":index.is_mapped(),"load_ms":load_ms,"load_note":"separate fresh process; OS page cache not forcibly evicted; includes CRC and structural validation","iterations":iterations,"baseline_memory":before,"after_load_memory":after_load,"after_queries_memory":memory(),"queries":rows,"first_screen_core_queries":first_screen,"first_screen_note":"core only; excludes input, IPC and presentation"}),
@@ -808,6 +897,48 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use xs_core::CatalogMetadata;
+
+    #[test]
+    fn synthetic_truth_rejects_stable_wrong_rank_and_metadata() {
+        let truth = synthetic_truth("budget | meeting", 5).unwrap();
+        assert_eq!(truth, (2, vec![(4, 1546), (1, 1138)]));
+        let mut builder = IndexBuilder::default();
+        for (i, name) in [
+            "干部任免报告_0000000.docx",
+            "project_budget_final_0000001.pdf",
+            "photo_archive_0000002.jpg",
+            "readme_source_0000003.rs",
+            "meeting_notes_0000004.txt",
+        ]
+        .iter()
+        .enumerate()
+        {
+            builder
+                .add(FileRecord {
+                    path: format!("/synthetic/department_000/year_{}/{}", 2020 + i % 7, name),
+                    size: (i as u64 * 7919) % 10_000_000,
+                    modified: 1700000000 + (i % 86400) as i64,
+                    is_dir: false,
+                    source: "offline:benchmark".into(),
+                })
+                .unwrap();
+        }
+        let index = builder.finish(1).unwrap();
+        let response = index
+            .search("budget | meeting", &SearchOptions::default(), None)
+            .unwrap();
+        verify_synthetic_truth(&response, 5, &truth).unwrap();
+        let mut wrong = response.clone();
+        wrong.results.swap(0, 1);
+        assert!(verify_benchmark_sample(&wrong, Some(&wrong)).is_ok());
+        assert!(verify_synthetic_truth(&wrong, 5, &truth).is_err());
+        let mut wrong = response.clone();
+        wrong.results[0].size += 1;
+        assert!(verify_synthetic_truth(&wrong, 5, &truth).is_err());
+        let mut wrong = response;
+        wrong.results[0].score += 1;
+        assert!(verify_synthetic_truth(&wrong, 5, &truth).is_err());
+    }
 
     #[test]
     fn benchmark_sample_rejects_partial_or_unstable_rankings() {
