@@ -165,7 +165,12 @@ pub(crate) fn extract(
             xlsx_workbook(book, &mut result)?;
         }
         "ods" => {
-            check_archive(bytes)?;
+            {
+                let mut archive = check_archive(bytes)?;
+                let mut budget = MAX_EXPANDED;
+                let content = member(&mut archive, "content.xml", &mut budget)?;
+                validate_ods_budget(&content)?;
+            }
             let book: Ods<_> = open_workbook_from_rs(Cursor::new(bytes))?;
             workbook(book, &mut result)?;
         }
@@ -902,6 +907,194 @@ fn append_formula(text: &mut String, formula: &str, limit: usize) -> Result<()> 
     Ok(())
 }
 
+// Calamine materializes ODS ranges and expands repeated text before our
+// segment budget is applied. Validate the XML and bound amplification first.
+// Trailing repeated blank rows/cells remain cheap, as in ordinary LibreOffice
+// files. Huge sparse rectangles are explicitly rejected, not partially indexed.
+fn validate_ods_budget(bytes: &[u8]) -> Result<()> {
+    const MAX_SLOTS: u64 = 1_000_000;
+    const MAX_ROWS: u64 = 1_048_576;
+    const MAX_COLS: u64 = 16_384;
+    #[derive(Default)]
+    struct Table {
+        rows: u64,
+        bounds: Option<(u64, u64, u64, u64)>,
+    }
+    struct Row {
+        repeat: u64,
+        cols: u64,
+        used: u64,
+    }
+    struct Cell {
+        repeat: u64,
+        start: u64,
+        spaces: u64,
+        occupied: bool,
+    }
+    fn repeat(
+        tag: &quick_xml::events::BytesStart<'_>,
+        key: &[u8],
+        decoder: quick_xml::encoding::Decoder,
+        max: u64,
+    ) -> Result<u64> {
+        let mut count = 1;
+        for attr in tag.attributes() {
+            let attr = attr?;
+            if attr.key.as_ref() == key {
+                count = attr
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
+                    .parse::<u64>()
+                    .context("非法 ODS 重复计数")?;
+            }
+        }
+        ensure!((1..=max).contains(&count), "ODS 重复计数超出预算");
+        Ok(count)
+    }
+    let mut reader = Reader::from_reader(bytes);
+    reader.config_mut().expand_empty_elements = true;
+    let mut depth = 0usize;
+    let mut table: Option<Table> = None;
+    let mut row: Option<Row> = None;
+    let mut cell: Option<Cell> = None;
+    let mut sheets = 0usize;
+    let mut slots = 0u64;
+    let mut expanded = 0u64;
+    let mut spaces = 0u64;
+    loop {
+        let start = reader.buffer_position();
+        match reader.read_event()? {
+            Event::Start(tag) => {
+                depth += 1;
+                ensure!(depth <= 128, "ODS XML 嵌套过深");
+                match tag.name().as_ref() {
+                    b"table:table" => {
+                        ensure!(table.is_none(), "不支持嵌套 ODS 工作表");
+                        sheets += 1;
+                        ensure!(sheets <= MAX_SEGMENTS, "ODS 工作表数量超出预算");
+                        table = Some(Table::default());
+                    }
+                    b"table:table-row" if table.is_some() => {
+                        ensure!(row.is_none(), "ODS 行嵌套无效");
+                        row = Some(Row {
+                            repeat: repeat(
+                                &tag,
+                                b"table:number-rows-repeated",
+                                reader.decoder(),
+                                MAX_ROWS,
+                            )?,
+                            cols: 0,
+                            used: 0,
+                        });
+                    }
+                    b"table:table-cell" | b"table:covered-table-cell" if row.is_some() => {
+                        ensure!(cell.is_none(), "ODS 单元格嵌套无效");
+                        let mut occupied = false;
+                        for attr in tag.attributes() {
+                            let attr = attr?;
+                            occupied |= matches!(
+                                attr.key.as_ref(),
+                                b"table:formula"
+                                    | b"office:value"
+                                    | b"office:string-value"
+                                    | b"office:date-value"
+                                    | b"office:time-value"
+                                    | b"office:boolean-value"
+                                    | b"office:value-type"
+                                    | b"calcext:value-type"
+                            );
+                        }
+                        cell = Some(Cell {
+                            repeat: repeat(
+                                &tag,
+                                b"table:number-columns-repeated",
+                                reader.decoder(),
+                                MAX_COLS,
+                            )?,
+                            start,
+                            spaces: 0,
+                            occupied,
+                        });
+                    }
+                    b"text:s" => {
+                        let count = repeat(&tag, b"text:c", reader.decoder(), MAX_TEXT as u64)?;
+                        spaces += count;
+                        ensure!(spaces <= MAX_TEXT as u64, "ODS 空格计数超出预算");
+                        if let Some(cell) = &mut cell {
+                            cell.spaces += count;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Event::End(tag) => {
+                depth = depth.checked_sub(1).context("ODS XML 结束标签无效")?;
+                match tag.name().as_ref() {
+                    b"table:table-cell" | b"table:covered-table-cell" if row.is_some() => {
+                        let cell = cell.take().context("ODS 单元格未开始")?;
+                        let row = row.as_mut().context("ODS 行未开始")?;
+                        let first = row.cols;
+                        row.cols += cell.repeat;
+                        ensure!(row.cols <= MAX_COLS, "ODS 列坐标超出范围");
+                        if cell.occupied {
+                            row.used = row.cols;
+                            let table = table.as_mut().context("ODS 工作表未开始")?;
+                            let last_row = table.rows + row.repeat - 1;
+                            let last_col = row.cols - 1;
+                            table.bounds = Some(match table.bounds {
+                                Some((r0, r1, c0, c1)) => (
+                                    r0.min(table.rows),
+                                    r1.max(last_row),
+                                    c0.min(first),
+                                    c1.max(last_col),
+                                ),
+                                None => (table.rows, last_row, first, last_col),
+                            });
+                            let encoded = reader
+                                .buffer_position()
+                                .checked_sub(cell.start)
+                                .context("ODS XML 位置无效")?;
+                            let cost = (encoded + cell.spaces)
+                                .checked_mul(cell.repeat)
+                                .and_then(|v| v.checked_mul(row.repeat))
+                                .context("ODS 内容展开预算溢出")?;
+                            expanded =
+                                expanded.checked_add(cost).context("ODS 内容展开预算溢出")?;
+                            ensure!(expanded <= MAX_EXPANDED, "ODS 内容展开超出预算");
+                        }
+                    }
+                    b"table:table-row" if table.is_some() => {
+                        let row = row.take().context("ODS 行未开始")?;
+                        let table = table.as_mut().context("ODS 工作表未开始")?;
+                        table.rows += row.repeat;
+                        ensure!(table.rows <= MAX_ROWS, "ODS 行坐标超出范围");
+                        // The decoder also creates intermediate column vectors.
+                        slots += row.used;
+                        ensure!(slots <= MAX_SLOTS, "ODS 单元格展开超出预算");
+                    }
+                    b"table:table" => {
+                        let table = table.take().context("ODS 工作表未开始")?;
+                        if let Some((r0, r1, c0, c1)) = table.bounds {
+                            slots += (r1 - r0 + 1) * (c1 - c0 + 1);
+                            ensure!(slots <= MAX_SLOTS, "ODS 单元格展开超出预算");
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Event::DocType(_) => bail!("ODS XML 禁止文档类型和自定义实体"),
+            Event::Eof => {
+                ensure!(
+                    depth == 0 && table.is_none() && row.is_none() && cell.is_none(),
+                    "ODS XML 未完整结束"
+                );
+                break;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 fn workbook<R: Read + std::io::Seek>(
     mut book: impl WorkbookReader<R, Error: std::error::Error + Send + Sync + 'static>,
     result: &mut Segments,
@@ -949,6 +1142,104 @@ fn a1(row: u32, col: u32) -> String {
     }
     let label: String = letters.into_iter().rev().collect();
     format!("{label}{}", u64::from(row) + 1)
+}
+
+#[cfg(test)]
+mod ods_budget_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn document(rows: &str) -> String {
+        format!(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="台账">{rows}</table:table></office:spreadsheet></office:body></office:document-content>"#
+        )
+    }
+
+    fn ods_bytes(rows: &str) -> Result<Vec<u8>> {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, text) in [
+            ("mimetype", "application/vnd.oasis.opendocument.spreadsheet"),
+            ("content.xml", &document(rows)),
+            (
+                "META-INF/manifest.xml",
+                r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
+            ),
+        ] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())?;
+            zip.write_all(text.as_bytes())?;
+        }
+        Ok(zip.finish()?.into_inner())
+    }
+
+    fn extract_rows(rows: &str) -> Result<Vec<Segment>> {
+        extract("ods", &ods_bytes(rows)?, false, &mut None)
+    }
+
+    #[test]
+    fn old_decoder_silently_caps_out_of_range_rows() {
+        let rows = r#"<table:table-row table:number-rows-repeated="1048577"/>"#;
+        let bytes = ods_bytes(rows).unwrap();
+        let old: Ods<_> = open_workbook_from_rs(Cursor::new(bytes)).unwrap();
+        assert_eq!(old.sheet_names(), ["台账"]);
+        assert!(extract_rows(rows)
+            .unwrap_err()
+            .to_string()
+            .contains("重复计数超出预算"));
+    }
+
+    #[test]
+    fn ordinary_values_and_trailing_empty_repeats_remain_searchable() {
+        let segments = extract_rows(r#"<table:table-row><table:table-cell office:value-type="string"><text:p>干部<text:s text:c="2"/>台账</text:p></table:table-cell><table:table-cell table:number-columns-repeated="16383"/></table:table-row><table:table-row table:number-rows-repeated="1048575"><table:table-cell table:number-columns-repeated="16384"/></table:table-row>"#).unwrap();
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].text, "干部  台账");
+        assert_eq!(
+            segments[0].location,
+            Location::Cell {
+                sheet: "台账".into(),
+                address: "A1".into()
+            }
+        );
+    }
+
+    #[test]
+    fn dense_sparse_rectangle_is_rejected_before_calamine() {
+        let error = extract_rows(r#"<table:table-row><table:table-cell office:value="1"/></table:table-row><table:table-row table:number-rows-repeated="100000"/><table:table-row><table:table-cell table:number-columns-repeated="1000"/><table:table-cell office:value="2"/></table:table-row>"#).unwrap_err().to_string();
+        assert!(error.contains("单元格展开超出预算"), "{error}");
+    }
+
+    #[test]
+    fn repeat_overflow_and_zero_are_not_silently_capped() {
+        for rows in [
+            r#"<table:table-row table:number-rows-repeated="1048577"/>"#,
+            r#"<table:table-row table:number-rows-repeated="0"/>"#,
+            r#"<table:table-row><table:table-cell table:number-columns-repeated="16384"/><table:table-cell office:value="2"/></table:table-row>"#,
+            r#"<table:table-row table:number-rows-repeated="1048576"/><table:table-row/>"#,
+            r#"<table:table-row><table:table-cell office:value-type="string"><text:p><text:s text:c="999999999999"/></text:p></table:table-cell></table:table-row>"#,
+        ] {
+            assert!(extract_rows(rows).is_err(), "{rows}");
+        }
+    }
+
+    #[test]
+    fn malformed_or_dtd_xml_fails_before_library_parser() {
+        for xml in [
+            "<table:table><table:table-row>",
+            "<table:table></wrong>",
+            "<!DOCTYPE foo><foo/>",
+        ] {
+            assert!(validate_ods_budget(xml.as_bytes()).is_err(), "{xml}");
+        }
+    }
+
+    #[test]
+    fn repeated_string_payload_is_bounded_even_with_small_cell_count() {
+        let text = "x".repeat(100_000);
+        let rows = format!(
+            r#"<table:table-row table:number-rows-repeated="1000"><table:table-cell office:value-type="string"><text:p>{text}</text:p></table:table-cell></table:table-row>"#
+        );
+        let error = extract_rows(&rows).unwrap_err().to_string();
+        assert!(error.contains("内容展开超出预算"), "{error}");
+    }
 }
 
 #[cfg(test)]

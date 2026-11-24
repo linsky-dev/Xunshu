@@ -207,37 +207,14 @@ fn content_index_token(settings: &Settings) -> Result<String> {
     hash.update(scope.as_bytes());
     // The previous XLSX extractor could omit out-of-order shared formulas.
     hash.update(b"\0xlsx-sparse-v2");
+    // Previous ODS snapshots may have accepted silently capped repeat counts.
+    hash.update(b"\0ods-budget-v1");
     // Older OCR snapshots may have silently missed inherited/form images.
     // Retain the OCR-specific semantic version in addition to the common one.
     if settings.ocr_enabled {
         hash.update(b"\0pdf-drawn-images-v2");
     }
     Ok(format!("{:x}", hash.finalize()))
-}
-
-#[cfg(test)]
-mod index_token_tests {
-    use super::*;
-
-    #[test]
-    fn upgrade_requires_old_content_rebuild_without_changing_scope() {
-        for ocr_enabled in [false, true] {
-            let settings = Settings {
-                content_enabled: true,
-                ocr_enabled,
-                ..Settings::default()
-            };
-            let mut old = Sha256::new();
-            old.update(settings.content_scope_token().unwrap().as_bytes());
-            if ocr_enabled {
-                old.update(b"\0pdf-drawn-images-v2");
-            }
-            let old = format!("{:x}", old.finalize());
-            let new = content_index_token(&settings).unwrap();
-            assert_ne!(old, new);
-            assert_eq!(new, content_index_token(&settings).unwrap());
-        }
-    }
 }
 
 impl Policy {
@@ -1217,5 +1194,37 @@ mod readability_tests {
             ));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod index_token_tests {
+    use super::*;
+
+    #[test]
+    fn upgrade_requires_old_content_rebuild_without_changing_scope() {
+        for ocr_enabled in [false, true] {
+            let settings = Settings {
+                content_enabled: true,
+                ocr_enabled,
+                ..Settings::default()
+            };
+            let mut old = Sha256::new();
+            old.update(settings.content_scope_token().unwrap().as_bytes());
+            if ocr_enabled {
+                old.update(b"\0pdf-drawn-images-v2");
+            }
+            let old = format!("{:x}", old.finalize());
+            let mut round14 = Sha256::new();
+            round14.update(settings.content_scope_token().unwrap().as_bytes());
+            round14.update(b"\0xlsx-sparse-v2");
+            if ocr_enabled {
+                round14.update(b"\0pdf-drawn-images-v2");
+            }
+            let new = content_index_token(&settings).unwrap();
+            assert_ne!(format!("{:x}", round14.finalize()), new);
+            assert_ne!(old, new);
+            assert_eq!(new, content_index_token(&settings).unwrap());
+        }
     }
 }
