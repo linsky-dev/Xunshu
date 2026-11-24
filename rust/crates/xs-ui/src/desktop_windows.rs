@@ -1077,34 +1077,6 @@ pub fn drag_local_file(window: HWND, path: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
-
-    #[test]
-    fn login_arguments_quote_spaces_quotes_and_trailing_slashes() {
-        let mut output = Vec::new();
-        quote_arg(&mut output, OsStr::new("D:\\含 空格\\"));
-        assert_eq!(OsString::from_wide(&output), "\"D:\\含 空格\\\\\"");
-        output.clear();
-        quote_arg(&mut output, OsStr::new("a\"b"));
-        assert_eq!(OsString::from_wide(&output), "\"a\\\"b\"");
-    }
-
-    #[test]
-    fn single_instance_key_normalizes_windows_path_spelling() {
-        assert_eq!(
-            profile_id(Path::new("D:\\Xunshu\\")),
-            profile_id(Path::new("d:/xunshu"))
-        );
-        assert_ne!(
-            profile_id(Path::new("D:\\Xunshu")),
-            profile_id(Path::new("D:\\other"))
-        );
-    }
-}
-
 /// 检测当前前台窗口是否为全屏游戏或全屏演示，避免双 Ctrl 误触打断用户。
 fn is_foreground_fullscreen() -> bool {
     unsafe {
@@ -1203,5 +1175,33 @@ pub(crate) fn jump_active_file_dialog(target_dir: &Path) -> Result<bool> {
         SendMessageW(edit, WM_SETTEXT, 0, path_w.as_ptr() as LPARAM);
         PostMessageW(edit, WM_KEYDOWN, VK_RETURN as WPARAM, 0);
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+
+    #[test]
+    fn login_arguments_quote_spaces_quotes_and_trailing_slashes() {
+        let mut output = Vec::new();
+        quote_arg(&mut output, OsStr::new("D:\\含 空格\\"));
+        assert_eq!(OsString::from_wide(&output), "\"D:\\含 空格\\\\\"");
+        output.clear();
+        quote_arg(&mut output, OsStr::new("a\"b"));
+        assert_eq!(OsString::from_wide(&output), "\"a\\\"b\"");
+    }
+
+    #[test]
+    fn single_instance_key_normalizes_windows_path_spelling() {
+        assert_eq!(
+            profile_id(Path::new("D:\\Xunshu\\")),
+            profile_id(Path::new("d:/xunshu"))
+        );
+        assert_ne!(
+            profile_id(Path::new("D:\\Xunshu")),
+            profile_id(Path::new("D:\\other"))
+        );
     }
 }
