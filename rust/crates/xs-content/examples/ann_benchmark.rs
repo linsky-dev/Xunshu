@@ -1,7 +1,7 @@
 //! Deterministic vector-only A/B benchmark. No model inference or user documents.
 use anyhow::{ensure, Result};
 use std::{collections::BinaryHeap, sync::atomic::AtomicBool, time::Instant};
-use xs_content::experimental_ann::{Hit, QuantizedIndex, DIM, MAX_VECTORS};
+use xs_content::experimental_ann::{ExactPruner, Hit, QuantizedIndex, DIM, MAX_VECTORS};
 
 fn random(state: &mut u64) -> f32 {
     *state ^= *state << 13;
@@ -63,6 +63,11 @@ fn run(count: usize, clustered: bool) -> Result<serde_json::Value> {
     let started = Instant::now();
     let index = QuantizedIndex::build(&data, &cancel)?;
     let build_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let started = Instant::now();
+    let pruner = ExactPruner::build(&index, &cancel)?;
+    let pruner_build_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let mut pruned_times = Vec::new();
+    let mut scored_counts = Vec::new();
     let mut exact_times = Vec::new();
     let mut approx_times = [Vec::new(), Vec::new(), Vec::new()];
     let mut recalls = [Vec::new(), Vec::new(), Vec::new()];
@@ -81,6 +86,18 @@ fn run(count: usize, clustered: bool) -> Result<serde_json::Value> {
         let started = Instant::now();
         let truth = exact(&data, &query, k);
         exact_times.push(started.elapsed().as_secs_f64() * 1000.0);
+        let started = Instant::now();
+        let result = pruner.search(&query, k, &cancel)?;
+        pruned_times.push(started.elapsed().as_secs_f64() * 1000.0);
+        ensure!(
+            result.hits == truth,
+            "exact pruning disagrees with full scan"
+        );
+        ensure!(
+            result.scored + result.pruned == count,
+            "incomplete pruning accounting"
+        );
+        scored_counts.push(result.scored);
         for (i, budget) in budgets.into_iter().enumerate() {
             let started = Instant::now();
             let result = index.search(&query, k, budget, &cancel)?;
@@ -113,7 +130,9 @@ fn run(count: usize, clustered: bool) -> Result<serde_json::Value> {
         serde_json::json!({"dataset":if clustered {"synthetic_clustered"} else {"synthetic_uniform"},
         "vectors":count,"dimension":DIM,"queries":32,"build_ms":build_ms,
         "code_bytes":index.allocated_bytes(),"original_bytes":data.len()*DIM*4,
-        "exact_p95_ms":p95(&mut exact_times),"variants":variants}),
+        "exact_p95_ms":p95(&mut exact_times),"exact_pruning_p95_ms":p95(&mut pruned_times),
+        "exact_pruning_verified_queries":scored_counts.len(),"exact_pruning_scored_counts":scored_counts,
+        "exact_pruning_build_ms":pruner_build_ms,"exact_pruning_extra_bytes":pruner.allocated_bytes(),"variants":variants}),
     )
 }
 

@@ -225,3 +225,6 @@ mod tests {
         assert!(QuantizedIndex::build(&[tiny], &cancel).is_ok());
     }
 }
+
+mod exact;
+pub use exact::{ExactPruner, ExactSearch};
