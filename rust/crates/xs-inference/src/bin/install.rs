@@ -454,12 +454,40 @@ fn prepare_probe(root: &Path, version: &Version) -> Result<PathBuf> {
     let probe = root.join("self-test-data").join(&version.directory);
     xs_platform::create_local_dir_all(&root.join("self-test-data"))?;
     xs_platform::create_local_dir_new(&probe)?;
-    xs_platform::atomic_write_local(
-        &probe.join(PROBE_OWNER),
-        version.manifest_sha256.as_bytes(),
-        false,
-    )?;
+    ensure!(
+        xs_platform::atomic_write_local(
+            &probe.join(PROBE_OWNER),
+            version.manifest_sha256.as_bytes(),
+            false,
+        )?
+        .is_durable(),
+        "自检目录归属持久化未确认"
+    );
     Ok(probe)
+}
+
+// Rollback must exercise a clean profile, not an old settings/index directory.
+// A separate random sibling also avoids touching legacy unowned probe data.
+fn prepare_rollback_probe(root: &Path, version: &Version) -> Result<(Version, PathBuf)> {
+    let mut nonce = [0_u8; 16];
+    getrandom::fill(&mut nonce).map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let probe_version = Version {
+        directory: format!("release-rollback-{}", hex(&nonce)),
+        manifest_sha256: version.manifest_sha256.clone(),
+    };
+    let path = prepare_probe(root, &probe_version)?;
+    Ok((probe_version, path))
+}
+
+fn rollback_self_test(root: &Path, directory: &Path, version: &Version) -> Result<()> {
+    let (probe_version, probe) = prepare_rollback_probe(root, version)?;
+    let result = self_test(directory, &probe);
+    // Only the freshly created, owner-marked probe is eligible for cleanup.
+    // A process killed before cleanup can leave a probe for manual inspection.
+    if let Err(error) = clean_probe(root, &probe_version) {
+        eprintln!("回退自检目录保留待人工确认 {}：{error:#}", probe.display());
+    }
+    result
 }
 
 /// 版本目录只能删除清单拥有的文件，目录必须确认为空后才移除。
@@ -490,6 +518,9 @@ fn remove_empty_release_dirs(directory: &Path, names: impl Iterator<Item = Strin
 /// 在指针持久化后清理既非当前也非回退的版本。
 /// 个别文件被占用时保留记录并报告，而不是误报清理成功或阻断已完成安装。
 fn cleanup_old_versions(root: &Path, state: &mut State) -> Result<usize> {
+    // Older states may omit active/previous from retained, even when cleanup
+    // is invoked directly rather than via install. Preserve them first.
+    retain_pointer_versions(state);
     // Ensure the current pointer is durable before any destructive operation.
     save_state(root, state)?;
     let mut keep = Vec::new();
@@ -511,11 +542,13 @@ fn cleanup_old_versions(root: &Path, state: &mut State) -> Result<usize> {
             Ok(()) => {
                 deleted += 1;
                 if let Err(error) = clean_probe(root, version) {
-                    // 旧版自检数据没有归属标识，不能自动删除，但不应阻塞继续升级。
+                    // Keep a retryable identity even if the release itself is gone.
+                    // An unknown probe must not be silently orphaned or deleted.
                     eprintln!(
                         "历史自检数据未清理，请人工核验 {}：{error:#}",
                         version.directory
                     );
+                    keep.push(version.clone());
                 }
             }
             Err(error) => {
@@ -742,10 +775,7 @@ fn run() -> Result<()> {
             let directory = version_root(&root, previous)?;
             verify(&directory, &previous.manifest_sha256)?;
             policy(&directory, "verify")?;
-            self_test(
-                &directory,
-                &root.join("self-test-data").join(&previous.directory),
-            )?;
+            rollback_self_test(&root, &directory, previous)?;
             std::mem::swap(&mut state.active, &mut state.previous);
             save_state(&root, &state)
         }
@@ -797,14 +827,12 @@ fn run() -> Result<()> {
             state.previous = None;
             state.retained = versions.clone();
             save_state(&root, &state)?;
-            for version in &versions {
-                remove_version(&root, version)?;
-                if let Err(error) = clean_probe(&root, version) {
-                    // 旧安装目录缺标记时不可误删；卸载继续，并明确残留。
-                    eprintln!("用户数据已保留，自检目录需手动确认：{error:#}");
-                }
-            }
-            save_state(&root, &State::default())
+            cleanup_old_versions(&root, &mut state)?;
+            ensure!(
+                state.retained.is_empty(),
+                "已停用寻枢并保留用户数据，但仍有未清理的历史目录；可重试 cleanup"
+            );
+            Ok(())
         }
     }
 }
@@ -945,6 +973,78 @@ mod lifecycle_tests {
         })();
         std::fs::remove_dir_all(&root)?;
         result
+    }
+
+    #[test]
+    fn rollback_probe_is_fresh_and_does_not_touch_legacy_data() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-rollback-test-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let v = version();
+        let old = root.join("self-test-data").join(&v.directory);
+        xs_platform::create_local_dir_all(&old)?;
+        std::fs::write(old.join("settings.json"), b"legacy user data")?;
+        let (a, first) = prepare_rollback_probe(&root, &v)?;
+        let (b, second) = prepare_rollback_probe(&root, &v)?;
+        assert_ne!(first, second);
+        assert_ne!(first, old);
+        assert_eq!(std::fs::read_dir(&first)?.count(), 1);
+        assert_eq!(std::fs::read_dir(&second)?.count(), 1);
+        assert_eq!(
+            std::fs::read(first.join(PROBE_OWNER))?,
+            v.manifest_sha256.as_bytes()
+        );
+        clean_probe(&root, &a)?;
+        clean_probe(&root, &b)?;
+        assert!(!first.exists() && !second.exists());
+        assert_eq!(
+            std::fs::read(old.join("settings.json"))?,
+            b"legacy user data"
+        );
+        std::fs::remove_dir_all(&root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn cleanup_preserves_retryable_probe_identity_and_legacy_pointers() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-cleanup-test-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let active = version();
+        let mut obsolete = active.clone();
+        obsolete.directory = "release-old-obsolete".into();
+        let mut state = State {
+            active: Some(active.clone()),
+            previous: None,
+            retained: vec![obsolete.clone()],
+        };
+        let old = root.join("self-test-data").join(&obsolete.directory);
+        xs_platform::create_local_dir_all(&old)?;
+        let unknown = old.join("keep.txt");
+        std::fs::write(&unknown, b"unowned data")?;
+        cleanup_old_versions(&root, &mut state)?;
+        let persisted = read_state(&root)?;
+        assert_eq!(persisted.retained.len(), 2);
+        assert!(persisted
+            .retained
+            .iter()
+            .any(|v| v.directory == active.directory));
+        assert!(persisted
+            .retained
+            .iter()
+            .any(|v| v.directory == obsolete.directory));
+        assert_eq!(std::fs::read(&unknown)?, b"unowned data");
+        // The user resolves the unowned directory themselves; cleanup may then
+        // clear the pending record without touching the live version.
+        std::fs::remove_file(unknown)?;
+        std::fs::remove_dir(old)?;
+        cleanup_old_versions(&root, &mut state)?;
+        assert_eq!(read_state(&root)?.retained.len(), 1);
+        assert_eq!(state.retained[0].directory, active.directory);
+        std::fs::remove_dir_all(&root)?;
+        Ok(())
     }
 
     #[cfg(target_os = "linux")]
