@@ -1839,6 +1839,7 @@ impl Index {
         let mut candidate_count_exact = true;
         let mut name_scratch = String::new();
         let mut path = String::new();
+        let mut boost_path = String::new();
         'parts: for part in 0..segment_count {
             let (start, segment) = catalog.map_or((0, self), |catalog| catalog.part(part));
             let sample = preview && segment.candidate_upper_bound(&plan) > 32_768;
@@ -1895,8 +1896,9 @@ impl Index {
                             let mut local_complete = true;
                             let mut local_name = String::new();
                             let mut local_path = String::new();
+                            let mut boost_path = String::new();
                             for offset in range_start..range_end {
-                                if (offset - range_start).is_multiple_of(4096)
+                                if (offset - range_start).is_multiple_of(128)
                                     && budget_ref.expired()
                                 {
                                     local_complete = false;
@@ -1971,15 +1973,16 @@ impl Index {
                                 ) {
                                     if let Some(boosts) = boosts {
                                         let full_path = if needs_path {
-                                            local_path.clone()
+                                            local_path.as_str()
                                         } else {
-                                            format!(
-                                                "{}{}",
-                                                segment.manifest.parents[parent_id], view.name
-                                            )
+                                            boost_path.clear();
+                                            boost_path.push_str(
+                                                &segment.manifest.parents[parent_id],
+                                            );
+                                            boost_path.push_str(view.name);
+                                            boost_path.as_str()
                                         };
-                                        score =
-                                            score.saturating_add(path_boost(boosts, &full_path));
+                                        score = score.saturating_add(path_boost(boosts, full_path));
                                     }
                                     local_total += 1;
                                     let rank = (score, Reverse(id_in_catalog));
@@ -2081,11 +2084,14 @@ impl Index {
                 ) {
                     if let Some(boosts) = boosts {
                         let full_path = if needs_path {
-                            path.clone()
+                            path.as_str()
                         } else {
-                            format!("{}{}", segment.manifest.parents[parent_id], view.name)
+                            boost_path.clear();
+                            boost_path.push_str(&segment.manifest.parents[parent_id]);
+                            boost_path.push_str(view.name);
+                            boost_path.as_str()
                         };
-                        score = score.saturating_add(path_boost(boosts, &full_path));
+                        score = score.saturating_add(path_boost(boosts, full_path));
                     }
                     total += 1;
                     if COLUMN_SORT {
