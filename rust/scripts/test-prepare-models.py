@@ -111,6 +111,18 @@ class BuildContracts(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertFalse(list(self.root.glob(".xunshu-model-build-*")))
 
+    def test_license_matches_pinned_git_object(self):
+        name = "BGE-LICENSE.txt"
+        path = self.root / name
+        data = b"fixture-license"
+        blob = hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+        with patch.dict(models.LICENSE_OBJECTS, {name: (len(data), blob)}):
+            path.write_bytes(data)
+            models.verify_license(path)
+            path.write_bytes(b"x" * len(data))
+            with self.assertRaises(ValueError):
+                models.verify_license(path)
+
     def test_numeric_gate_rejects_shape_zero_nan_and_infinity(self):
         import numpy as np
         expected = np.ones((4, 512), dtype=np.float32)

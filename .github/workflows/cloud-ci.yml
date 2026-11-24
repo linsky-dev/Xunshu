@@ -159,12 +159,13 @@ jobs:
           mkdir -p "$base"
           python scripts/prepare-models.py --cache "$base/cache" --output "$base/resources" --platform "$platform"
           # Static OTF and license from the immutable Noto CJK Sans2.004 commit.
-          python -c "import urllib.request, pathlib, sys; root=pathlib.Path(sys.argv[1]); base='https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/'; urllib.request.urlretrieve(base+'Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf', root/'font.otf'); urllib.request.urlretrieve(base+'Sans/LICENSE', root/'font-license.txt')" "$base"
+          python -c "import urllib.request, pathlib, sys; root=pathlib.Path(sys.argv[1]); base='https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/'; urllib.request.urlretrieve(base+'Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf', root/'font.otf'); urllib.request.urlretrieve(base+'LICENSE', root/'font-license.txt')" "$base"
           version=$(python -c "import tomllib; print(tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version'])")
           python scripts/make-install-payload.py --binaries target/release --resources "$base/resources" --font "$base/font.otf" --font-license "$base/font-license.txt" --output "$base/payload" --platform "$platform" --version "$version" | tee "$RUNNER_TEMP/xunshu-evidence/model-payload.json"
           python scripts/verify-recovery.py --bin-dir "$base/payload" --temp-root "$base" --with-models | tee "$RUNNER_TEMP/xunshu-evidence/model-recovery.json"
           python scripts/verify-install.py --installer "target/release/xs-install$suffix" --payload "$base/payload" --temp-root "$base" | tee "$RUNNER_TEMP/xunshu-evidence/install.jsonl"
           cp "$base/resources/inference.json" "$RUNNER_TEMP/xunshu-evidence/inference.json"
+          cp "$base/resources/build-provenance.json" "$RUNNER_TEMP/xunshu-evidence/build-provenance.json"
       - name: Preserve validation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

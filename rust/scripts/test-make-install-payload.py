@@ -1,5 +1,8 @@
 """Offline integrity contracts. Fixtures are not runnable neural models."""
 import importlib.util
+import hashlib
+import struct
+import sys
 import json
 import tempfile
 import unittest
@@ -73,6 +76,67 @@ class PayloadContracts(unittest.TestCase):
         self.refresh_provenance()
         with self.assertRaisesRegex(ValueError, "重复字段"):
             payload.validate_resources(self.resources, "linux")
+
+    def test_pinned_font_and_license_bytes(self):
+        for role in ("font", "license"):
+            data = ("synthetic-" + role).encode()
+            fixture = self.root / role
+            fixture.write_bytes(data)
+            sha = hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+            with patch.dict(payload.FONT_OBJECTS, {role: (len(data), sha)}):
+                payload.verify_font_object(fixture, role)
+                fixture.write_bytes(b"x" * len(data))
+                with self.assertRaises(ValueError):
+                    payload.verify_font_object(fixture, role)
+
+    def test_elf_architecture_and_type(self):
+        path = self.root / "elf"
+        header = bytearray(64)
+        header[:7] = b"\x7fELF\x02\x01\x01"
+        struct.pack_into("<HHI", header, 16, 2, 62, 1)
+        struct.pack_into("<H", header, 52, 64)
+        path.write_bytes(header)
+        payload.verify_native_header(path, "linux")
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "linux", library=True)
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "windows")
+        struct.pack_into("<H", header, 18, 183)  # AArch64 is not x64.
+        path.write_bytes(header)
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "linux")
+        path.write_bytes(b"\x7fELF")
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "linux")
+
+    def test_pe_architecture_and_dll_type(self):
+        path = self.root / "pe"
+        header = bytearray(512)
+        header[:2] = b"MZ"
+        struct.pack_into("<I", header, 60, 64)
+        header[64:68] = b"PE\0\0"
+        struct.pack_into("<HH", header, 68, 0x8664, 1)
+        struct.pack_into("<HHH", header, 84, 112, 2, 0x20b)
+        path.write_bytes(header)
+        payload.verify_native_header(path, "windows")
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "windows", library=True)
+        struct.pack_into("<H", header, 86, 0x2002)
+        path.write_bytes(header)
+        payload.verify_native_header(path, "windows", library=True)
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "windows")
+        struct.pack_into("<H", header, 68, 0xaa64)
+        path.write_bytes(header)
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "windows", library=True)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "real ELF host executable only")
+    def test_real_linux_executable_header(self):
+        import platform
+        if platform.machine() != "x86_64":
+            self.skipTest("x64-only packaging contract")
+        payload.verify_native_header(Path(sys.executable).resolve(), "linux")
 
     def test_failed_assembly_never_publishes_payload(self):
         output = self.root / "payload"

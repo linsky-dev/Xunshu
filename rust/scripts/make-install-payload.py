@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import shutil
+import struct
 import tempfile
 from pathlib import Path
 
@@ -13,6 +14,65 @@ def digest(path):
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
+
+
+# Noto CJK Sans2.004, upstream tree 523d033d6cb47f4a80c58a35753646f5c3608a78.
+# Git blob IDs authenticate the exact pinned repository objects; release.json
+# separately records SHA-256 of the delivered bytes.
+FONT_OBJECTS = {
+    "font": (16437364, "dc15562470b4f842321894787a0d066879ccff8b"),
+    "license": (4301, "d952d62c065f3f35fb83a173496e90b21525aef3"),
+}
+
+
+def verify_font_object(path, role):
+    size, expected = FONT_OBJECTS[role]
+    if path.is_symlink() or not path.is_file() or path.stat().st_size != size:
+        raise ValueError(f"字体来源文件长度或类型不匹配：{path.name}")
+    data = path.read_bytes()
+    if len(data) != size or hashlib.sha1(f"blob {size}\0".encode() + data).hexdigest() != expected:
+        raise ValueError(f"字体来源 Git 对象摘要不匹配：{path.name}")
+
+
+def verify_native_header(path, platform, library=False):
+    """Reject mistaken platform/architecture before assembling x64 payloads.
+
+    Header checks are not code signing, loading or native execution tests.
+    """
+    def invalid():
+        raise ValueError(f"原生程序平台、架构或文件类型不匹配：{path.name}")
+
+    with path.open("rb") as stream:
+        header = stream.read(64)
+        if len(header) != 64:
+            invalid()
+        if platform == "linux":
+            if header[:7] != b"\x7fELF\x02\x01\x01":
+                invalid()
+            kind, machine, version = struct.unpack_from("<HHI", header, 16)
+            if machine != 62 or version != 1 or kind not in ((3,) if library else (2, 3)):
+                invalid()
+            if struct.unpack_from("<H", header, 52)[0] != 64:
+                invalid()
+        elif platform == "windows":
+            if header[:2] != b"MZ":
+                invalid()
+            offset = struct.unpack_from("<I", header, 60)[0]
+            if not 64 <= offset <= 1024 * 1024:
+                invalid()
+            stream.seek(offset)
+            pe = stream.read(26)
+            if len(pe) != 26 or pe[:4] != b"PE\0\0":
+                invalid()
+            machine, sections = struct.unpack_from("<HH", pe, 4)
+            optional_size, flags, magic = struct.unpack_from("<HHH", pe, 20)
+            if (machine != 0x8664 or not sections or optional_size < 112 or magic != 0x20b
+                    or not flags & 2 or bool(flags & 0x2000) != library):
+                invalid()
+            if path.stat().st_size < offset + 24 + optional_size + 40 * sections:
+                invalid()
+        else:
+            invalid()
 
 
 def unique_object(pairs):
@@ -71,9 +131,17 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
     expected = [binaries / name for name in names] + [resources / "inference.json", font, font_license]
     if any(not path.is_file() or path.is_symlink() for path in expected):
         raise ValueError("构建程序、模型清单或字体文件缺失")
+    verify_font_object(font, "font")
+    verify_font_object(font_license, "license")
     output.mkdir(parents=True, exist_ok=False)
     for name in names:
-        shutil.copy2(binaries / name, output / name)
+        source = binaries / name
+        verify_native_header(source, platform)
+        before = digest(source)
+        shutil.copy2(source, output / name)
+        if digest(output / name) != before:
+            raise ValueError(f"程序在复制期间发生变化：{name}")
+        verify_native_header(output / name, platform)
     resource_copy = output / "resources"
     resource_copy.mkdir()
     for path in resources.iterdir():
@@ -82,10 +150,15 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
         shutil.copyfile(path, resource_copy / path.name)
     if validate_resources(resource_copy, platform) != expected_hashes:
         raise ValueError("模型资源在复制期间发生变化")
+    verify_native_header(resource_copy / ("onnxruntime.dll" if platform == "windows" else "libonnxruntime.so"), platform, library=True)
     fonts = resource_copy / "fonts"
     fonts.mkdir()
     shutil.copyfile(font, fonts / "NotoSansSC-Regular.otf")
     shutil.copyfile(font_license, fonts / "Noto-CJK-LICENSE.txt")
+    verify_font_object(fonts / "NotoSansSC-Regular.otf", "font")
+    verify_font_object(fonts / "Noto-CJK-LICENSE.txt", "license")
+    # Render with the exact staged font, not a mutable external input.
+    font = fonts / "NotoSansSC-Regular.otf"
 
     # 纯合成文字图像及只嵌入栅格图像的 PDF，用于检验真实 OCR。
     tests = output / "self-test"

@@ -24,6 +24,10 @@ OCR_SHA256 = {
 }
 BGE_LICENSE = "https://raw.githubusercontent.com/FlagOpen/FlagEmbedding/d04f7989eeec2c6db4ead7c77ddef656f9c9d3aa/LICENSE"
 OCR_LICENSE = "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/a00f633cef33a8192f853fdaf8decf24ce2240b0/LICENSE"
+LICENSE_OBJECTS = {
+    "BGE-LICENSE.txt": (1065, "360931513aa6c02f933a403202afa99ac2c5bc88"),
+    "PP-OCRv5-LICENSE.txt": (11376, "430edfa0cfcb59f15b7aa5457427d0faf2e40dac"),
+}
 ORT_RELEASE = "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4"
 ORT_ARCHIVES = {
     "windows": ("onnxruntime-win-x64-1.24.4.zip", "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357", "onnxruntime.dll", "onnxruntime.dll"),
@@ -70,6 +74,15 @@ def fetch(url, dest, expected=None):
         return dest
     finally:
         temp.unlink(missing_ok=True)
+
+
+def verify_license(path):
+    size, expected = LICENSE_OBJECTS[path.name]
+    if path.is_symlink() or not path.is_file() or path.stat().st_size != size:
+        raise ValueError(f"许可证来源长度或类型不匹配：{path.name}")
+    data = path.read_bytes()
+    if len(data) != size or hashlib.sha1(f"blob {size}\0".encode() + data).hexdigest() != expected:
+        raise ValueError(f"许可证来源 Git 对象摘要不匹配：{path.name}")
 
 
 def checked_copy(source, target, expected):
@@ -239,6 +252,8 @@ def build_resources(cache, work, output, platform):
         "BGE-LICENSE.txt": fetch(BGE_LICENSE, work / "BGE-LICENSE.txt"),
         "PP-OCRv5-LICENSE.txt": fetch(OCR_LICENSE, work / "PP-OCRv5-LICENSE.txt"),
     }
+    for notice in notices.values():
+        verify_license(notice)
     output.mkdir()
     records = {}
 
@@ -261,12 +276,15 @@ def build_resources(cache, work, output, platform):
         shutil.copyfile(work / folder / "README.md", output / f"{name}-MODEL-CARD.md")
     for name, notice in notices.items():
         shutil.copyfile(notice, output / name)
+        verify_license(output / name)
     (output / "inference.json").write_text(json.dumps({"schema": 1, "files": records}, indent=2, sort_keys=True) + "\n",
                                                encoding="utf-8", newline="\n")
     provenance["ocr"] = {name: {"source": url, "config_sha256": digest(work / name / "inference.yml"),
                               "model_sha256": OCR_SHA256[name]}
                          for name, url in (("det", DET), ("rec", REC))}
     provenance["license_sources"] = {"BGE-LICENSE.txt": BGE_LICENSE, "PP-OCRv5-LICENSE.txt": OCR_LICENSE}
+    provenance["license_git_objects"] = {name: {"bytes": size, "git_blob_sha1": sha}
+                                         for name, (size, sha) in LICENSE_OBJECTS.items()}
     provenance["outputs_sha256"] = {p.name: digest(p) for p in sorted(output.iterdir())}
     (output / "build-provenance.json").write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n",
                                                   encoding="utf-8", newline="\n")
