@@ -175,21 +175,43 @@ impl ModelClient {
         if !reply.ok {
             bail!("{}", reply.error.unwrap_or_else(|| "语义推理失败".into()));
         }
-        for window in &reply.windows {
-            ensure!(
-                window.start < window.end
-                    && text.is_char_boundary(window.start)
-                    && text.is_char_boundary(window.end)
-                    && window.vector.len() == DIMENSION
-                    && window
-                        .vector
-                        .iter()
-                        .all(|value| value.is_finite() && value.abs() <= 1.01),
-                "语义进程返回了无效的分窗向量"
-            );
-        }
+        validate_windows(text, &reply.windows)?;
         Ok(reply.windows)
     }
+}
+
+// The model worker promises unit-normalized, nonempty embeddings for tokenized
+// text. Reject a broken worker before publishing an incomplete semantic index.
+fn validate_windows(text: &str, windows: &[Window]) -> Result<()> {
+    ensure!(
+        text.trim().is_empty() || !windows.is_empty(),
+        "语义进程未返回有效分窗，无法确认正文语义收录完整"
+    );
+    let mut starts = std::collections::HashSet::with_capacity(windows.len());
+    for window in windows {
+        ensure!(
+            window.start < window.end
+                && text.is_char_boundary(window.start)
+                && text.is_char_boundary(window.end)
+                && starts.insert(window.start)
+                && window.vector.len() == DIMENSION
+                && window
+                    .vector
+                    .iter()
+                    .all(|value| value.is_finite() && value.abs() <= 1.01),
+            "语义进程返回了无效或重复的分窗向量"
+        );
+        let squared_norm: f64 = window
+            .vector
+            .iter()
+            .map(|&value| f64::from(value).powi(2))
+            .sum();
+        ensure!(
+            (0.99..=1.01).contains(&squared_norm),
+            "语义进程返回了未归一化的向量"
+        );
+    }
+    Ok(())
 }
 
 /// Validate model output once per exact scan, not once per indexed vector.
@@ -285,6 +307,25 @@ mod tests {
         data.vector.pop();
         assert!(PreparedQueries::new(&[data]).is_err());
         assert!(PreparedQueries::new(&[]).is_err());
+    }
+
+    #[test]
+    fn model_protocol_rejects_empty_duplicate_and_non_normalized_windows() {
+        let text = "中文文本";
+        let make = |start, end, value| {
+            let mut vector = vec![0.0; DIMENSION];
+            vector[0] = value;
+            Window { start, end, vector }
+        };
+        assert!(validate_windows(text, &[]).is_err());
+        assert!(validate_windows("  ", &[]).is_ok());
+        assert!(validate_windows(text, &[make(0, 6, 1.0), make(3, 12, 1.0)]).is_ok());
+        assert!(validate_windows(text, &[make(0, 6, 1.0), make(0, 12, 1.0)]).is_err());
+        assert!(validate_windows(text, &[make(1, 6, 1.0)]).is_err());
+        assert!(validate_windows(text, &[make(0, 13, 1.0)]).is_err());
+        assert!(validate_windows(text, &[make(0, 6, 0.0)]).is_err());
+        assert!(validate_windows(text, &[make(0, 6, 0.5)]).is_err());
+        assert!(validate_windows(text, &[make(0, 6, f32::NAN)]).is_err());
     }
 
     #[test]
