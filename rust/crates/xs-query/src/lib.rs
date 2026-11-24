@@ -243,6 +243,7 @@ pub(crate) enum Field {
 pub(crate) enum Pattern {
     Literal {
         needle: String,
+        finder: Box<memchr::memmem::Finder<'static>>,
         case_sensitive: bool,
     },
     Glob {
@@ -502,6 +503,7 @@ impl Leaf {
                     Pattern::Literal {
                         needle,
                         case_sensitive: false,
+                        ..
                     },
             } if !needle.is_empty() => CandidatePlan::Literal(needle.clone()),
             Self::Text {
@@ -545,6 +547,7 @@ impl Pattern {
         match self {
             Self::Literal {
                 needle,
+                finder,
                 case_sensitive,
             } => {
                 let haystack = if *case_sensitive {
@@ -552,7 +555,7 @@ impl Pattern {
                 } else {
                     evaluation.folded(field)
                 };
-                literal_score(haystack, needle)
+                literal_score(haystack, needle, finder)
             }
             Self::Glob {
                 regex,
@@ -650,21 +653,23 @@ impl<'data, 'entry, 'prepared> Evaluation<'data, 'entry, 'prepared> {
     }
 }
 
-fn literal_score(text: &str, needle: &str) -> Option<i64> {
-    let at = text.find(needle)?;
-    if text == needle {
-        return Some(2000);
-    }
-    let stem = text
-        .rsplit_once('.')
-        .map_or(text, |(head, _)| if head.is_empty() { text } else { head });
-    if stem == needle {
-        return Some(1800);
-    }
-    let position = text[..at].chars().count().min(200) as i64;
+fn literal_score(text: &str, needle: &str, finder: &memchr::memmem::Finder<'_>) -> Option<i64> {
+    // Both inputs are valid UTF-8; a nonempty UTF-8 needle cannot start inside
+    // a continuation byte. Empty needles also match at byte zero.
+    let at = finder.find(text.as_bytes())?;
     if at == 0 {
+        if text == needle {
+            return Some(2000);
+        }
+        let stem = text
+            .rsplit_once('.')
+            .map_or(text, |(head, _)| if head.is_empty() { text } else { head });
+        if stem == needle {
+            return Some(1800);
+        }
         return Some(1500);
     }
+    let position = text[..at].chars().count().min(200) as i64;
     let previous = text[..at].chars().next_back();
     if previous.is_some_and(|c| !c.is_alphanumeric()) {
         return Some(1100 - position);
@@ -761,5 +766,65 @@ mod smart_query_tests {
         assert!(Query::parse("smart:reprt").unwrap().matches(&en));
         assert!(Query::parse("typo:repxrt").unwrap().matches(&en));
         assert!(!Query::parse("smart:totallyunrelated").unwrap().matches(&cn));
+    }
+}
+
+#[cfg(test)]
+mod literal_finder_tests {
+    use super::*;
+
+    fn reference(text: &str, needle: &str) -> Option<i64> {
+        let at = text.find(needle)?;
+        if text == needle {
+            return Some(2000);
+        }
+        let stem = text
+            .rsplit_once('.')
+            .map_or(text, |(head, _)| if head.is_empty() { text } else { head });
+        if stem == needle {
+            return Some(1800);
+        }
+        let position = text[..at].chars().count().min(200) as i64;
+        if at == 0 {
+            return Some(1500);
+        }
+        if text[..at]
+            .chars()
+            .next_back()
+            .is_some_and(|c| !c.is_alphanumeric())
+        {
+            return Some(1100 - position);
+        }
+        Some(800 - position)
+    }
+
+    #[test]
+    fn prepared_literal_finder_preserves_unicode_and_exact_scores() {
+        let long_name = format!("{}报告.txt", "甲".repeat(220));
+        for name in [
+            "",
+            "budget",
+            "budget.pdf",
+            "budget_final.pdf",
+            "meeting_budget.txt",
+            ".budget",
+            "干部任免报告.docx",
+            "甲_报告.pdf",
+            "甲报告.pdf",
+            "e\u{301}.pdf",
+            "😀报告.pdf",
+            &long_name,
+        ] {
+            for needle in [
+                "", "budget", "meeting", ".", "报告", "甲", "😀", "e\u{301}", "é", "absent",
+            ] {
+                let finder = memchr::memmem::Finder::new(needle.as_bytes());
+                assert_eq!(
+                    literal_score(name, needle, &finder),
+                    reference(name, needle),
+                    "{name:?} {needle:?}"
+                );
+            }
+        }
     }
 }
