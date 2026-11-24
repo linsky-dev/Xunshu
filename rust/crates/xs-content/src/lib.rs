@@ -1,6 +1,7 @@
 //! 独立的正文收录与查询。内容范围和文件对象版本是发布与展示的共同约束。
 
 pub mod connectors;
+pub mod experimental_ann;
 mod extract;
 mod ipc;
 mod search;
