@@ -1,0 +1,101 @@
+name: Cloud engineering CI
+on:
+  push:
+    branches: ['cloud/**', main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: xunshu-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: Native ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TERM_COLOR: never
+      RUST_BACKTRACE: '1'
+      PYTHONUTF8: '1'
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - name: Native Linux development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libx11-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libudev-dev xvfb
+      - name: Toolchain and locked dependencies
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          rustc -vV
+          cargo -V
+          cargo fetch --locked
+      - name: Source preflight
+        run: python scripts/check_release_consistency.py
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Type check
+        run: cargo check --workspace --locked --offline
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+      - name: Linux native tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/xunshu-evidence"
+          export XS_CONTENT_TEST_ROOT="$(mktemp -d "$RUNNER_TEMP/xunshu-test.XXXXXXXX")"
+          export TMPDIR="$XS_CONTENT_TEST_ROOT"
+          cargo build --locked --offline -p xs-content --bin xs-content-worker
+          export XS_CONTENT_TEST_WORKER_PATH="$PWD/target/debug/xs-content-worker"
+          cargo test --workspace --locked --offline --no-fail-fast 2>&1 | tee "$RUNNER_TEMP/xunshu-evidence/tests.log"
+      - name: Windows native tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:XS_CONTENT_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('xunshu-test-' + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $env:XS_CONTENT_TEST_ROOT -Force | Out-Null
+          $env:TEMP = $env:XS_CONTENT_TEST_ROOT
+          $env:TMP = $env:XS_CONTENT_TEST_ROOT
+          $ev = Join-Path $env:RUNNER_TEMP 'xunshu-evidence'
+          New-Item -ItemType Directory -Path $ev -Force | Out-Null
+          cargo build --locked --offline -p xs-content --bin xs-content-worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:XS_CONTENT_TEST_WORKER_PATH = Join-Path $PWD 'target/debug/xs-content-worker.exe'
+          cargo test --workspace --locked --offline --no-fail-fast 2>&1 | Tee-Object -FilePath (Join-Path $ev 'tests.log')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native release build
+        run: cargo build --workspace --release --locked --offline
+      - name: Linux recovery contracts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify-recovery.py --bin-dir target/release --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/recovery.json"
+      - name: Windows recovery contracts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/verify-recovery.py --bin-dir target/release --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/recovery.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: engineering-evidence-${{ matrix.os }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/xunshu-evidence/
+          if-no-files-found: warn
+          retention-days: 14
