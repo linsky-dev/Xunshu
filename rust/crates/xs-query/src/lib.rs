@@ -104,27 +104,64 @@ pub fn fold(text: &str) -> String {
 pub struct Query {
     expr: Expr,
     needs_metadata: bool,
+    // Compile only an OR of case-insensitive literal name leaves. All other
+    // expressions retain the general evaluator and its unknown-value rules.
+    literal_name_or: Option<Vec<PreparedNameLiteral>>,
+}
+
+#[derive(Debug, Clone)]
+struct PreparedNameLiteral {
+    needle: String,
+    finder: memchr::memmem::Finder<'static>,
 }
 
 impl Query {
+    fn from_expr(expr: Expr) -> Self {
+        let literal_name_or = if let Expr::Or(parts) = &expr {
+            parts
+                .iter()
+                .map(|part| {
+                    if let Expr::Leaf(Leaf::Text {
+                        field: Field::Name,
+                        pattern:
+                            Pattern::Literal {
+                                needle,
+                                finder,
+                                case_sensitive: false,
+                            },
+                    }) = part
+                    {
+                        Some(PreparedNameLiteral {
+                            needle: needle.clone(),
+                            finder: finder.as_ref().clone(),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Option<Vec<_>>>()
+        } else {
+            None
+        };
+        Self {
+            needs_metadata: expr.needs_metadata(),
+            expr,
+            literal_name_or,
+        }
+    }
+
     pub fn parse(text: &str) -> Result<Self, QueryError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|duration| duration.as_secs().min(i64::MAX as u64) as i64)
             .unwrap_or(0);
-        parser::parse(text, now, true).map(|expr| Self {
-            needs_metadata: expr.needs_metadata(),
-            expr,
-        })
+        parser::parse(text, now, true).map(Self::from_expr)
     }
 
     /// Deterministic entry point for date-dependent saved searches and tests.
     /// Relative dates are fixed at parse time and interpreted in UTC.
     pub fn parse_at(text: &str, now_unix_utc: i64) -> Result<Self, QueryError> {
-        parser::parse(text, now_unix_utc, false).map(|expr| Self {
-            needs_metadata: expr.needs_metadata(),
-            expr,
-        })
+        parser::parse(text, now_unix_utc, false).map(Self::from_expr)
     }
 
     /// 普通名字查询可以跳过导入属性解析及附加属性读取。
@@ -184,14 +221,34 @@ impl Query {
         depth: usize,
         metadata: QueryMetadata,
     ) -> Option<i64> {
-        self.expr
-            .evaluate(&Evaluation::new(entry, folded_name, metadata))
-            .score()
-            .map(|score| {
-                score
-                    .saturating_add(50)
-                    .saturating_sub(depth.min(50) as i64)
-            })
+        let score = if let Some(literals) = &self.literal_name_or {
+            let normalized;
+            let name = match folded_name {
+                Some(name) => name,
+                None => {
+                    normalized = fold(entry.name);
+                    &normalized
+                }
+            };
+            let mut best = None;
+            for literal in literals {
+                best = best.max(literal_score(name, &literal.needle, &literal.finder));
+                // An exact filename match is the maximum possible literal score.
+                if best == Some(2000) {
+                    break;
+                }
+            }
+            best
+        } else {
+            self.expr
+                .evaluate(&Evaluation::new(entry, folded_name, metadata))
+                .score()
+        };
+        score.map(|score| {
+            score
+                .saturating_add(50)
+                .saturating_sub(depth.min(50) as i64)
+        })
     }
 
     pub fn candidate_plan(&self) -> CandidatePlan {
@@ -661,10 +718,10 @@ fn literal_score(text: &str, needle: &str, finder: &memchr::memmem::Finder<'_>) 
         if text == needle {
             return Some(2000);
         }
-        let stem = text
-            .rsplit_once('.')
-            .map_or(text, |(head, _)| if head.is_empty() { text } else { head });
-        if stem == needle {
+        if !needle.is_empty()
+            && text.as_bytes().get(needle.len()) == Some(&b'.')
+            && !text.as_bytes()[needle.len() + 1..].contains(&b'.')
+        {
             return Some(1800);
         }
         return Some(1500);
@@ -796,6 +853,79 @@ mod literal_finder_tests {
             return Some(1100 - position);
         }
         Some(800 - position)
+    }
+
+    #[test]
+    fn prepared_literal_name_or_matches_general_evaluator() {
+        for query in [
+            "budget | meeting",
+            "name:报告 | name:预算",
+            "é | ＢＵＤＧＥＴ",
+            "budget | budget | meeting",
+            "budget | case:Meeting",
+            "budget | ext:pdf",
+            "budget | !meeting",
+            "budget | path:docs",
+            "budget | smart:meeting",
+            "budget | size:>1KB",
+            "budget meeting",
+        ] {
+            let parsed = Query::parse_at(query, 1_700_000_000).unwrap();
+            for name in [
+                "",
+                "budget",
+                "budget.pdf",
+                "budget..pdf",
+                "budget_final.pdf",
+                "meeting_budget.txt",
+                "Meeting.txt",
+                ".budget",
+                "干部任免报告.docx",
+                "预算",
+                "ＢＵＤＧＥＴ",
+                "e\u{301}.pdf",
+                "😀报告.pdf",
+                "never",
+            ] {
+                let entry = EntryRef {
+                    name,
+                    path: "/docs/example",
+                    size: 10,
+                    modified: 0,
+                    is_dir: false,
+                    source: "test",
+                };
+                let folded = fold(name);
+                let metadata = QueryMetadata {
+                    size_known: false,
+                    ..QueryMetadata::default()
+                };
+                for prepared in [None, Some(folded.as_str())] {
+                    let expected = parsed
+                        .expr
+                        .evaluate(&Evaluation::new(&entry, prepared, metadata))
+                        .score()
+                        .map(|s| s + 48);
+                    assert_eq!(
+                        parsed.matched_score_with_metadata(&entry, prepared, 2, metadata),
+                        expected,
+                        "{query:?} {name:?}"
+                    );
+                }
+            }
+        }
+        assert!(
+            Query::parse("budget | meeting")
+                .unwrap()
+                .literal_name_or
+                .is_some()
+        );
+        assert!(
+            Query::parse("budget | ext:pdf")
+                .unwrap()
+                .literal_name_or
+                .is_none()
+        );
     }
 
     #[test]
