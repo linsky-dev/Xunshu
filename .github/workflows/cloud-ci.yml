@@ -91,6 +91,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native release build
         run: cargo build --workspace --release --locked --offline
+      - name: Native installer negative contracts (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/xunshu-evidence"
+          python scripts/verify-install-negative.py --installer target/release/xs-install --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
+      - name: Native installer negative contracts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/verify-install-negative.py --installer target/release/xs-install.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Linux recovery contracts
         if: runner.os == 'Linux'
         shell: bash
