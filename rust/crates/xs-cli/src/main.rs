@@ -706,6 +706,43 @@ fn percentile(values: &[f64], fraction: f64) -> f64 {
         .saturating_sub(1)
         .min(values.len() - 1)]
 }
+// Validate outside the measured query time. A partial or inconsistent sample
+// must never disappear behind the final iteration's successful summary.
+fn verify_benchmark_sample(
+    response: &xs_core::SearchResponse,
+    previous: Option<&xs_core::SearchResponse>,
+) -> Result<()> {
+    ensure!(
+        response.complete && response.coverage_complete && response.total_relation == "exact",
+        "benchmark sample is incomplete"
+    );
+    ensure!(
+        response.elapsed_ms.is_finite() && response.elapsed_ms >= 0.0,
+        "invalid benchmark latency"
+    );
+    ensure!(
+        response.results.len() == response.total.min(SearchOptions::default().limit),
+        "benchmark sample page length mismatch"
+    );
+    if let Some(reference) = previous {
+        ensure!(
+            response.generation == reference.generation
+                && response.total == reference.total
+                && response.index_entries == reference.index_entries
+                && response
+                    .results
+                    .iter()
+                    .zip(&reference.results)
+                    .all(|(a, b)| a.id == b.id
+                        && a.score == b.score
+                        && a.path == b.path
+                        && a.source == b.source),
+            "benchmark samples disagree on generation, total or ranked page"
+        );
+    }
+    Ok(())
+}
+
 fn benchmark_read(snapshot: &Path, iterations: usize) -> Result<Value> {
     ensure!((1..=100).contains(&iterations), "iterations must be 1..100");
     let before = memory();
@@ -753,12 +790,13 @@ fn benchmark_read(snapshot: &Path, iterations: usize) -> Result<Value> {
                 },
                 None,
             )?;
+            verify_benchmark_sample(&response, summary.as_ref())?;
             times.push(response.elapsed_ms);
             summary = Some(response);
         }
         times.sort_by(f64::total_cmp);
         let s = summary.unwrap();
-        rows.push(json!({"query":query,"p50_ms":percentile(&times,0.5),"p95_ms":percentile(&times,0.95),"p99_ms":percentile(&times,0.99),"total":s.total,"candidates":s.candidate_count,"examined":s.examined,"complete":s.complete}));
+        rows.push(json!({"query":query,"p50_ms":percentile(&times,0.5),"p95_ms":percentile(&times,0.95),"p99_ms":percentile(&times,0.99),"verified_samples":iterations,"total":s.total,"candidates":s.candidate_count,"examined":s.examined,"complete":s.complete}));
     }
     Ok(
         json!({"mapped":index.is_mapped(),"load_ms":load_ms,"load_note":"separate fresh process; OS page cache not forcibly evicted; includes CRC and structural validation","iterations":iterations,"baseline_memory":before,"after_load_memory":after_load,"after_queries_memory":memory(),"queries":rows,"first_screen_core_queries":first_screen,"first_screen_note":"core only; excludes input, IPC and presentation"}),
@@ -770,6 +808,40 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use xs_core::CatalogMetadata;
+
+    #[test]
+    fn benchmark_sample_rejects_partial_or_unstable_rankings() {
+        let mut builder = IndexBuilder::default();
+        for path in ["/synthetic/report-a.txt", "/synthetic/report-b.txt"] {
+            builder
+                .add(FileRecord {
+                    path: path.into(),
+                    size: 1,
+                    modified: 0,
+                    is_dir: false,
+                    source: "offline:test".into(),
+                })
+                .unwrap();
+        }
+        let idx = builder.finish(1).unwrap();
+        let reference = idx
+            .search("report", &SearchOptions::default(), None)
+            .unwrap();
+        assert!(verify_benchmark_sample(&reference, None).is_ok());
+        assert!(verify_benchmark_sample(&reference, Some(&reference)).is_ok());
+        let mut changed = reference.clone();
+        changed.results.swap(0, 1);
+        assert!(verify_benchmark_sample(&changed, Some(&reference)).is_err());
+        changed = reference.clone();
+        changed.complete = false;
+        assert!(verify_benchmark_sample(&changed, Some(&reference)).is_err());
+        changed = reference.clone();
+        changed.generation += 1;
+        assert!(verify_benchmark_sample(&changed, Some(&reference)).is_err());
+        changed = reference.clone();
+        changed.total += 1;
+        assert!(verify_benchmark_sample(&changed, Some(&reference)).is_err());
+    }
 
     #[test]
     fn empty_import_replaces_its_identity_and_preserves_unrelated_metadata() {

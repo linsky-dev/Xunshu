@@ -40,6 +40,8 @@ def evaluate(report):
         seen.add(query)
         if row.get("complete") is not True or type(row.get("total")) is not int or row["total"] != EXPECTED[query]:
             errors.append(f"Incorrect or incomplete result: {query}")
+        if type(row.get("verified_samples")) is not int or row["verified_samples"] != read.get("iterations"):
+            errors.append(f"Missing per-iteration verification: {query}")
         values = [row.get(key) for key in ("p50_ms", "p95_ms", "p99_ms")]
         if any(type(x) not in (int, float) or not math.isfinite(x) or x < 0 for x in values) or values != sorted(values):
             errors.append(f"Invalid percentile evidence: {query}")
