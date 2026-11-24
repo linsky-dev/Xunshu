@@ -23,6 +23,9 @@ const MAX_QUERY_BYTES: usize = 1024;
 const MAX_QUERY_TERMS: usize = 128;
 // One bounded ranking prefix per reader. Only IDs/scores are retained, not text.
 const MAX_LEXICAL_CACHE_RESULTS: usize = 16_384;
+// One in-memory semantic/hybrid prefix per reader; no document text is cached.
+const MAX_MODEL_CACHE_RESULTS: usize = 4096;
+const MODEL_CACHE_LOOKAHEAD: usize = 256;
 // 当前语义实现为精确线性扫描，预算超限时明确报错，绝不静默截断而谎报全库搜索。
 const MAX_SEMANTIC_DOT_PRODUCTS: usize = 200_000;
 
@@ -120,6 +123,7 @@ pub struct ContentReader {
     cached: Option<Cached>,
     model: Option<semantic::ModelClient>,
     lexical_cache: Option<LexicalCache>,
+    model_cache: Option<ModelRankCache>,
 }
 
 impl ContentReader {
@@ -129,6 +133,7 @@ impl ContentReader {
             cached: None,
             model: None,
             lexical_cache: None,
+            model_cache: None,
         }
     }
 
@@ -136,6 +141,7 @@ impl ContentReader {
         self.cached = None;
         self.model = None;
         self.lexical_cache = None;
+        self.model_cache = None;
     }
 
     pub fn search(
@@ -232,6 +238,7 @@ impl ContentReader {
             catalog.scope_token == policy.token,
             "正文范围或检索功能开关已更改，请重建正文索引"
         );
+        let mut cached_page = None;
         let vectors = if matches!(mode, SearchMode::Semantic | SearchMode::Hybrid) {
             ensure!(policy.settings.semantic_enabled, "语义搜索尚未启用");
             let fingerprint = catalog
@@ -251,14 +258,23 @@ impl ContentReader {
                 model.fingerprint() == fingerprint,
                 "语义模型已更新，请重建正文库"
             );
-            match model.embed(query, cancel) {
-                Ok(vectors) => {
-                    ensure!(!vectors.is_empty(), "查询未产生可用的语义向量");
-                    vectors
-                }
-                Err(error) => {
-                    self.model = None;
-                    return Err(error);
+            cached_page = self
+                .model_cache
+                .as_ref()
+                .and_then(|cache| cache.page(query, mode, options));
+            if cached_page.is_some() {
+                Vec::new()
+            } else {
+                match model.embed(query, cancel) {
+                    Ok(vectors) => {
+                        ensure!(!vectors.is_empty(), "查询未产生可用的语义向量");
+                        vectors
+                    }
+                    Err(error) => {
+                        self.model = None;
+                        self.model_cache = None;
+                        return Err(error);
+                    }
                 }
             }
         } else {
@@ -269,18 +285,44 @@ impl ContentReader {
         catalog
             .db
             .progress_handler(1000, Some(move || signal.load(Ordering::Acquire)))?;
+        let mut pending_cache = None;
         let search = (|| {
-            let (total, ranked) = match mode {
-                SearchMode::Lexical => {
-                    cached_lexical_page(catalog, terms, options, cancel, &mut self.lexical_cache)?
-                }
-                SearchMode::Semantic => semantic_page(catalog, &vectors, options, cancel)?,
-                SearchMode::Hybrid => {
-                    // 两路必须先得到完整的文档排名再融合，不能用单页候选估计总数：
-                    // 否则翻页超过 200 条会出现假空页，也会丢失深页中的双路命中。
-                    let (_, lex) = lexical_ranked(catalog, terms, None, cancel)?;
-                    let sem = semantic_ranked(catalog, &vectors, cancel)?;
-                    rrf_fuse(&lex, &sem, options, cancel)?
+            let (total, ranked) = if let Some(page) = cached_page {
+                page
+            } else {
+                let prefix = model_cache_options(mode, options);
+                let rank_options = prefix.as_ref().unwrap_or(options);
+                let (total, ranked) = match mode {
+                    SearchMode::Lexical => cached_lexical_page(
+                        catalog,
+                        terms,
+                        options,
+                        cancel,
+                        &mut self.lexical_cache,
+                    )?,
+                    SearchMode::Semantic => semantic_page(catalog, &vectors, rank_options, cancel)?,
+                    SearchMode::Hybrid => {
+                        // 两路必须先得到完整的文档排名再融合，不能用单页候选估计总数：
+                        // 否则翻页超过 200 条会出现假空页，也会丢失深页中的双路命中。
+                        let (_, lex) = lexical_ranked(catalog, terms, None, cancel)?;
+                        let sem = semantic_ranked(catalog, &vectors, cancel)?;
+                        rrf_fuse(&lex, &sem, rank_options, cancel)?
+                    }
+                };
+                if prefix.is_some() {
+                    let next = ModelRankCache {
+                        query: query.to_owned(),
+                        mode,
+                        total,
+                        prefix: ranked,
+                    };
+                    let page = next
+                        .page(query, mode, options)
+                        .context("语义排名缓存边界不一致")?;
+                    pending_cache = Some(next);
+                    page
+                } else {
+                    (total, ranked)
                 }
             };
             let source = Ranking {
@@ -295,6 +337,10 @@ impl ContentReader {
         reset?;
         policy.verify(&self.dir)?;
         stamp.verify(&path)?;
+        ensure!(!cancel.load(Ordering::Acquire), "正文查询已取消");
+        if let Some(next) = pending_cache {
+            self.model_cache = Some(next);
+        }
         Ok(response)
     }
 }
@@ -421,6 +467,50 @@ fn cached_lexical_page(
     Ok(page)
 }
 
+// This cache belongs to a verified snapshot and is cleared by ContentReader::release.
+// Raw query (not normalized FTS terms) and mode are part of its key: embeddings
+// depend on original text, while semantic and hybrid ranking differ.
+struct ModelRankCache {
+    query: String,
+    mode: SearchMode,
+    total: usize,
+    prefix: Vec<Ranked>,
+}
+
+impl ModelRankCache {
+    fn page(
+        &self,
+        query: &str,
+        mode: SearchMode,
+        options: &SearchOptions,
+    ) -> Option<(usize, Vec<Ranked>)> {
+        if self.query != query || self.mode != mode {
+            return None;
+        }
+        if options.offset >= self.total {
+            return Some((self.total, Vec::new()));
+        }
+        let end = options.offset.saturating_add(options.limit).min(self.total);
+        if end > self.prefix.len() {
+            return None;
+        }
+        Some((self.total, self.prefix[options.offset..end].to_vec()))
+    }
+}
+
+fn model_cache_options(mode: SearchMode, options: &SearchOptions) -> Option<SearchOptions> {
+    let end = options.offset.saturating_add(options.limit);
+    if mode == SearchMode::Lexical || end > MAX_MODEL_CACHE_RESULTS {
+        return None;
+    }
+    Some(SearchOptions {
+        offset: 0,
+        limit: end
+            .saturating_add(MODEL_CACHE_LOOKAHEAD)
+            .min(MAX_MODEL_CACHE_RESULTS),
+    })
+}
+
 /// 每份文档仅提交最佳语义窗口；流式处理避免对所有原始窗口排序。
 fn semantic_document_winners(
     catalog: &Cached,
@@ -432,6 +522,7 @@ fn semantic_document_winners(
         .db
         .query_row("SELECT count(*) FROM vectors", [], |row| row.get(0))?;
     check_semantic_budget(usize::try_from(total_vectors)?, vectors.len())?;
+    let prepared = semantic::PreparedQueries::new(vectors)?;
     let mut query = catalog.db.prepare_cached(
         "SELECT doc, segment, start, end, embedding FROM vectors ORDER BY doc,segment,start",
     )?;
@@ -442,7 +533,7 @@ fn semantic_document_winners(
         let ranked = Ranked {
             doc: row.get(0)?,
             segment: row.get(1)?,
-            score: semantic::cosine(row.get_ref(4)?.as_blob()?, vectors)?,
+            score: prepared.cosine(row.get_ref(4)?.as_blob()?)?,
             window: Some((row.get(2)?, row.get(3)?)),
             evidence: MatchEvidence::Semantic,
         };
@@ -474,6 +565,95 @@ fn check_semantic_budget(rows: usize, query_windows: usize) -> Result<()> {
 #[cfg(test)]
 mod semantic_budget_tests {
     use super::*;
+
+    #[test]
+    fn model_rank_cache_is_bounded_and_never_fakes_deep_pages() {
+        let query = "预算 Budget";
+        let options = SearchOptions {
+            offset: 0,
+            limit: 40,
+        };
+        let prefix = model_cache_options(SearchMode::Semantic, &options).unwrap();
+        assert_eq!(prefix.limit, 296);
+        let cache = ModelRankCache {
+            query: query.into(),
+            mode: SearchMode::Semantic,
+            total: 10_000,
+            prefix: (0..prefix.limit as i64)
+                .map(|doc| Ranked {
+                    doc,
+                    segment: doc,
+                    score: 1.0,
+                    window: None,
+                    evidence: MatchEvidence::Semantic,
+                })
+                .collect(),
+        };
+        let (total, page) = cache
+            .page(
+                query,
+                SearchMode::Semantic,
+                &SearchOptions {
+                    offset: 250,
+                    limit: 40,
+                },
+            )
+            .unwrap();
+        assert_eq!(total, 10_000);
+        assert_eq!(page.first().unwrap().doc, 250);
+        assert_eq!(page.last().unwrap().doc, 289);
+        assert!(cache.page(query, SearchMode::Hybrid, &options).is_none());
+        assert!(cache
+            .page("预算 budget", SearchMode::Semantic, &options)
+            .is_none());
+        assert!(cache
+            .page(
+                query,
+                SearchMode::Semantic,
+                &SearchOptions {
+                    offset: 280,
+                    limit: 40
+                }
+            )
+            .is_none());
+        assert!(cache
+            .page(
+                query,
+                SearchMode::Semantic,
+                &SearchOptions {
+                    offset: usize::MAX - 200,
+                    limit: 200
+                }
+            )
+            .unwrap()
+            .1
+            .is_empty());
+        assert!(model_cache_options(
+            SearchMode::Semantic,
+            &SearchOptions {
+                offset: 4096,
+                limit: 1
+            }
+        )
+        .is_none());
+        assert_eq!(
+            model_cache_options(
+                SearchMode::Hybrid,
+                &SearchOptions {
+                    offset: 4095,
+                    limit: 1
+                }
+            )
+            .unwrap()
+            .limit,
+            MAX_MODEL_CACHE_RESULTS
+        );
+        assert!(model_cache_options(SearchMode::Lexical, &options).is_none());
+        let mut reader = ContentReader::new(Path::new("/synthetic"));
+        reader.model_cache = Some(cache);
+        reader.release();
+        assert!(reader.model_cache.is_none());
+    }
 
     #[test]
     fn semantic_budget_never_silently_truncates() {
