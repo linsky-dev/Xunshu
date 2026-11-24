@@ -1976,9 +1976,8 @@ impl Index {
                                             local_path.as_str()
                                         } else {
                                             boost_path.clear();
-                                            boost_path.push_str(
-                                                &segment.manifest.parents[parent_id],
-                                            );
+                                            boost_path
+                                                .push_str(&segment.manifest.parents[parent_id]);
                                             boost_path.push_str(view.name);
                                             boost_path.as_str()
                                         };
@@ -2349,6 +2348,23 @@ mod tests {
             .search("budget | readme", &SearchOptions::default(), None)
             .unwrap();
         assert_eq!(r.total, 2);
+    }
+    #[test]
+    fn personalized_search_preserves_path_filter_and_global_rank() {
+        let idx = fixture();
+        let boosts = HashMap::from([("/tmp/project/readme.md".to_owned(), 100_000)]);
+        let options = SearchOptions {
+            limit: 1,
+            ..Default::default()
+        };
+        for query in ["budget | readme", "path:project (budget | readme)"] {
+            let r = idx
+                .search_personalized(query, &options, None, &boosts)
+                .unwrap();
+            assert!(r.complete);
+            assert_eq!(r.total, 2);
+            assert_eq!(r.results[0].path, "/tmp/project/readme.md");
+        }
     }
     #[test]
     fn mixed_not_path_is_conservative() {
