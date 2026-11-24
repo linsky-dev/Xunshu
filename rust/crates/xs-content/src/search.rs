@@ -280,7 +280,7 @@ impl ContentReader {
                     // 否则翻页超过 200 条会出现假空页，也会丢失深页中的双路命中。
                     let (_, lex) = lexical_ranked(catalog, terms, None, cancel)?;
                     let sem = semantic_ranked(catalog, &vectors, cancel)?;
-                    rrf_fuse(&lex, &sem, options)
+                    rrf_fuse(&lex, &sem, options, cancel)?
                 }
             };
             let source = Ranking {
@@ -312,16 +312,6 @@ struct Ranking {
     total: usize,
     ranked: Vec<Ranked>,
     mode: SearchMode,
-}
-
-fn page_ranked(ranked: Vec<Ranked>, options: &SearchOptions) -> (usize, Vec<Ranked>) {
-    let total = ranked.len();
-    let page = ranked
-        .into_iter()
-        .skip(options.offset)
-        .take(options.limit)
-        .collect();
-    (total, page)
 }
 
 /// 对每份文档只保留 BM25 最强命中段落；无页数截断。
@@ -713,8 +703,13 @@ impl Terms {
 
     fn snippet(&self, body: &str) -> (String, Vec<Highlight>) {
         let tokens = tokenize(body);
+        // Duplicate terms can affect BM25: keep the original FTS expression,
+        // but deduplicate identical groups for snippet highlights.
+        let mut groups: Vec<_> = self.groups.iter().collect();
+        groups.sort_unstable();
+        groups.dedup();
         let mut spans = Vec::new();
-        for group in &self.groups {
+        for group in groups {
             for slice in tokens.windows(group.len()) {
                 if slice
                     .iter()
@@ -920,11 +915,15 @@ fn rrf_fuse(
     lexical: &[Ranked],
     semantic: &[Ranked],
     options: &SearchOptions,
-) -> (usize, Vec<Ranked>) {
+    cancel: &AtomicBool,
+) -> Result<(usize, Vec<Ranked>)> {
     use std::collections::HashMap;
     const RRF_K: f64 = 60.0;
     let mut fused: HashMap<i64, Ranked> = HashMap::new();
     for (rank, item) in lexical.iter().enumerate() {
+        if rank.is_multiple_of(128) {
+            ensure!(!cancel.load(Ordering::Acquire), "混合查询已取消");
+        }
         // 词法和语义分数不同尺度，创建条目时不得沿用原始分数。
         let entry = fused.entry(item.doc).or_insert(Ranked {
             score: 0.0,
@@ -933,6 +932,9 @@ fn rrf_fuse(
         entry.score += 1.0 / (RRF_K + rank as f64 + 1.0);
     }
     for (rank, item) in semantic.iter().enumerate() {
+        if rank.is_multiple_of(128) {
+            ensure!(!cancel.load(Ordering::Acquire), "混合查询已取消");
+        }
         let entry = fused.entry(item.doc).or_insert(Ranked {
             score: 0.0,
             ..*item
@@ -944,9 +946,29 @@ fn rrf_fuse(
         // 词法命中优先作展示证据，确保摘要能高亮输入的原词。
         // 纯语义命中展示语义得分最强的分窗。
     }
-    let mut combined: Vec<Ranked> = fused.into_values().collect();
-    combined.sort_unstable_by(|a, b| b.score.total_cmp(&a.score).then(a.doc.cmp(&b.doc)));
-    page_ranked(combined, options)
+    ensure!(!cancel.load(Ordering::Acquire), "混合查询已取消");
+    let total = fused.len();
+    if options.offset >= total || options.limit == 0 {
+        return Ok((total, Vec::new()));
+    }
+    let capacity = options.offset.saturating_add(options.limit).min(total);
+    let mut heap = BinaryHeap::<std::cmp::Reverse<SemanticBest>>::new();
+    for (n, item) in fused.into_values().enumerate() {
+        if n.is_multiple_of(128) {
+            ensure!(!cancel.load(Ordering::Acquire), "混合查询已取消");
+        }
+        let item = SemanticBest(item);
+        if heap.len() < capacity {
+            heap.push(std::cmp::Reverse(item));
+        } else if heap.peek().is_some_and(|worst| item > worst.0) {
+            heap.pop();
+            heap.push(std::cmp::Reverse(item));
+        }
+    }
+    let mut page: Vec<_> = heap.into_iter().map(|entry| entry.0 .0).collect();
+    page.sort_unstable_by(|a, b| b.score.total_cmp(&a.score).then(a.doc.cmp(&b.doc)));
+    ensure!(!cancel.load(Ordering::Acquire), "混合查询已取消");
+    Ok((total, page.into_iter().skip(options.offset).collect()))
 }
 
 #[cfg(test)]
@@ -994,7 +1016,9 @@ mod hybrid_rrf_tests {
                 offset: 0,
                 limit: 10,
             },
-        );
+            &AtomicBool::new(false),
+        )
+        .unwrap();
         assert_eq!(total, 3);
         assert_eq!(page[0].doc, 2);
         assert_eq!(
@@ -1006,6 +1030,71 @@ mod hybrid_rrf_tests {
         assert_eq!(page[1].evidence, MatchEvidence::Lexical);
         assert_eq!(page[2].evidence, MatchEvidence::Semantic);
         assert_eq!(page.iter().filter(|hit| hit.doc == 2).count(), 1);
+    }
+
+    #[test]
+    fn hybrid_top_k_matches_full_reference_sort() {
+        let make = |doc, evidence| Ranked {
+            doc,
+            segment: doc,
+            score: 1.0,
+            window: None,
+            evidence,
+        };
+        let lex: Vec<_> = (0..3000)
+            .filter(|doc| doc % 3 != 0)
+            .map(|doc| make(doc, MatchEvidence::Lexical))
+            .collect();
+        let sem: Vec<_> = (0..3000)
+            .rev()
+            .filter(|doc| doc % 5 != 0)
+            .map(|doc| make(doc, MatchEvidence::Semantic))
+            .collect();
+        let mut scores = std::collections::BTreeMap::<i64, f64>::new();
+        for source in [&lex, &sem] {
+            for (rank, hit) in source.iter().enumerate() {
+                *scores.entry(hit.doc).or_default() += 1.0 / (61.0 + rank as f64);
+            }
+        }
+        let mut expected: Vec<_> = scores.into_iter().collect();
+        expected.sort_unstable_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        for offset in [0, 1, 199, 1000, 2799, 3000, usize::MAX - 200] {
+            let (total, actual) = rrf_fuse(
+                &lex,
+                &sem,
+                &SearchOptions { offset, limit: 200 },
+                &AtomicBool::new(false),
+            )
+            .unwrap();
+            assert_eq!(total, expected.len());
+            assert_eq!(
+                actual
+                    .iter()
+                    .map(|hit| (hit.doc, hit.score))
+                    .collect::<Vec<_>>(),
+                expected
+                    .iter()
+                    .skip(offset)
+                    .take(200)
+                    .copied()
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn repeated_terms_preserve_snippet_highlights() {
+        let body = format!("前缀{}后缀", "中文报告 budget ".repeat(200));
+        let one = Terms::parse("报告 budget").unwrap();
+        let many = Terms::parse(&"报告 budget ".repeat(40)).unwrap();
+        let (a, ah) = one.snippet(&body);
+        let (b, bh) = many.snippet(&body);
+        assert_eq!(a, b);
+        assert_eq!(
+            ah.iter().map(|h| (h.start, h.end)).collect::<Vec<_>>(),
+            bh.iter().map(|h| (h.start, h.end)).collect::<Vec<_>>()
+        );
+        assert_ne!(one.expression, many.expression);
     }
 
     #[test]
@@ -1030,7 +1119,13 @@ mod hybrid_rrf_tests {
             .collect();
         let mut ids = std::collections::HashSet::new();
         for offset in (0..450).step_by(37) {
-            let (total, page) = rrf_fuse(&lex, &sem, &SearchOptions { offset, limit: 37 });
+            let (total, page) = rrf_fuse(
+                &lex,
+                &sem,
+                &SearchOptions { offset, limit: 37 },
+                &AtomicBool::new(false),
+            )
+            .unwrap();
             assert_eq!(total, 450);
             for hit in page {
                 assert!(ids.insert(hit.doc), "分页重复文档");
@@ -1044,8 +1139,17 @@ mod hybrid_rrf_tests {
                 offset: 450,
                 limit: 37,
             },
-        );
+            &AtomicBool::new(false),
+        )
+        .unwrap();
         assert!(past_end.is_empty());
+        assert!(rrf_fuse(
+            &lex,
+            &sem,
+            &SearchOptions::default(),
+            &AtomicBool::new(true)
+        )
+        .is_err());
     }
 }
 
