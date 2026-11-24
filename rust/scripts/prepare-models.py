@@ -28,6 +28,10 @@ LICENSE_OBJECTS = {
     "BGE-LICENSE.txt": (1065, "360931513aa6c02f933a403202afa99ac2c5bc88"),
     "PP-OCRv5-LICENSE.txt": (11376, "430edfa0cfcb59f15b7aa5457427d0faf2e40dac"),
 }
+LICENSE_SHA256 = {
+    "BGE-LICENSE.txt": "587a673933425dbc36ec61268d3b954051b2d3ef3c9b322ede357976055ffdd5",
+    "PP-OCRv5-LICENSE.txt": "3840c5c0c61c294264d2dd77b8777be6ddd90121ef4e0e64abcd22edea581d6e",
+}
 ORT_RELEASE = "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4"
 ORT_ARCHIVES = {
     "windows": ("onnxruntime-win-x64-1.24.4.zip", "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357", "onnxruntime.dll", "onnxruntime.dll"),
@@ -81,6 +85,8 @@ def verify_license(path):
     if path.is_symlink() or not path.is_file() or path.stat().st_size != size:
         raise ValueError(f"许可证来源长度或类型不匹配：{path.name}")
     data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != LICENSE_SHA256[path.name]:
+        raise ValueError(f"许可证来源 SHA-256 不匹配：{path.name}")
     if len(data) != size or hashlib.sha1(f"blob {size}\0".encode() + data).hexdigest() != expected:
         raise ValueError(f"许可证来源 Git 对象摘要不匹配：{path.name}")
 
@@ -283,7 +289,7 @@ def build_resources(cache, work, output, platform):
                               "model_sha256": OCR_SHA256[name]}
                          for name, url in (("det", DET), ("rec", REC))}
     provenance["license_sources"] = {"BGE-LICENSE.txt": BGE_LICENSE, "PP-OCRv5-LICENSE.txt": OCR_LICENSE}
-    provenance["license_git_objects"] = {name: {"bytes": size, "git_blob_sha1": sha}
+    provenance["license_git_objects"] = {name: {"bytes": size, "git_blob_sha1": sha, "sha256": LICENSE_SHA256[name]}
                                          for name, (size, sha) in LICENSE_OBJECTS.items()}
     provenance["outputs_sha256"] = {p.name: digest(p) for p in sorted(output.iterdir())}
     (output / "build-provenance.json").write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n",

@@ -24,12 +24,20 @@ FONT_OBJECTS = {
     "license": (4301, "d952d62c065f3f35fb83a173496e90b21525aef3"),
 }
 
+FONT_LICENSE_SHA256 = "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+MODEL_LICENSE_SHA256 = {
+    "BGE-LICENSE.txt": "587a673933425dbc36ec61268d3b954051b2d3ef3c9b322ede357976055ffdd5",
+    "PP-OCRv5-LICENSE.txt": "3840c5c0c61c294264d2dd77b8777be6ddd90121ef4e0e64abcd22edea581d6e",
+}
+
 
 def verify_font_object(path, role):
     size, expected = FONT_OBJECTS[role]
     if path.is_symlink() or not path.is_file() or path.stat().st_size != size:
         raise ValueError(f"字体来源文件长度或类型不匹配：{path.name}")
     data = path.read_bytes()
+    if role == "license" and hashlib.sha256(data).hexdigest() != FONT_LICENSE_SHA256:
+        raise ValueError(f"字体许可证来源 SHA-256 不匹配：{path.name}")
     if len(data) != size or hashlib.sha1(f"blob {size}\0".encode() + data).hexdigest() != expected:
         raise ValueError(f"字体来源 Git 对象摘要不匹配：{path.name}")
 
@@ -115,6 +123,9 @@ def validate_resources(resources, platform):
     if inference.get("schema") != 1 or set(inference.get("files", {})) != models:
         raise ValueError("内置推理清单资源集合不匹配")
     hashes = {name: digest(paths[name]) for name in required - {"build-provenance.json"}}
+    for name, expected in MODEL_LICENSE_SHA256.items():
+        if hashes[name] != expected:
+            raise ValueError(f"模型许可证来源 SHA-256 不匹配：{name}")
     if provenance.get("outputs_sha256") != hashes:
         raise ValueError("构建来源清单与模型资源摘要不一致")
     for name, record in inference["files"].items():

@@ -116,7 +116,7 @@ class BuildContracts(unittest.TestCase):
         path = self.root / name
         data = b"fixture-license"
         blob = hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
-        with patch.dict(models.LICENSE_OBJECTS, {name: (len(data), blob)}):
+        with patch.dict(models.LICENSE_OBJECTS, {name: (len(data), blob)}), patch.dict(models.LICENSE_SHA256, {name: sha(data)}):
             path.write_bytes(data)
             models.verify_license(path)
             path.write_bytes(b"x" * len(data))

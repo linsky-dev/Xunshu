@@ -33,6 +33,12 @@ class PayloadContracts(unittest.TestCase):
                            for name in self.models}}
         self.write_json("inference.json", self.inference)
         self.refresh_provenance()
+        # Fixtures are not upstream licenses; override only the independently
+        # pinned expected hashes in this isolated test scope.
+        pins = patch.dict(payload.MODEL_LICENSE_SHA256, {name: payload.digest(self.resources / name)
+                          for name in payload.MODEL_LICENSE_SHA256})
+        pins.start()
+        self.addCleanup(pins.stop)
 
     def write_json(self, name, data):
         (self.resources / name).write_text(json.dumps(data), encoding="utf-8")
@@ -59,6 +65,12 @@ class PayloadContracts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "内置推理清单记录"):
             payload.validate_resources(self.resources, "linux")
 
+    def test_recomputed_provenance_cannot_replace_pinned_license(self):
+        (self.resources / "BGE-LICENSE.txt").write_bytes(b"substituted")
+        self.refresh_provenance()
+        with self.assertRaisesRegex(ValueError, "模型许可证来源 SHA-256"):
+            payload.validate_resources(self.resources, "linux")
+
     def test_missing_extra_and_wrong_platform(self):
         with self.assertRaises(ValueError):
             payload.validate_resources(self.resources, "windows")
@@ -83,7 +95,7 @@ class PayloadContracts(unittest.TestCase):
             fixture = self.root / role
             fixture.write_bytes(data)
             sha = hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
-            with patch.dict(payload.FONT_OBJECTS, {role: (len(data), sha)}):
+            with patch.dict(payload.FONT_OBJECTS, {role: (len(data), sha)}), patch.object(payload, "FONT_LICENSE_SHA256", hashlib.sha256(data).hexdigest()):
                 payload.verify_font_object(fixture, role)
                 fixture.write_bytes(b"x" * len(data))
                 with self.assertRaises(ValueError):
