@@ -205,8 +205,10 @@ fn content_index_token(settings: &Settings) -> Result<String> {
     let scope = settings.content_scope_token()?;
     let mut hash = Sha256::new();
     hash.update(scope.as_bytes());
+    // The previous XLSX extractor could omit out-of-order shared formulas.
+    hash.update(b"\0xlsx-sparse-v2");
     // Older OCR snapshots may have silently missed inherited/form images.
-    // Invalidate only OCR-enabled indexes so unchanged files are re-extracted.
+    // Retain the OCR-specific semantic version in addition to the common one.
     if settings.ocr_enabled {
         hash.update(b"\0pdf-drawn-images-v2");
     }
@@ -218,19 +220,21 @@ mod index_token_tests {
     use super::*;
 
     #[test]
-    fn upgrade_preserves_non_ocr_index_but_requires_old_ocr_rebuild() {
+    fn upgrade_requires_old_content_rebuild_without_changing_scope() {
         for ocr_enabled in [false, true] {
             let settings = Settings {
                 content_enabled: true,
                 ocr_enabled,
                 ..Settings::default()
             };
-            let old = format!(
-                "{:x}",
-                Sha256::digest(settings.content_scope_token().unwrap().as_bytes())
-            );
+            let mut old = Sha256::new();
+            old.update(settings.content_scope_token().unwrap().as_bytes());
+            if ocr_enabled {
+                old.update(b"\0pdf-drawn-images-v2");
+            }
+            let old = format!("{:x}", old.finalize());
             let new = content_index_token(&settings).unwrap();
-            assert_eq!(old != new, ocr_enabled);
+            assert_ne!(old, new);
             assert_eq!(new, content_index_token(&settings).unwrap());
         }
     }

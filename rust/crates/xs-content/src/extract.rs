@@ -1,7 +1,10 @@
 //! 从已授权的文档字节中抽取正文。解析器不读取任何路径或外部引用。
 
 use anyhow::{bail, ensure, Context, Result};
-use calamine::{open_workbook_from_rs, Data, Ods, Range, Reader as WorkbookReader, Xlsx};
+use calamine::{
+    expand_shared_formula, open_workbook_from_rs, Data, DataRef, Dimensions, Ods, Range,
+    Reader as WorkbookReader, SheetType, Xlsx, XlsxFormulaMetadata,
+};
 use quick_xml::{events::Event, Reader, XmlVersion};
 use scraper::{Html, Node};
 use serde::{Deserialize, Serialize};
@@ -159,7 +162,7 @@ pub(crate) fn extract(
         "xlsx" => {
             check_archive(bytes)?;
             let book: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes))?;
-            workbook(book, &mut result)?;
+            xlsx_workbook(book, &mut result)?;
         }
         "ods" => {
             check_archive(bytes)?;
@@ -784,6 +787,121 @@ fn cells<T: calamine::CellType>(range: &Range<T>) -> impl Iterator<Item = ((u32,
         .map(move |(r, c, value)| ((row + r as u32, col + c as u32), value))
 }
 
+// Sparse XLSX worksheets must not allocate the enclosing row/column rectangle.
+// The metadata reader also avoids Calamine's shared-index-sized template vector.
+fn xlsx_workbook<R: Read + std::io::Seek>(mut book: Xlsx<R>, result: &mut Segments) -> Result<()> {
+    const MAX_VISITED_CELLS: usize = 1_000_000;
+    const MAX_FORMULA_BYTES: usize = 64 * 1024;
+    let mut visited = 0;
+    let mut stored_bytes = 0usize;
+    let mut stored_cells = 0usize;
+    let sheets = book.sheets_metadata().to_vec();
+    ensure!(sheets.len() <= MAX_SEGMENTS, "工作表数量超出抽取预算");
+    for sheet in sheets {
+        if sheet.typ != SheetType::WorkSheet {
+            continue;
+        }
+        ensure!(sheet.name.len() <= 1024, "工作表名称超出预算");
+        let mut reader = book.worksheet_cells_reader(&sheet.name)?;
+        let mut entries = BTreeMap::new();
+        let mut shared: BTreeMap<usize, (Dimensions, String)> = BTreeMap::new();
+        let mut derived = Vec::new();
+        while let Some(cell) = reader.next_cell_with_formula_metadata()? {
+            visited += 1;
+            ensure!(visited <= MAX_VISITED_CELLS, "XLSX 单元格访问数量超出预算");
+            let pos = cell.pos;
+            ensure!(xlsx_position(pos), "XLSX 单元格坐标超出范围");
+            if matches!(cell.value, DataRef::Empty) && cell.formula.is_none() {
+                continue;
+            }
+            stored_cells += 1;
+            ensure!(stored_cells <= MAX_SEGMENTS, "工作簿单元格数超出抽取预算");
+            let mut text = match cell.value {
+                DataRef::Empty => String::new(),
+                value => Data::from(value).to_string(),
+            };
+            match cell.formula {
+                None => {}
+                Some(XlsxFormulaMetadata::Normal { formula }) => {
+                    append_formula(&mut text, &formula, MAX_FORMULA_BYTES)?;
+                }
+                Some(XlsxFormulaMetadata::Shared {
+                    shared_index,
+                    range,
+                    formula,
+                }) => {
+                    let range = range.context("XLSX 共享公式缺少范围")?;
+                    ensure!(
+                        xlsx_position(range.start)
+                            && xlsx_position(range.end)
+                            && range.start == pos
+                            && range.contains(range.start.0, range.start.1),
+                        "XLSX 共享公式锚点或范围无效"
+                    );
+                    append_formula(&mut text, &formula, MAX_FORMULA_BYTES)?;
+                    ensure!(
+                        shared.insert(shared_index, (range, formula)).is_none(),
+                        "XLSX 共享公式锚点重复"
+                    );
+                }
+                Some(XlsxFormulaMetadata::SharedDerived { shared_index }) => {
+                    derived.push((pos, shared_index));
+                }
+                Some(_) => bail!("不支持的 XLSX 公式元数据"),
+            }
+            stored_bytes = stored_bytes
+                .checked_add(text.len())
+                .context("XLSX 正文预算溢出")?;
+            ensure!(stored_bytes <= MAX_TEXT, "XLSX 正文超出抽取预算");
+            ensure!(entries.insert(pos, text).is_none(), "XLSX 单元格坐标重复");
+        }
+        // Resolve shared formulas only after collecting bounded anchors. This
+        // preserves derived cells that appear before their anchor in XML order.
+        for (pos, index) in derived {
+            let (range, template) = shared.get(&index).context("XLSX 共享公式缺少锚点")?;
+            ensure!(
+                range.contains(pos.0, pos.1),
+                "XLSX 共享公式派生单元格超出范围"
+            );
+            let formula = expand_shared_formula(template, range.start, pos)?;
+            let text = entries.get_mut(&pos).context("XLSX 共享公式单元格缺失")?;
+            let before = text.len();
+            append_formula(text, &formula, MAX_FORMULA_BYTES)?;
+            stored_bytes = stored_bytes
+                .checked_add(text.len() - before)
+                .context("XLSX 正文预算溢出")?;
+            ensure!(stored_bytes <= MAX_TEXT, "XLSX 正文超出抽取预算");
+        }
+        for ((row, col), text) in entries {
+            result.add(
+                &text,
+                Location::Cell {
+                    sheet: sheet.name.clone(),
+                    address: a1(row, col),
+                },
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn xlsx_position((row, col): (u32, u32)) -> bool {
+    row < 1_048_576 && col < 16_384
+}
+
+fn append_formula(text: &mut String, formula: &str, limit: usize) -> Result<()> {
+    ensure!(
+        !formula.is_empty() && formula.len() <= limit,
+        "XLSX 公式为空或超出预算"
+    );
+    if !text.is_empty() {
+        text.push('\n');
+    }
+    text.push('=');
+    text.push_str(formula);
+    Ok(())
+}
+
 fn workbook<R: Read + std::io::Seek>(
     mut book: impl WorkbookReader<R, Error: std::error::Error + Send + Sync + 'static>,
     result: &mut Segments,
@@ -831,6 +949,108 @@ fn a1(row: u32, col: u32) -> String {
     }
     let label: String = letters.into_iter().rev().collect();
     format!("{label}{}", u64::from(row) + 1)
+}
+
+#[cfg(test)]
+mod xlsx_sparse_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn extract_sheet(rows: &str) -> Result<Vec<Segment>> {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let sheet = format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{rows}</sheetData></worksheet>"#
+        );
+        let parts = [
+            (
+                "[Content_Types].xml",
+                r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#,
+            ),
+            (
+                "_rels/.rels",
+                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+            ),
+            (
+                "xl/workbook.xml",
+                r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="台账" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
+            ),
+            ("xl/worksheets/sheet1.xml", &sheet),
+        ];
+        for (name, text) in parts {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(text.as_bytes()).unwrap();
+        }
+        let bytes = zip.finish().unwrap().into_inner();
+        extract("xlsx", &bytes, false, &mut None)
+    }
+
+    #[test]
+    fn opposite_corners_preserve_sparse_cells_and_absolute_locations() {
+        let segments = extract_sheet(r#"<row r="1"><c r="A1" t="inlineStr"><is><t>年初台账</t></is></c></row><row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>年末台账</t></is></c></row>"#).unwrap();
+        assert_eq!(segments.len(), 2);
+        for (segment, (address, text)) in segments
+            .iter()
+            .zip([("A1", "年初台账"), ("XFD1048576", "年末台账")])
+        {
+            assert_eq!(
+                segment.location,
+                Location::Cell {
+                    sheet: "台账".into(),
+                    address: address.into()
+                }
+            );
+            assert_eq!(segment.text, text);
+        }
+    }
+
+    #[test]
+    fn shared_formula_uses_bounded_map_and_resolves_late_anchor() {
+        let segments = extract_sheet(r#"<row r="3"><c r="B3"><f t="shared" si="4000000000"/><v>8</v></c></row><row r="2"><c r="B2"><f t="shared" si="4000000000" ref="B2:B3">A2+$C$1</f><v>7</v></c><c r="D2"><f>SUM(A1:A2)</f></c></row>"#).unwrap();
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].text, "7\n=A2+$C$1");
+        assert_eq!(segments[1].text, "=SUM(A1:A2)");
+        assert_eq!(segments[2].text, "8\n=A3+$C$1");
+    }
+
+    #[test]
+    fn corrupt_shared_formula_and_duplicate_cells_fail_closed() {
+        for (rows, expected) in [
+            (
+                r#"<row r="1"><c r="A1"><f t="shared" si="9"/><v>1</v></c></row>"#,
+                "缺少锚点",
+            ),
+            (
+                r#"<row r="1"><c r="A1"><f t="shared" si="1" ref="A1:A2">B1</f></c><c r="B1"><f t="shared" si="1"/></c></row>"#,
+                "超出范围",
+            ),
+            (
+                r#"<row r="1"><c r="A1"><v>1</v></c><c r="A1"><v>2</v></c></row>"#,
+                "坐标重复",
+            ),
+            (
+                r#"<row r="1"><c r="XFE1"><v>1</v></c></row>"#,
+                "坐标超出范围",
+            ),
+        ] {
+            let error = extract_sheet(rows).unwrap_err().to_string();
+            assert!(error.contains(expected), "{error}");
+        }
+    }
+
+    #[test]
+    fn sparse_workbook_enforces_meaningful_cell_budget_before_dense_allocation() {
+        let mut rows = String::new();
+        for n in 1..=MAX_SEGMENTS + 1 {
+            rows.push_str(&format!(r#"<row r="{n}"><c r="A{n}"><v>1</v></c></row>"#));
+        }
+        let error = extract_sheet(&rows).unwrap_err().to_string();
+        assert!(error.contains("单元格数超出"), "{error}");
+    }
 }
 
 #[cfg(test)]

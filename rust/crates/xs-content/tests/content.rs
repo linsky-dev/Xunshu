@@ -85,7 +85,7 @@ fn real_worker_indexes_safe_formats_and_locations() {
             ("_rels/.rels", r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#),
             ("xl/workbook.xml", r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="表格" sheetId="1" r:id="rId1"/></sheets></workbook>"#),
             ("xl/_rels/workbook.xml.rels", r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#),
-            ("xl/worksheets/sheet1.xml", r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="3"><c r="AB3" t="inlineStr"><is><t>单元格位置</t></is></c><c r="AC3"><f>SUM(1,2)</f><v>3</v></c></row></sheetData></worksheet>"#),
+            ("xl/worksheets/sheet1.xml", r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>年初台账</t></is></c></row><row r="2"><c r="B2"><f t="shared" si="4000000000" ref="B2:B3">D2+$E$1</f><v>7</v></c></row><row r="3"><c r="B3"><f t="shared" si="4000000000"/><v>8</v></c><c r="AB3" t="inlineStr"><is><t>单元格位置</t></is></c><c r="AC3"><f>SUM(1,2)</f><v>3</v></c></row><row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>年末台账</t></is></c></row></sheetData></worksheet>"#),
         ]),
     )
     .unwrap();
@@ -126,6 +126,30 @@ fn real_worker_indexes_safe_formats_and_locations() {
             address: "AC3".into(),
         }
     );
+    assert_eq!(
+        query("年初台账").hits[0].location,
+        Location::Cell {
+            sheet: "表格".into(),
+            address: "A1".into()
+        }
+    );
+    assert_eq!(
+        query("年末台账").hits[0].location,
+        Location::Cell {
+            sheet: "表格".into(),
+            address: "XFD1048576".into()
+        }
+    );
+    let derived = query("D3");
+    assert_eq!(derived.indexed_total, 1);
+    assert_eq!(
+        derived.hits[0].location,
+        Location::Cell {
+            sheet: "表格".into(),
+            address: "B3".into()
+        }
+    );
+    assert!(derived.hits[0].snippet.contains("=D3+$E$1"));
     let hit = &query("会议").hits[0];
     let span = &hit.highlights[0];
     assert_eq!(&hit.snippet[span.start..span.end], "会议");
