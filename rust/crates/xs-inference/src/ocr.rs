@@ -54,6 +54,7 @@ impl Ocr {
     }
 
     pub fn recognize(&mut self, bytes: &[u8], cancel: &AtomicBool) -> Result<Vec<TextLine>> {
+        ensure!(!cancel.load(Ordering::Relaxed), "OCR 已取消");
         ensure!(bytes.len() <= MAX_IMAGE_BYTES, "图片超过 OCR 输入上限");
         let mut reader = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
         let mut limits = Limits::default();
@@ -91,12 +92,14 @@ impl Ocr {
         ))?;
         let regions = {
             let outputs = self.det.run(ort::inputs![tensor])?;
+            ensure!(!cancel.load(Ordering::Relaxed), "OCR 已取消");
+            ensure!(outputs.len() == 1, "OCR 检测模型输出数量无效");
             let (shape, map) = outputs[0].try_extract_tensor::<f32>()?;
             ensure!(
                 shape.as_ref() == [1, 1, i64::from(height), i64::from(width)],
                 "OCR 检测模型输出形状无效"
             );
-            regions(map, width, height)
+            regions(map, width, height)?
         };
         let mut lines = Vec::new();
         for region in regions {
@@ -122,6 +125,8 @@ impl Ocr {
                 planar(&crop, padded_width, [0.5; 3], [0.5; 3]),
             ))?;
             let outputs = self.rec.run(ort::inputs![tensor])?;
+            ensure!(!cancel.load(Ordering::Relaxed), "OCR 已取消");
+            ensure!(outputs.len() == 1, "OCR 识别模型输出数量无效");
             let (shape, values) = outputs[0].try_extract_tensor::<f32>()?;
             ensure!(
                 shape.len() == 3 && shape[0] == 1,
@@ -140,6 +145,7 @@ impl Ocr {
                 });
             }
         }
+        ensure!(!cancel.load(Ordering::Relaxed), "OCR 已取消");
         Ok(lines)
     }
 }
@@ -159,7 +165,16 @@ fn planar(image: &RgbImage, padded_width: u32, mean: [f32; 3], std: [f32; 3]) ->
 }
 
 /// 在检测概率图上找相连区域并为裁剪补足边距，坐标始终位于输入内。
-fn regions(map: &[f32], width: u32, height: u32) -> Vec<Region> {
+fn regions(map: &[f32], width: u32, height: u32) -> Result<Vec<Region>> {
+    ensure!(
+        width > 0
+            && height > 0
+            && width <= MAX_SIDE
+            && height <= MAX_SIDE
+            && map.len() == width as usize * height as usize
+            && map.iter().all(|v| v.is_finite()),
+        "OCR 检测概率图无效"
+    );
     let mut mask: Vec<_> = map.iter().map(|&value| value >= 0.3).collect();
     let mut stack = Vec::new();
     let mut regions = Vec::new();
@@ -207,30 +222,32 @@ fn regions(map: &[f32], width: u32, height: u32) -> Vec<Region> {
         bounds.right = (bounds.right + pad + 1).min(width);
         bounds.bottom = (bounds.bottom + pad + 1).min(height);
         regions.push(bounds);
-        if regions.len() == MAX_LINES {
-            break;
-        }
+        ensure!(
+            regions.len() <= MAX_LINES,
+            "OCR 检测行数超过预算，拒绝返回不完整结果"
+        );
     }
     regions.sort_by_key(|region| (region.top / 12, region.left, region.top));
-    regions
+    Ok(regions)
 }
 
 fn decode(values: &[f32], classes: usize, dictionary: &[String]) -> Result<(String, f32)> {
     ensure!(
         (classes == dictionary.len() + 1 || classes == dictionary.len() + 2)
-            && values.len().is_multiple_of(classes),
+            && !values.is_empty()
+            && values.len().is_multiple_of(classes)
+            && values.iter().all(|v| v.is_finite()),
         "OCR 识别模型与字典不匹配"
     );
     let mut text = String::new();
     let mut previous = 0;
     let mut count = 0;
-    let mut score = 0.0;
+    let mut score = 0.0_f64;
     for step in values.chunks_exact(classes) {
         let Some((id, confidence)) = step
             .iter()
             .copied()
             .enumerate()
-            .filter(|(_, value)| value.is_finite())
             .max_by(|a, b| a.1.total_cmp(&b.1))
         else {
             continue;
@@ -238,15 +255,52 @@ fn decode(values: &[f32], classes: usize, dictionary: &[String]) -> Result<(Stri
         if id != 0 && id != previous {
             text.push_str(dictionary.get(id - 1).map_or(" ", String::as_str));
             count += 1;
-            score += confidence;
+            score += f64::from(confidence);
         }
         previous = id;
     }
-    Ok((text, if count > 0 { score / count as f32 } else { 0.0 }))
+    Ok((
+        text,
+        if count > 0 {
+            (score / f64::from(count)) as f32
+        } else {
+            0.0
+        },
+    ))
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn invalid_prediction_is_not_silently_skipped() {
+        let dictionary = ["中".into()];
+        assert!(super::decode(&[0.0, f32::NAN], 2, &dictionary).is_err());
+        assert!(super::decode(&[0.0, f32::INFINITY], 2, &dictionary).is_err());
+        assert!(super::decode(&[], 2, &dictionary).is_err());
+    }
+
+    #[test]
+    fn detection_budget_rejects_partial_results() {
+        let (width, height) = (160, 160);
+        let mut map = vec![0.0; width * height];
+        for row in 0..32 {
+            for col in 0..32 {
+                for y in row * 5..row * 5 + 3 {
+                    for x in col * 5..col * 5 + 4 {
+                        map[y * width + x] = 1.0;
+                    }
+                }
+            }
+        }
+        assert!(super::regions(&map, width as u32, height as u32).is_err());
+        map.fill(0.0);
+        assert!(super::regions(&map, width as u32, height as u32)
+            .unwrap()
+            .is_empty());
+        map[0] = f32::NAN;
+        assert!(super::regions(&map, width as u32, height as u32).is_err());
+    }
+
     #[test]
     fn ctc_blank_and_duplicate_collapse() {
         let predictions = [
