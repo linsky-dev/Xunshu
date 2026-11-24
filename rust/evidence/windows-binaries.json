@@ -1,0 +1,58 @@
+[
+  {
+    "name": "xunshu.exe",
+    "bytes": 5582336,
+    "sha256": "607dc06abe3b31b47185371c2470fe5b4efa4b646132512a55779f8e239c3c73",
+    "dll_imports": [
+      "api-ms-win-core-synch-l1-2-0.dll",
+      "bcryptprimitives.dll",
+      "kernel32.dll",
+      "KERNEL32.dll",
+      "msvcrt.dll",
+      "ntdll.dll"
+    ],
+    "pe_fields": {
+      "Subsystem": "00000003\t(Windows CUI)",
+      "MajorSubsystemVersion": "5",
+      "MinorSubsystemVersion": "2",
+      "DllCharacteristics": "00000160"
+    },
+    "imports_winpthread": false,
+    "imports_dynamic_gcc": false,
+    "actual_windows_execution": false
+  },
+  {
+    "name": "xs-ui.exe",
+    "bytes": 6992896,
+    "sha256": "fae3a3193e63cc9ed4441364d9f5343e84e5b2646f15a1f6d0120d3461c1314e",
+    "dll_imports": [
+      "advapi32.dll",
+      "api-ms-win-core-synch-l1-2-0.dll",
+      "bcryptprimitives.dll",
+      "dwmapi.dll",
+      "gdi32.dll",
+      "GDI32.dll",
+      "imm32.dll",
+      "kernel32.dll",
+      "KERNEL32.dll",
+      "msvcrt.dll",
+      "ntdll.dll",
+      "ole32.dll",
+      "OPENGL32.dll",
+      "shell32.dll",
+      "shlwapi.dll",
+      "USER32.dll",
+      "user32.dll",
+      "uxtheme.dll"
+    ],
+    "pe_fields": {
+      "Subsystem": "00000002\t(Windows GUI)",
+      "MajorSubsystemVersion": "5",
+      "MinorSubsystemVersion": "2",
+      "DllCharacteristics": "00000160"
+    },
+    "imports_winpthread": false,
+    "imports_dynamic_gcc": false,
+    "actual_windows_execution": false
+  }
+]

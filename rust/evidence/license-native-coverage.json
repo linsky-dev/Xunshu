@@ -1,0 +1,19 @@
+{
+  "selected_targets": [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-gnu"
+  ],
+  "includes_build_dependencies": true,
+  "targets": {
+    "linux": {
+      "registry_packages": 190,
+      "all_have_notice_files": true,
+      "missing": []
+    },
+    "windows": {
+      "registry_packages": 159,
+      "all_have_notice_files": true,
+      "missing": []
+    }
+  }
+}

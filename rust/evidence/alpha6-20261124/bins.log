@@ -1,0 +1,9 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling xs-content v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-content)
+   Compiling xs-inference v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-inference)
+   Compiling xs-ui v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-ui)
+   Compiling xs-cli v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.73s

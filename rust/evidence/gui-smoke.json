@@ -1,0 +1,50 @@
+{
+  "version": "0.18.0-alpha.1",
+  "platform": "Debian 13 x86_64 shared Linux desktop, X11 + xfwm4",
+  "method": "Manual interaction through native desktop UI; observed screenshots, no screenshot files delivered",
+  "synthetic_fixture_only": true,
+  "final_binary_sha256": "2c421362ffc7ecdca46b463d693001b41d8b1a32003f2827d7a341f10a9869d9",
+  "final_checks": [
+    {
+      "step": "Launch final release with existing synthetic settings and snapshot",
+      "observed": "Native window opens, Chinese text legible, vector search glyph replaces missing glyph squares; no scan on startup."
+    },
+    {
+      "step": "pinyin:xssj",
+      "observed": "Exactly one result: 寻枢设计方案.md from 9 indexed fixture entries."
+    },
+    {
+      "step": "Edit scope type to directories only, confirm and save+scan",
+      "observed": "New generation 2 contains exactly 2 directory records; previous document query returns 0."
+    },
+    {
+      "step": "Clear query",
+      "observed": "Exactly ui-files and 人事资料, both shown as directories; footer and total agree."
+    }
+  ],
+  "earlier_in_same_session": [
+    {
+      "step": "First-run welcome defer",
+      "observed": "Returns to empty state with scope settings entry; setup not marked completed."
+    },
+    {
+      "step": "Add explicit synthetic folder, all types, save+scan",
+      "observed": "9 records from 7 files and 2 directories; search ready."
+    },
+    {
+      "step": "ext:pdf",
+      "observed": "Exactly 2026年度考核汇总.pdf."
+    },
+    {
+      "step": "unknown:value",
+      "observed": "Visible unsupported-field error with no stale result list."
+    }
+  ],
+  "not_tested": [
+    "Windows native execution",
+    "UOS desktop",
+    "global shortcut/tray (not implemented)",
+    "real document opening by external default applications",
+    "high DPI and screen-reader accessibility"
+  ]
+}

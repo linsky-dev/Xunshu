@@ -1,0 +1,36 @@
+{
+  "catalog_bytes": 64061496,
+  "documents": 100000,
+  "first_ipc_search_ms": 2326.929257,
+  "first_load_os_page_cache_flushed": false,
+  "foreground_rebuild_ms": 136081.726256,
+  "foreground_rebuild_one_core_cpu_percent": 98.32624165002494,
+  "platform": "linux",
+  "reaped_process_tree_cpu_seconds": 133.804047,
+  "warm_ipc": [
+    {
+      "hits": 1,
+      "max_ms": 3.526529,
+      "p95_ms": 1.840266,
+      "passes_100ms_p95": true,
+      "query": "唯一测试标识",
+      "samples": 30
+    },
+    {
+      "hits": 50000,
+      "max_ms": 180.454715,
+      "p95_ms": 11.370412,
+      "passes_100ms_p95": true,
+      "query": "项目",
+      "samples": 30
+    },
+    {
+      "hits": 50000,
+      "max_ms": 160.954092,
+      "p95_ms": 14.430387,
+      "passes_100ms_p95": true,
+      "query": "budget",
+      "samples": 30
+    }
+  ]
+}

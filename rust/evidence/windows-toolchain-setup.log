@@ -1,0 +1,13 @@
+2026-11-08T05:36:42.409115+00:00 VERIFIED CACHE binutils-mingw-w64-x86-64_2.44-3+12+b1_amd64.deb
+2026-11-08T05:36:42.409157+00:00 EXTRACT binutils-mingw-w64-x86-64_2.44-3+12+b1_amd64.deb
+2026-11-08T05:36:42.530444+00:00 DOWNLOAD attempt=1 https://deb.debian.org/debian/pool/main/g/gcc-mingw-w64/gcc-mingw-w64-base_14.2.0-19+27+b1_amd64.deb
+2026-11-08T05:36:47.976395+00:00 EXTRACT gcc-mingw-w64-base_14.2.0-19+27+b1_amd64.deb
+2026-11-08T05:36:48.007083+00:00 VERIFIED CACHE gcc-mingw-w64-x86-64-posix_14.2.0-19+27+b1_amd64.deb
+2026-11-08T05:36:48.007125+00:00 EXTRACT gcc-mingw-w64-x86-64-posix_14.2.0-19+27+b1_amd64.deb
+2026-11-08T05:36:48.427221+00:00 VERIFIED CACHE gcc-mingw-w64-x86-64-posix-runtime_14.2.0-19+27+b1_amd64.deb
+2026-11-08T05:36:48.427319+00:00 EXTRACT gcc-mingw-w64-x86-64-posix-runtime_14.2.0-19+27+b1_amd64.deb
+2026-11-08T05:36:48.695526+00:00 VERIFIED CACHE mingw-w64-common_12.0.0-5_all.deb
+2026-11-08T05:36:48.695555+00:00 EXTRACT mingw-w64-common_12.0.0-5_all.deb
+2026-11-08T05:36:48.835925+00:00 VERIFIED CACHE mingw-w64-x86-64-dev_12.0.0-5_all.deb
+2026-11-08T05:36:48.835952+00:00 EXTRACT mingw-w64-x86-64-dev_12.0.0-5_all.deb
+2026-11-08T05:36:49.029331+00:00 SUCCESS toolchain extracted into /workspace/scratch/036c199d3807/.toolchain/mingw

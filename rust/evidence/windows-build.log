@@ -1,0 +1,191 @@
+
+BUILD ATTEMPT 2026-11-08T05:38:17.069560+00:00
+Command: cargo build --release --target x86_64-pc-windows-gnu -p xs-cli -p xs-ui --locked
+Target: x86_64-pc-windows-gnu; user-owned GCC 14.2.0 MinGW; jobs=3
+Rust flags: -Ctarget-feature=+crt-static -Clink-arg=-static-libgcc
+Source digest before: 0891b738549d0b9bcf506de97de144c4d5c337f8f6cfab47aeb36a807ff5a850
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling windows-link v0.2.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling smallvec v1.16.5
+   Compiling cfg-if v1.0.5
+   Compiling bitflags v2.13.2
+   Compiling windows-sys v0.61.2
+   Compiling autocfg v1.5.1
+   Compiling khronos_api v3.1.0
+   Compiling syn v3.0.9
+   Compiling cfg_aliases v0.2.2
+   Compiling utf_types v1.0.0
+   Compiling litemap v0.8.3
+   Compiling memchr v2.8.3
+   Compiling xml-rs v0.8.29
+   Compiling writeable v0.6.4
+   Compiling log v0.4.35
+   Compiling crc32fast v1.5.4
+   Compiling windows_x86_64_gnu v0.52.6
+   Compiling gl_generator v0.14.0
+   Compiling utf8_iter v1.1.0
+   Compiling icu_properties_data v2.4.0
+   Compiling simd-adler32 v0.3.10
+   Compiling synstructure v0.14.0
+   Compiling icu_normalizer_data v2.4.0
+   Compiling version_check v0.9.5
+   Compiling adler2 v2.0.1
+   Compiling zerocopy v0.8.63
+   Compiling once_cell v1.21.4
+   Compiling serde_core v1.0.229
+   Compiling parking_lot_core v0.9.12
+   Compiling ahash v0.8.12
+   Compiling windows-targets v0.52.6
+   Compiling num-traits v0.2.19
+   Compiling find-msvc-tools v0.1.15
+   Compiling scopeguard v1.2.0
+   Compiling shlex v2.0.1
+   Compiling ttf-parser v0.25.1
+   Compiling cc v1.11.1
+   Compiling zerofrom-derive v0.1.8
+   Compiling zerofrom v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.7
+   Compiling yoke v0.8.4
+   Compiling displaydoc v0.2.7
+   Compiling zerovec v0.11.9
+   Compiling bytemuck_derive v1.12.1
+   Compiling tinystr v0.8.5
+   Compiling icu_locale_core v2.4.0
+   Compiling bytemuck v1.25.2
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling icu_collections v2.4.0
+   Compiling emath v0.33.3
+   Compiling icu_provider v2.4.0
+   Compiling owned_ttf_parser v0.25.1
+   Compiling lock_api v0.4.14
+   Compiling icu_properties v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling windows-sys v0.52.0
+   Compiling miniz_oxide v0.9.1
+   Compiling zmij v1.0.23
+   Compiling winapi-x86_64-pc-windows-gnu v0.4.0
+   Compiling vcpkg v0.2.15
+   Compiling pkg-config v0.3.34
+   Compiling ab_glyph_rasterizer v0.1.10
+   Compiling unicode-segmentation v1.13.3
+   Compiling ab_glyph v0.2.32
+   Compiling libsqlite3-sys v0.35.0
+   Compiling flate2 v1.1.11
+   Compiling parking_lot v0.12.5
+   Compiling idna_adapter v1.2.2
+   Compiling ecolor v0.33.3
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling glutin_wgl_sys v0.6.1
+   Compiling glutin_egl_sys v0.7.1
+   Compiling aho-corasick v1.1.5
+   Compiling winit v0.30.13
+   Compiling percent-encoding v2.3.2
+   Compiling thiserror v2.0.21
+   Compiling winapi v0.3.9
+   Compiling foldhash v0.1.5
+   Compiling profiling v1.0.18
+   Compiling itoa v1.0.18
+   Compiling epaint_default_fonts v0.33.3
+   Compiling regex-syntax v0.8.11
+   Compiling serde v1.0.229
+   Compiling tracing-core v0.1.36
+   Compiling pinyin v0.11.0
+   Compiling nohash-hasher v0.2.0
+   Compiling raw-window-handle v0.6.2
+   Compiling pin-project-lite v0.2.17
+   Compiling serde_json v1.0.154
+   Compiling pxfm v0.1.30
+   Compiling regex-automata v0.4.18
+   Compiling moxcms v0.8.1
+   Compiling tracing v0.1.44
+   Compiling epaint v0.33.3
+   Compiling hashbrown v0.15.5
+   Compiling form_urlencoded v1.2.2
+   Compiling png v0.18.1
+   Compiling idna v1.1.0
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling glutin v0.32.3
+   Compiling memoffset v0.9.1
+   Compiling anyhow v1.0.104
+   Compiling byteorder-lite v0.1.0
+   Compiling smol_str v0.2.2
+   Compiling utf8parse v0.2.2
+   Compiling cursor-icon v1.2.0
+   Compiling once_cell_polyfill v1.70.2
+   Compiling tinyvec v1.13.3
+   Compiling dpi v0.1.2
+   Compiling anstyle v1.0.14
+   Compiling error-code v3.4.0
+   Compiling anstyle-wincon v3.0.11
+   Compiling clipboard-win v5.4.3
+   Compiling unicode-normalization v0.1.26
+   Compiling anstyle-parse v1.0.0
+   Compiling image v0.25.10
+   Compiling url v2.5.8
+   Compiling hashlink v0.10.0
+   Compiling egui v0.33.3
+   Compiling regex v1.13.1
+   Compiling anstyle-query v1.1.5
+   Compiling csv-core v0.1.13
+   Compiling glutin-winit v0.5.0
+   Compiling libloading v0.8.9
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling fallible-iterator v0.3.0
+   Compiling ryu v1.0.23
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling anstream v1.0.0
+   Compiling csv v1.4.0
+   Compiling xs-query v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+   Compiling webbrowser v1.2.6
+   Compiling xs-platform v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling fs2 v0.4.3
+   Compiling arboard v3.7.0
+   Compiling memmap2 v0.9.12
+   Compiling strsim v0.11.1
+   Compiling glow v0.16.0
+   Compiling web-time v1.1.0
+   Compiling clap_lex v1.1.1
+   Compiling heck v0.5.0
+   Compiling litrs v1.0.1
+   Compiling document-features v0.2.12
+   Compiling clap_derive v4.6.7
+   Compiling clap_builder v4.6.7
+   Compiling egui-winit v0.33.3
+   Compiling egui_glow v0.33.3
+   Compiling static_assertions v1.1.0
+   Compiling eframe v0.33.3
+   Compiling clap v4.6.7
+   Compiling ctrlc v3.5.2
+   Compiling rusqlite v0.37.0
+   Compiling xs-core v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+   Compiling xs-ui v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+   Compiling xs-cli v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+    Finished `release` profile [optimized] target(s) in 1m 29s
+Exit code: 0
+Source digest after: 0891b738549d0b9bcf506de97de144c4d5c337f8f6cfab47aeb36a807ff5a850
+Source stable: True
+Elapsed seconds: 89.921
+
+BUILD ATTEMPT 2026-11-08T06:03:22.408001+00:00
+Command: cargo build --release --target x86_64-pc-windows-gnu -p xs-cli -p xs-ui --locked
+Target: x86_64-pc-windows-gnu; user-owned GCC 14.2.0 MinGW; jobs=3
+Rust flags: -Ctarget-feature=+crt-static -Clink-arg=-static-libgcc
+Source digest before: 6e6fe6d002e78524de3f895e33eecc7ce1397e5d1b8ff8e749596885d7606135
+   Compiling xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+   Compiling xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+   Compiling xs-cli v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+   Compiling xs-ui v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+    Finished `release` profile [optimized] target(s) in 27.10s
+Exit code: 0
+Source digest after: 6e6fe6d002e78524de3f895e33eecc7ce1397e5d1b8ff8e749596885d7606135
+Source stable: True
+Elapsed seconds: 27.138

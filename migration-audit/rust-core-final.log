@@ -1,0 +1,110 @@
+   Compiling xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+   Compiling xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.13s
+     Running unittests src/lib.rs (target/debug/deps/xs_core-08143b0f377bb746)
+
+running 41 tests
+test changes::tests::deleting_unknown_parent_also_removes_its_known_orphan_subtree ... ok
+test changes::tests::deleting_parent_invalidates_whole_subtree_without_child_events ... ok
+test changes::tests::append_and_move_resolve_current_paths_without_separate_stale_path_tape ... ok
+test changes::tests::host_independent_paths_preserve_posix_backslashes_and_no_network_roots ... ok
+test changes::tests::directory_rename_updates_every_descendant_path_from_stable_parent_ids ... ok
+test changes::tests::corrupted_snapshot_cycle_and_unknown_fields_are_rejected ... ok
+test changes::tests::file_cannot_be_used_as_parent_or_replace_nonempty_directory ... ok
+test changes::tests::graph_and_cursor_rollback_after_late_invalid_event ... ok
+test changes::tests::journal_recreation_gap_and_overlap_require_explicit_rebuild ... ok
+test changes::tests::moved_child_survives_old_parent_deletion_in_the_same_batch ... ok
+test changes::tests::newly_added_descendants_are_included_in_same_batch_deletion ... ok
+test changes::tests::rename_across_batches_replaces_the_same_id_without_old_name_record_dependency ... ok
+test changes::tests::root_changes_and_rename_without_metadata_request_rebuild ... ok
+test changes::tests::stable_id_upsert_never_duplicates_and_complete_batch_replay_is_noop ... ok
+test changes::tests::stable_identity_and_graph_json_roundtrip_validate_derived_state ... ok
+test changes::tests::invalid_envelopes_and_names_never_advance_cursor ... ok
+test index::tests::bad_pagination_rejected ... ok
+test changes::tests::unknown_parent_is_hidden_until_resolved_and_never_fabricated_at_root ... ok
+test index::tests::malformed_postings_fail ... ok
+test index::tests::cancellation_is_honest ... ok
+test index::tests::posix_backslash_is_a_filename_character ... ok
+test index::tests::root_path_survives ... ok
+test index::tests::cjk_short_uses_posting ... ok
+test index::tests::missing_word_does_not_scan ... ok
+test index::tests::or_does_not_drop_branch ... ok
+test index::tests::u32_varint_roundtrip ... ok
+test index::tests::mixed_not_path_is_conservative ... ok
+test index::tests::windows_paths_survive_linux ... ok
+test interchange::tests::efu_windows_and_network_names_never_opened ... ok
+test persistence::tests::bad_pointer_cannot_escape_store ... ok
+test persistence::tests::bit_flip_detected_and_immutable_write_rejected ... ok
+test service::tests::invalid_method_is_not_a_command ... ok
+test service::tests::oversized_request_is_bounded_and_next_line_survives ... ok
+test interchange::tests::schema4_read_only_roundtrip ... ok
+test persistence::tests::publication_cursor_rejects_oversize_or_invalid_pointers ... ok
+test persistence::tests::pointer_and_lock_symlinks_are_errors_not_absence ... ok
+test persistence::tests::stale_writer_cannot_replace_newer_generation ... ok
+test persistence::tests::mapped_reader_retains_its_generation_after_publish ... ok
+test persistence::tests::published_snapshot_is_mapped_and_searchable ... ok
+test persistence::tests::publication_cursor_does_not_map_a_corrupt_previous_snapshot ... ok
+test changes::tests::moving_directory_cannot_hide_an_overdeep_unchanged_descendant ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/adversarial.rs (target/debug/deps/adversarial-cc9e5fdc28a59b19)
+
+running 2 tests
+test malicious_query_never_panics ... ok
+test inverted_candidates_equal_semantic_full_scan ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/interchange_fidelity.rs (target/debug/deps/interchange_fidelity-89b3d78862b86fc4)
+
+running 13 tests
+test exporter_preflights_unrepresentable_dates_and_ambiguous_column_union ... ok
+test exporter_unions_custom_columns_and_uses_raw_empty_over_defaults ... ok
+test schema4_rejects_nonempty_wal_instead_of_reading_stale_rows ... ok
+test efu_preserves_raw_values_empty_cells_created_time_and_custom_columns ... ok
+test schema4_preserves_raw_calendar_dates_without_claiming_a_new_projection ... ok
+test schema4_preserves_precision_nulls_extra_fields_and_filters_disabled_sources ... ok
+test schema4_optional_columns_and_negative_fractional_dates_work ... ok
+test duplicate_headers_and_missing_or_invalid_filenames_are_rejected ... ok
+test invalid_efu_numbers_do_not_silently_become_zero ... ok
+test schema4_invalid_extra_json_and_overflow_fail_without_changing_source ... ok
+test unsigned_filetime_extremes_are_bounded_and_retain_exact_text ... ok
+test serialized_metadata_and_column_budgets_reject_amplified_rows ... ok
+test logical_csv_record_budget_counts_embedded_newlines_and_escaped_quotes ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/snapshot_validation.rs (target/debug/deps/snapshot_validation-d2013003b6c6f66a)
+
+running 4 tests
+test pre_cancelled_wide_or_does_not_generate_candidates ... ok
+test sparse_metadata_survives_snapshot_and_rebuild ... ok
+test valid_crc_cannot_hide_invalid_normalization_or_postings ... ok
+test an_expired_deadline_never_claims_an_exact_empty_result ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/transactions.rs (target/debug/deps/transactions-3924632c19677d37)
+
+running 10 tests
+test denied_scope_is_rejected_before_probing_a_missing_path ... ok
+test corrupt_settings_are_not_replaced_by_defaults ... ok
+test local_open_rechecks_current_extension_policy ... ok
+test an_empty_scope_token_cannot_admit_local_records ... ok
+test unavailable_root_never_deletes_published_records ... ok
+test scope_edited_mid_scan_cannot_publish_under_new_settings ... ok
+test resident_service_revokes_a_cached_index_after_scope_change ... ok
+test rebuilding_local_scopes_keeps_offline_catalogs_without_opening_them ... ok
+test scope_change_cancellation_and_self_exclusion_are_transactional ... ok
+test rebuild_keeps_catalog_precision_and_unknown_fields ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests xs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

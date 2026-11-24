@@ -1,0 +1,17 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Checking xs-platform v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-platform)
+    Checking xs-runtime v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-runtime)
+    Checking xs-query v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-query)
+    Checking tempfile v3.27.0
+    Checking phf_shared v0.12.1
+    Checking phf v0.12.1
+    Checking chrono-tz v0.10.4
+    Checking xs-inference v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-inference)
+    Checking xs-core v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-core)
+    Checking xs-content v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-content)
+    Checking xs-cli v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-cli)
+    Checking xs-ui v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.16s

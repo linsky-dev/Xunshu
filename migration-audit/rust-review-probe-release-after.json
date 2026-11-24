@@ -1,0 +1,68 @@
+{
+  "cancellation": {
+    "build_ms": 30.890624,
+    "one_ms_budget": {
+      "complete": false,
+      "elapsed_ms": 1.0782100000000001,
+      "examined": 128
+    },
+    "or_branches": 128,
+    "pre_cancelled": {
+      "complete": false,
+      "elapsed_ms": 0.000201,
+      "examined": 0
+    },
+    "records": 25000
+  },
+  "corruption": {
+    "baseline": {
+      "complete": true,
+      "elapsed_ms": 0.003666,
+      "first_path_bytes": 18,
+      "load_ok": true,
+      "relation": "exact",
+      "results": 1,
+      "search_ok": true,
+      "total": 1
+    },
+    "oversize_parent": {
+      "error": "invalid parent path",
+      "load_ok": false
+    },
+    "unterminated_postings": {
+      "error": "truncated posting list",
+      "load_ok": false
+    },
+    "wrong_normalized_flag": {
+      "error": "invalid prepared normalization flag",
+      "load_ok": false
+    },
+    "zero_length_postings": {
+      "error": "posting section invalid",
+      "load_ok": false
+    }
+  },
+  "differential": {
+    "comparisons": 185,
+    "failures": [],
+    "records": 300
+  },
+  "efu_overflow": {
+    "error": "EFU dates must be unsigned 64-bit integer FILETIME ticks: invalid digit found in string",
+    "panicked": false
+  },
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-probe-5-1794117632958296101",
+  "scope": {
+    "empty_scope_token_with_local_record": {
+      "error": "空范围标记的索引包含本地来源，索引无效。请重新扫描，或重新导入离线目录。",
+      "load_ok": false
+    },
+    "missing_outside_scope_open": {
+      "Err": "文件已不在当前授权目录、文件类型或排除策略内。"
+    },
+    "outside_fixture": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-probe-5-1794117632958296101/outside/outside-scope-probe.txt",
+    "outside_scope_open": {
+      "Err": "文件已不在当前授权目录、文件类型或排除策略内。"
+    }
+  }
+}

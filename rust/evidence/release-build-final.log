@@ -1,0 +1,6 @@
+   Compiling xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+   Compiling xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+   Compiling xs-cli v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+   Compiling xs-ui v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+    Finished `release` profile [optimized] target(s) in 26.89s

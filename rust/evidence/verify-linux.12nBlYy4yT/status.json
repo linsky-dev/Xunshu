@@ -1,0 +1,43 @@
+{
+  "capabilities": {
+    "filename_search": true,
+    "legacy_query_full_parity": false,
+    "mft_usn": false,
+    "mmap_snapshot": true,
+    "native_ui": true,
+    "ocr": false,
+    "semantic": false,
+    "stdio_ipc": true
+  },
+  "data_dir": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private",
+  "index": {
+    "entries": 5,
+    "generation": 1,
+    "mapped": true,
+    "scope_matches": true,
+    "snapshot_bytes": 1729
+  },
+  "network": false,
+  "runtime": "Rust",
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "pdf",
+          "txt"
+        ],
+        "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  },
+  "version": "0.18.0-alpha.1"
+}

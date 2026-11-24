@@ -1,0 +1,366 @@
+wsl: Failed to translate 'E:\Git\cmd'
+wsl: Failed to translate 'E:\Gety\bin'
+fixture_filesystem=ext4
+fixture_directory=/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ
+Using supplied local binaries. This invocation checks CLI contracts only.
+$ sha256sum -- /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xs-ui
+d48fcd4923cc70a3a2aff756a0ee7b9044a8626226e1138648a871fe74b0c912  /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu
+1a3b1dde7a0b12c13e301d4185532c55c4632192dfbce5534767ab35aebd56ba  /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xs-ui
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --help
+寻枢 · Rust 原生离线文件搜索（显式范围，无联网）
+
+Usage: xunshu [OPTIONS] <COMMAND>
+
+Commands:
+  init               创建收录配置；不会扫描，已有配置需显式 --replace
+  volumes            显示本地卷能力；不会扫描卷
+  status             显示设置与实际索引代次
+  doctor             只读检查本机配置和索引，默认输出脱敏诊断摘要
+  scan               只扫描当前已保存范围，Ctrl-C 取消，失败保留原索引
+  watch              监听当前文件名范围，在变更、通知丢失或范围调整时校准索引
+  recover            从当前授权范围的历史完整代次恢复文件名索引
+  content-configure  独立设置正文收录范围，保留文件名范围
+  content-rebuild    由独立工作进程抽取正文并提交索引，Ctrl-C 取消
+  content-search     搜索已经发布的正文索引
+  content-serve      为桌面提供继承式正文查询进程
+  mcp                启动本地 MCP 标准输入输出服务
+  agent-inspect      查看需要逐次授权的 Agent 请求
+  agent-approve      授权一条已核对的 Agent 请求，仅限当前会话一次
+  search             搜索现有索引；查询语法错误显式返回
+  import-efu         EFU 目录作为不可打开的离线元数据导入，保留其他来源
+  import-legacy      只读导入旧 schema4；替换上次 schema4 导入的全部来源，不改旧数据库
+  export-efu         导出当前有效范围内全部元数据
+  efu-inspect        查看 EFU 行号及当前文件版本，供另存编辑时复核
+  efu-edit           修改或删除一行并另存为新的 EFU 文件
+  efu-compare        比较两个离线清单中的新增、删除与属性差异
+  folder-compare     比较两个已授权目录在当前完整文件名索引中的内容
+  migrate-settings   迁移旧设置到独立新文件，旧文件保持不变
+  migrate-m1         将 M1 的设置和索引只读复制到当前全新数据目录
+  serve              纯本地 JSON-lines 子进程服务，不开放 TCP/HTTP
+  serve-v2           可取消并自动重载的本地文件名搜索服务，协议版本 2
+  benchmark          工作区合成基准，不访问文件名对应路径
+  help               Print this message or the help of the given subcommand(s)
+
+Options:
+      --data-dir <DATA_DIR>  
+  -h, --help                 Print help
+  -V, --version              Print version
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xs-ui --help
+寻枢 Rust 原生界面
+
+xs-ui [--data-dir 绝对路径] [--query 查询文本] [--font 本地字体] [--quick | --content] [--standalone | --background | --smoke-test]
+
+--quick 打开快捷搜索框。
+--content 直接打开正文页。
+--standalone 单独显示窗口，不启动托盘。
+--background 在 Windows 启动常驻托盘，不显示窗口。
+--smoke-test 验证原生窗口，不启动扫描。
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private init --root /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files --ext txt\,pdf
+{
+  "commit": {
+    "state": "durable"
+  },
+  "message": "范围已保存；运行 scan 后生效。正文、OCR、语义默认关闭。",
+  "ok": true,
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "txt",
+          "pdf"
+        ],
+        "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  }
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private scan
+{
+  "durability_warning": null,
+  "durable": true,
+  "elapsed_ms": 44.774846,
+  "generation": 1,
+  "indexed": 5,
+  "published": true,
+  "report": {
+    "cancelled": false,
+    "complete": true,
+    "entries": [],
+    "errors": [],
+    "skipped_excluded": 2,
+    "skipped_links": 0,
+    "skipped_mounts": 0,
+    "skipped_non_utf8": 0,
+    "skipped_special": 0
+  }
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private search ''
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "coverage_complete": true,
+  "elapsed_ms": 0.009819999999999999,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 0,
+      "is_dir": true,
+      "modified": 1794316610,
+      "name": "files",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files",
+      "score": 44,
+      "size": 0,
+      "source": "local"
+    },
+    {
+      "id": 1,
+      "is_dir": true,
+      "modified": 1794316610,
+      "name": "subdir",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/subdir",
+      "score": 43,
+      "size": 0,
+      "source": "local"
+    },
+    {
+      "id": 3,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "预算报告.pdf",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/预算报告.pdf",
+      "score": 43,
+      "size": 42,
+      "source": "local"
+    },
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "report.txt",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/report.txt",
+      "score": 43,
+      "size": 17,
+      "source": "local"
+    },
+    {
+      "id": 2,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "notes.txt",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/subdir/notes.txt",
+      "score": 42,
+      "size": 16,
+      "source": "local"
+    }
+  ],
+  "total": 5,
+  "total_relation": "exact"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private search ext:txt
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "coverage_complete": true,
+  "elapsed_ms": 0.013731,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "report.txt",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/report.txt",
+      "score": 43,
+      "size": 17,
+      "source": "local"
+    },
+    {
+      "id": 2,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "notes.txt",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/subdir/notes.txt",
+      "score": 42,
+      "size": 16,
+      "source": "local"
+    }
+  ],
+  "total": 2,
+  "total_relation": "exact"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private search ext:pdf
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "coverage_complete": true,
+  "elapsed_ms": 0.021115000000000002,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 3,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "预算报告.pdf",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/预算报告.pdf",
+      "score": 43,
+      "size": 42,
+      "source": "local"
+    }
+  ],
+  "total": 1,
+  "total_relation": "exact"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private status
+{
+  "capabilities": {
+    "content_search": true,
+    "directory_watch": true,
+    "fast_service": false,
+    "filename_search": true,
+    "legacy_query_full_parity": false,
+    "mcp_content": true,
+    "mft_usn": false,
+    "mmap_snapshot": true,
+    "native_ui": true,
+    "ocr": true,
+    "semantic": true,
+    "stdio_ipc": true,
+    "stdio_ipc_v2": true
+  },
+  "data_dir": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private",
+  "index": {
+    "coverage_complete": true,
+    "entries": 5,
+    "generation": 1,
+    "mapped": true,
+    "scope_matches": true,
+    "snapshot_bytes": 2090
+  },
+  "model_resources": {
+    "state": "checked_on_use"
+  },
+  "network": false,
+  "runtime": "Rust",
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "pdf",
+          "txt"
+        ],
+        "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  },
+  "version": "0.18.0-alpha.2"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private doctor --json --export /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/diagnostics.json
+{
+  "arch": "x86_64",
+  "disk": {
+    "data_directory": "local_accessible"
+  },
+  "hotkey": {
+    "state": "unsupported"
+  },
+  "index": {
+    "coverage_complete": true,
+    "entries": 5,
+    "generation": 1,
+    "snapshot_bytes": 2090,
+    "state": "readable"
+  },
+  "network": false,
+  "os": "linux",
+  "privileged_service": {
+    "state": "unsupported"
+  },
+  "schema": 1,
+  "settings": {
+    "configured_roots": {
+      "accessible": 1,
+      "denied": 0,
+      "unavailable": 0
+    },
+    "requested_mode": "standard",
+    "state": "readable"
+  },
+  "version": "0.18.0-alpha.2"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private export-efu /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/fixture.efu
+{
+  "commit": {
+    "state": "durable"
+  },
+  "exported": 5,
+  "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/fixture.efu"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/catalog-data import-efu /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/fixture.efu --name fixture
+{
+  "durability_warning": null,
+  "durable": true,
+  "generation": 1,
+  "imported": 5,
+  "mode": "metadata_only",
+  "opened_catalog_paths": 0,
+  "replaced_source": "offline:fixture",
+  "replaced_source_prefix": false,
+  "total": 5
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/catalog-data search ext:pdf
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "coverage_complete": true,
+  "elapsed_ms": 0.012029,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 3,
+      "is_dir": false,
+      "modified": 1794316610,
+      "name": "预算报告.pdf",
+      "path": "/var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/预算报告.pdf",
+      "score": 43,
+      "size": 42,
+      "source": "offline:fixture"
+    }
+  ],
+  "total": 1,
+  "total_relation": "exact"
+}
+$ /var/tmp/xunshu-rust-recovery-036c199d3807/target/release/xunshu --data-dir /var/tmp/xunshu-rust-recovery-036c199d3807/test-tmp/xunshu-verify.D71sBTzJDZ/files/app-private search unknown_field:value
+{"error":"不支持的搜索字段：unknown_field:（字节位置 0）","ok":false}
+PASS: Synthetic CLI contracts.
+verification_exit_code=0
+Evidence retained: /var/tmp/xunshu-rust-recovery-036c199d3807/m2.XeqDSMkS/evidence/verify-linux.Pt6IJBKw5D

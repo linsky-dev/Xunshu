@@ -1,0 +1,19 @@
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling memchr v2.8.3
+   Compiling windows-sys v0.61.2
+   Compiling syn v3.0.9
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling thiserror v2.0.21
+   Compiling serde_json v1.0.154
+   Compiling xs-platform v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-platform)
+    Finished `dev` profile [unoptimized] target(s) in 7.88s
+合成虚拟磁盘 1，类型 File Backed Virtual，容量 167772160 字节
+    Blocking waiting for file lock on build directory
+    Finished `dev` profile [unoptimized] target(s) in 5.83s
+     Running `rust/target\debug\examples\verify_native_vhd.exe E:\ 1df36785b9c247acba84f2d86fd9e1df`
+MFT 快照收录 6 条记录，起始游标 1304，硬链接双路径一致
+原生改名返回旧名和新名，游标推进到 1544
+硬链接改写返回两个现存路径，游标推进到 1784
+目录变更和错误日志标识均保留旧游标，取消不返回可提交游标

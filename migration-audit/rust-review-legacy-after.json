@@ -1,0 +1,66 @@
+{
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-8ffzqqah",
+  "source_before": {
+    "legacy.db": "6211b9601977349adb308e4cc908163225073c372308b99397113739d09e8e02"
+  },
+  "source_after": {
+    "legacy.db": "6211b9601977349adb308e4cc908163225073c372308b99397113739d09e8e02"
+  },
+  "byte_identical_and_no_new_sidecars": true,
+  "import": {
+    "args": [
+      "import-legacy",
+      "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-8ffzqqah/legacy.db"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"durability_warning\": null,\n  \"durable\": true,\n  \"generation\": 1,\n  \"imported\": 2,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:schema4:\",\n  \"replaced_source_prefix\": true,\n  \"total\": 2\n}\n",
+    "stderr": ""
+  },
+  "disabled_catalog_search": {
+    "args": [
+      "search",
+      "source:offline:schema4:efu:disabled"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"candidate_count\": 2,\n  \"candidate_count_exact\": true,\n  \"complete\": true,\n  \"elapsed_ms\": 0.009694999999999999,\n  \"examined\": 2,\n  \"generation\": 1,\n  \"index_entries\": 2,\n  \"results\": [],\n  \"total\": 0,\n  \"total_relation\": \"exact\"\n}\n",
+    "stderr": ""
+  },
+  "removed_source": "efu:enabled",
+  "enabled_before_removal": {
+    "args": [
+      "search",
+      "source:offline:schema4:efu:enabled"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"candidate_count\": 2,\n  \"candidate_count_exact\": true,\n  \"complete\": true,\n  \"elapsed_ms\": 0.0067800000000000004,\n  \"examined\": 2,\n  \"generation\": 1,\n  \"index_entries\": 2,\n  \"results\": [\n    {\n      \"id\": 0,\n      \"is_dir\": false,\n      \"modified\": 1700000000,\n      \"name\": \"enabled.txt\",\n      \"path\": \"C:\\\\synthetic\\\\enabled.txt\",\n      \"score\": 48,\n      \"size\": 2,\n      \"source\": \"offline:schema4:efu:enabled\"\n    }\n  ],\n  \"total\": 1,\n  \"total_relation\": \"exact\"\n}\n",
+    "stderr": ""
+  },
+  "reimport_after_source_removal": {
+    "args": [
+      "import-legacy",
+      "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-8ffzqqah/legacy.db"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"durability_warning\": null,\n  \"durable\": true,\n  \"generation\": 2,\n  \"imported\": 1,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:schema4:\",\n  \"replaced_source_prefix\": true,\n  \"total\": 1\n}\n",
+    "stderr": ""
+  },
+  "removed_source_search": {
+    "args": [
+      "search",
+      "source:offline:schema4:efu:enabled"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"candidate_count\": 1,\n  \"candidate_count_exact\": true,\n  \"complete\": true,\n  \"elapsed_ms\": 0.004266000000000001,\n  \"examined\": 1,\n  \"generation\": 2,\n  \"index_entries\": 1,\n  \"results\": [],\n  \"total\": 0,\n  \"total_relation\": \"exact\"\n}\n",
+    "stderr": ""
+  },
+  "nonempty_wal": true,
+  "pending_wal_import": {
+    "args": [
+      "import-legacy",
+      "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-8ffzqqah/pending.db"
+    ],
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "{\"error\":\"旧数据库存在未合并的 WAL；请先退出旧程序并完成 checkpoint，再导入副本。\",\"ok\":false}\n"
+  }
+}

@@ -1,0 +1,1 @@
+{"ok": true, "platform": "nt", "verified": ["scope_scan", "resident_stdio_v2", "watch_update", "efu_edit_compare", "nullable_metadata", "content_worker", "agent_once_and_revocation", "installed_ocr", "scanned_pdf", "semantic_tail"]}

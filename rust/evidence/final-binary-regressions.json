@@ -1,0 +1,21 @@
+{
+  "cli_sha256": "8992326dbbdaeb009f9e96000bde166e11c05e7411d37ad8daddca8da54da52b",
+  "scenarios": [
+    {
+      "script": "rust_review_cli.py",
+      "exit_code": 0,
+      "report": "../migration-audit/rust-review-cli-final.json"
+    },
+    {
+      "script": "rust_review_legacy.py",
+      "exit_code": 0,
+      "report": "../migration-audit/rust-review-legacy-final.json"
+    },
+    {
+      "script": "rust_review_faults.py",
+      "exit_code": 0,
+      "report": "../migration-audit/rust-review-faults-final.json"
+    }
+  ],
+  "fixtures": "task-owned synthetic tmpfs only"
+}

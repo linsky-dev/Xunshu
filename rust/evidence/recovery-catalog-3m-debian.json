@@ -1,0 +1,180 @@
+{
+  "arch": "x86_64",
+  "build_ms": 3738.528161,
+  "build_process_memory": {
+    "peak_rss_kib": 209392,
+    "rss_kib": 90956
+  },
+  "bytes_per_entry": 28.674285666666666,
+  "dataset": "deterministic synthetic mixed Chinese/English filenames; no real files scanned",
+  "entries": 3000000,
+  "persist_ms": 209.794195,
+  "platform": "linux",
+  "read_process": {
+    "after_load_memory": {
+      "peak_rss_kib": 89388,
+      "rss_kib": 89388
+    },
+    "after_queries_memory": {
+      "peak_rss_kib": 103696,
+      "rss_kib": 89928
+    },
+    "baseline_memory": {
+      "peak_rss_kib": 4300,
+      "rss_kib": 4300
+    },
+    "iterations": 30,
+    "load_ms": 199.072027,
+    "load_note": "separate fresh process; OS page cache not forcibly evicted; includes CRC and structural validation",
+    "mapped": true,
+    "queries": [
+      {
+        "candidates": 0,
+        "complete": true,
+        "examined": 0,
+        "p50_ms": 0.000557,
+        "p95_ms": 0.000733,
+        "p99_ms": 0.001674,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 30,
+          "limit": 50,
+          "nonempty_runs": 0,
+          "p95_ms": 0.001503,
+          "p99_ms": 0.025226
+        },
+        "query": "never_present_xyz",
+        "total": 0
+      },
+      {
+        "candidates": 191,
+        "complete": true,
+        "examined": 191,
+        "p50_ms": 0.145724,
+        "p95_ms": 0.159274,
+        "p99_ms": 0.164909,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 30,
+          "limit": 50,
+          "nonempty_runs": 30,
+          "p95_ms": 0.195626,
+          "p99_ms": 0.239359
+        },
+        "query": "0001234",
+        "total": 1
+      },
+      {
+        "candidates": 0,
+        "complete": true,
+        "examined": 0,
+        "p50_ms": 0.0007390000000000001,
+        "p95_ms": 0.000847,
+        "p99_ms": 0.001184,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 30,
+          "limit": 50,
+          "nonempty_runs": 0,
+          "p95_ms": 0.002348,
+          "p99_ms": 0.008741
+        },
+        "query": "预算决算不存在",
+        "total": 0
+      },
+      {
+        "candidates": 600000,
+        "complete": true,
+        "examined": 600000,
+        "p50_ms": 47.789325,
+        "p95_ms": 51.484494,
+        "p99_ms": 51.984195,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 0,
+          "limit": 50,
+          "nonempty_runs": 30,
+          "p95_ms": 0.101388,
+          "p99_ms": 0.105991
+        },
+        "query": "干部",
+        "total": 600000
+      },
+      {
+        "candidates": 44,
+        "complete": true,
+        "examined": 44,
+        "p50_ms": 0.114708,
+        "p95_ms": 0.13192600000000002,
+        "p99_ms": 0.139084,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 30,
+          "limit": 50,
+          "nonempty_runs": 30,
+          "p95_ms": 0.146523,
+          "p99_ms": 0.187765
+        },
+        "query": "project_budget_final_0000121",
+        "total": 1
+      },
+      {
+        "candidates": 0,
+        "complete": true,
+        "examined": 0,
+        "p50_ms": 0.00076,
+        "p95_ms": 0.000883,
+        "p99_ms": 0.000944,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 30,
+          "limit": 50,
+          "nonempty_runs": 0,
+          "p95_ms": 0.001989,
+          "p99_ms": 0.005004
+        },
+        "query": "name:report ext:pdf",
+        "total": 0
+      },
+      {
+        "candidates": 600000,
+        "complete": true,
+        "examined": 600000,
+        "p50_ms": 69.66681500000001,
+        "p95_ms": 74.153505,
+        "p99_ms": 74.892038,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 0,
+          "limit": 50,
+          "nonempty_runs": 30,
+          "p95_ms": 0.106706,
+          "p99_ms": 0.119116
+        },
+        "query": "readme ext:rs",
+        "total": 600000
+      },
+      {
+        "candidates": 1200000,
+        "complete": true,
+        "examined": 1200000,
+        "p50_ms": 167.987955,
+        "p95_ms": 177.485977,
+        "p99_ms": 177.592131,
+        "preview": {
+          "budget_ms": 8,
+          "complete_runs": 0,
+          "limit": 50,
+          "nonempty_runs": 30,
+          "p95_ms": 0.08038200000000001,
+          "p99_ms": 0.100625
+        },
+        "query": "budget | meeting",
+        "total": 1200000
+      }
+    ]
+  },
+  "snapshot_bytes": 86022857,
+  "target_metrics_are_not_acceptance": true,
+  "version": 1
+}

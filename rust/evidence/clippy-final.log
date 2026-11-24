@@ -1,0 +1,5 @@
+    Checking xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+    Checking xs-ui v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+    Checking xs-cli v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+    Checking xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.62s

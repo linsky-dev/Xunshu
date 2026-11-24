@@ -1,0 +1,54 @@
+   Compiling xs-platform v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling xs-core v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.21s
+     Running unittests src/lib.rs (target/debug/deps/xs_core-b400ad8c76d38206)
+
+running 19 tests
+test index::tests::malformed_postings_fail ... ok
+test index::tests::bad_pagination_rejected ... ok
+test index::tests::missing_word_does_not_scan ... ok
+test index::tests::cancellation_is_honest ... ok
+test index::tests::cjk_short_uses_posting ... ok
+test index::tests::mixed_not_path_is_conservative ... ok
+test index::tests::root_path_survives ... ok
+test index::tests::posix_backslash_is_a_filename_character ... ok
+test index::tests::u32_varint_roundtrip ... ok
+test index::tests::or_does_not_drop_branch ... ok
+test interchange::tests::efu_windows_and_network_names_never_opened ... ok
+test persistence::tests::bad_pointer_cannot_escape_store ... ok
+test index::tests::windows_paths_survive_linux ... ok
+test service::tests::invalid_method_is_not_a_command ... ok
+test service::tests::oversized_request_is_bounded_and_next_line_survives ... ok
+test interchange::tests::schema4_read_only_roundtrip ... ok
+test persistence::tests::published_snapshot_is_mapped_and_searchable ... ok
+test persistence::tests::bit_flip_detected_and_immutable_write_rejected ... ok
+test persistence::tests::stale_writer_cannot_replace_newer_generation ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/adversarial.rs (target/debug/deps/adversarial-abee6984a42bfbef)
+
+running 2 tests
+test malicious_query_never_panics ... ok
+test inverted_candidates_equal_semantic_full_scan ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/transactions.rs (target/debug/deps/transactions-247e7cc4a2b42f08)
+
+running 6 tests
+test corrupt_settings_are_not_replaced_by_defaults ... ok
+test local_open_rechecks_current_extension_policy ... ok
+test unavailable_root_never_deletes_published_records ... ok
+test scope_edited_mid_scan_cannot_publish_under_new_settings ... ok
+test rebuilding_local_scopes_keeps_offline_catalogs_without_opening_them ... ok
+test scope_change_cancellation_and_self_exclusion_are_transactional ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests xs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

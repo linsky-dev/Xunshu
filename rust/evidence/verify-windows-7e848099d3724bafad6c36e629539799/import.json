@@ -1,0 +1,11 @@
+{
+  "durability_warning": null,
+  "durable": true,
+  "generation": 1,
+  "imported": 5,
+  "mode": "metadata_only",
+  "opened_catalog_paths": 0,
+  "replaced_source": "offline:fixture",
+  "replaced_source_prefix": false,
+  "total": 5
+}

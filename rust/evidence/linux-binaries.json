@@ -1,0 +1,72 @@
+[
+  {
+    "name": "xunshu",
+    "bytes": 6110568,
+    "sha256": "8992326dbbdaeb009f9e96000bde166e11c05e7411d37ad8daddca8da54da52b",
+    "strong_glibc_versions": [
+      "GLIBC_2.2.5",
+      "GLIBC_2.3",
+      "GLIBC_2.3.4",
+      "GLIBC_2.4",
+      "GLIBC_2.9",
+      "GLIBC_2.14",
+      "GLIBC_2.15",
+      "GLIBC_2.16",
+      "GLIBC_2.17",
+      "GLIBC_2.28",
+      "GLIBC_2.29",
+      "GLIBC_2.32",
+      "GLIBC_2.33",
+      "GLIBC_2.34"
+    ],
+    "weak_glibc_versions": [
+      "GLIBC_2.18",
+      "GLIBC_2.25",
+      "GLIBC_2.29",
+      "GLIBC_2.30",
+      "GLIBC_2.39"
+    ],
+    "highest_strong_glibc": "GLIBC_2.34",
+    "needed_libraries": [
+      "libgcc_s.so.1",
+      "libm.so.6",
+      "libc.so.6"
+    ]
+  },
+  {
+    "name": "xs-ui",
+    "bytes": 10058544,
+    "sha256": "2c421362ffc7ecdca46b463d693001b41d8b1a32003f2827d7a341f10a9869d9",
+    "strong_glibc_versions": [
+      "GLIBC_2.2.5",
+      "GLIBC_2.3",
+      "GLIBC_2.3.4",
+      "GLIBC_2.4",
+      "GLIBC_2.9",
+      "GLIBC_2.14",
+      "GLIBC_2.15",
+      "GLIBC_2.16",
+      "GLIBC_2.17",
+      "GLIBC_2.27",
+      "GLIBC_2.32",
+      "GLIBC_2.33",
+      "GLIBC_2.34",
+      "GLIBC_2.35"
+    ],
+    "weak_glibc_versions": [
+      "GLIBC_2.18",
+      "GLIBC_2.25",
+      "GLIBC_2.28",
+      "GLIBC_2.29",
+      "GLIBC_2.30",
+      "GLIBC_2.39"
+    ],
+    "highest_strong_glibc": "GLIBC_2.35",
+    "needed_libraries": [
+      "libgcc_s.so.1",
+      "libm.so.6",
+      "libc.so.6",
+      "ld-linux-x86-64.so.2"
+    ]
+  }
+]

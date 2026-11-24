@@ -1,0 +1,81 @@
+{
+  "binary": "/workspace/scratch/036c199d3807/xunshu/rust/target/release/xunshu",
+  "binary_sha256": "8992326dbbdaeb009f9e96000bde166e11c05e7411d37ad8daddca8da54da52b",
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-4xvywi38",
+  "source_unchanged": true,
+  "input_efu": "Filename,Size,Date Modified,Date Created,Attributes,Project\n\"C:\\synthetic\\precise.txt\",123,133444736000000001,133444736123456789,34,项目甲\n\"C:\\synthetic\\unknown.txt\",,,,,\n",
+  "output_efu": "Filename,Size,Date Modified,Date Created,Attributes,Project\nC:\\synthetic\\precise.txt,123,133444736000000001,133444736123456789,34,项目甲\nC:\\synthetic\\unknown.txt,,,,,\n",
+  "roundtrip_rows": [
+    {
+      "Filename": "C:\\synthetic\\precise.txt",
+      "Size": "123",
+      "Date Modified": "133444736000000001",
+      "Date Created": "133444736123456789",
+      "Attributes": "34",
+      "Project": "项目甲"
+    },
+    {
+      "Filename": "C:\\synthetic\\unknown.txt",
+      "Size": "",
+      "Date Modified": "",
+      "Date Created": "",
+      "Attributes": "",
+      "Project": ""
+    }
+  ],
+  "empty_reimport_total": 0,
+  "events": [
+    {
+      "args": [
+        "import-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-4xvywi38/original.efu",
+        "--name",
+        "review"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"durability_warning\": null,\n  \"durable\": true,\n  \"generation\": 1,\n  \"imported\": 2,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:review\",\n  \"replaced_source_prefix\": false,\n  \"total\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "export-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-4xvywi38/exported.efu"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"commit\": {\n    \"state\": \"durable\"\n  },\n  \"exported\": 2,\n  \"path\": \"/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-4xvywi38/exported.efu\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "import-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-4xvywi38/empty.efu",
+        "--name",
+        "review"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"durability_warning\": null,\n  \"durable\": true,\n  \"generation\": 2,\n  \"imported\": 0,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:review\",\n  \"replaced_source_prefix\": false,\n  \"total\": 0\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "source:offline:review"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"candidate_count\": 0,\n  \"candidate_count_exact\": true,\n  \"complete\": true,\n  \"elapsed_ms\": 0.004406,\n  \"examined\": 0,\n  \"generation\": 2,\n  \"index_entries\": 0,\n  \"results\": [],\n  \"total\": 0,\n  \"total_relation\": \"exact\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "import-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-4xvywi38/extreme.efu",
+        "--name",
+        "extreme"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "{\"error\":\"EFU dates must be unsigned 64-bit integer FILETIME ticks: invalid digit found in string\",\"ok\":false}\n"
+    }
+  ],
+  "roundtrip_values_exact": true
+}

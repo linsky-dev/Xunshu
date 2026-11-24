@@ -1,0 +1,3 @@
+/.recovery-tools/
+/rust/target/
+/rust/test-tmp/

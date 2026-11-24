@@ -1,0 +1,38 @@
+   Compiling memchr v2.8.3
+   Compiling foldhash v0.2.0
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling libsqlite3-sys v0.39.1
+   Compiling cpufeatures v0.3.1
+   Compiling typed-path v0.12.4
+   Compiling atoi_simd v0.18.1
+   Compiling hashbrown v0.17.1
+   Compiling chacha20 v0.10.2
+   Compiling aho-corasick v1.1.5
+   Compiling serde_json v1.0.154
+   Compiling nom v7.1.3
+   Compiling nom v8.0.0
+   Compiling quick-xml v0.42.0
+   Compiling csv-core v0.1.13
+   Compiling quick-xml v0.41.0
+   Compiling indexmap v2.14.2
+   Compiling hashlink v0.12.2
+   Compiling rand v0.10.3
+   Compiling csv v1.4.0
+   Compiling zip v9.0.0
+   Compiling xs-platform v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-platform)
+   Compiling regex-automata v0.4.18
+   Compiling spm_precompiled v0.1.4
+   Compiling calamine v0.38.0
+   Compiling lopdf v0.42.0
+   Compiling regex v1.13.1
+   Compiling fancy-regex v0.14.0
+   Compiling xs-query v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-query)
+   Compiling tokenizers v0.21.4
+   Compiling xs-inference v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-inference)
+   Compiling rusqlite v0.41.1
+   Compiling xs-content v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-content)
+   Compiling xs-core v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-core)
+   Compiling xs-cli v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-cli)
+   Compiling xs-ui v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-ui)
+    Finished `release` profile [optimized] target(s) in 2m 10s

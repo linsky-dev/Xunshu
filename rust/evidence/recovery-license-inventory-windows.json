@@ -1,0 +1,23 @@
+{
+  "packages": 316,
+  "notice_files": 570,
+  "without_bundled_notice_file": [
+    "clipboard-win@5.4.3",
+    "ecolor@0.33.3",
+    "eframe@0.33.3",
+    "egui@0.33.3",
+    "egui-wgpu@0.33.3",
+    "egui-winit@0.33.3",
+    "egui_glow@0.33.3",
+    "emath@0.33.3",
+    "epaint@0.33.3",
+    "fxhash@0.2.1",
+    "gl_generator@0.14.0",
+    "hexf-parse@0.2.1",
+    "khronos_api@3.1.0",
+    "mac@0.1.1",
+    "match_token@0.35.0",
+    "profiling@1.0.18",
+    "selectors@0.31.0"
+  ]
+}

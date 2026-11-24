@@ -1,0 +1,39 @@
+   Compiling log v0.4.35
+   Compiling windows-sys v0.61.2
+   Compiling syn v3.0.9
+   Compiling ahash v0.8.12
+   Compiling once_cell v1.21.4
+   Compiling bytemuck v1.25.2
+   Compiling ttf-parser v0.25.1
+   Compiling zopfli v0.8.4
+   Compiling selectors v0.31.0
+   Compiling image v0.25.10
+   Compiling zip v9.0.0
+   Compiling anstyle-wincon v3.0.11
+   Compiling anstyle-query v1.1.5
+   Compiling ctrlc v3.5.2
+   Compiling anstream v1.0.0
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling clap_builder v4.6.7
+   Compiling thiserror v2.0.21
+   Compiling lopdf v0.42.0
+   Compiling serde v1.0.229
+   Compiling clap v4.6.7
+   Compiling string_cache v0.8.9
+   Compiling xs-platform v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-platform)
+   Compiling compact_str v0.9.1
+   Compiling spm_precompiled v0.1.4
+   Compiling dary_heap v0.3.9
+   Compiling calamine v0.38.0
+   Compiling web_atoms v0.1.3
+   Compiling tokenizers v0.21.4
+   Compiling markup5ever v0.35.0
+   Compiling html5ever v0.35.0
+   Compiling xs-core v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-core)
+   Compiling scraper v0.24.0
+   Compiling xs-inference v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-inference)
+   Compiling xs-content v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-content)
+   Compiling xs-cli v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-cli)
+    Finished `release` profile [optimized] target(s) in 1m 30s

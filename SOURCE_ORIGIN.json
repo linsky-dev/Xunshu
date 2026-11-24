@@ -1,0 +1,10 @@
+{
+  "original_filename": "Xunshu-0.17.0-source.zip",
+  "original_sha256": "36618521c1244a11dbc70b57f5c36da76c8b1efceb79fc7ebef24f6fe36346e0",
+  "original_bytes": 13585575,
+  "rewrite_version": "0.18.0-alpha.1",
+  "runtime": "independent Rust workspace",
+  "legacy_runtime_included": false,
+  "legacy_database_modified": false,
+  "source_layout": "rust/ contains new runtime; migration-audit/ contains synthetic review probes/evidence; docs/ contains selected original reference documents"
+}

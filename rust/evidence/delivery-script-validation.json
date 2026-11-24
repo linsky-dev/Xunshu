@@ -1,0 +1,72 @@
+{
+  "version": "0.18.0-alpha.1",
+  "linux_verify": {
+    "exit": 0,
+    "rust_tests_passed": 125,
+    "rust_tests_failed": 0,
+    "rust_tests_ignored": 0,
+    "cli_contracts": "passed",
+    "fixture_removed": true,
+    "evidence": "verify-linux.12nBlYy4yT/verify.log"
+  },
+  "linux_build": {
+    "exit": 0,
+    "evidence": "build-linux-script.Gt0ChSsE.log",
+    "package_path": "/workspace/scratch/036c199d3807/xunshu-build-script-validation/package-linux-x64.Hu5naQC2pJ",
+    "exact_package_files": [
+      "README.txt",
+      "xs-ui",
+      "xunshu"
+    ],
+    "binaries": [
+      {
+        "name": "xunshu",
+        "bytes": 6110504,
+        "sha256": "3d44814656892a2b8e1e4252b2d5c87d9d5beea73f42e1a84688649d8c625714",
+        "non_gui_smoke_exit": 0
+      },
+      {
+        "name": "xs-ui",
+        "bytes": 10058704,
+        "sha256": "ade84e33fc229f29dc7c3cce96bd27253352b9c483e418671155557cd92e39b4",
+        "non_gui_smoke_exit": 0
+      }
+    ],
+    "glibc_nonweak": {
+      "xunshu": "2.34",
+      "xs-ui": "2.35"
+    },
+    "glibc_max_including_weak": "2.39",
+    "not_the_final_desktop_acceptance_package": true
+  },
+  "negative_checks": [
+    {
+      "script": "build-linux.sh",
+      "case": "symlink directory with trailing slash",
+      "exit": 1,
+      "decoy_untouched": true
+    },
+    {
+      "script": "verify.sh",
+      "case": "symlink directory with trailing slash",
+      "exit": 1,
+      "decoy_untouched": true
+    },
+    {
+      "case": "non-weak GLIBC ceiling 2.33",
+      "exit": 1,
+      "previous_package_unchanged": true,
+      "diagnostic": "Finished `release` profile [optimized] target(s) in 0.11s\nBUILD FAILED: xunshu requires GLIBC_2.34, exceeding the requested GLIBC_2.33 ceiling.\nBUILD FAILED (exit 1). Incomplete output retained at: /workspace/scratch/036c199d3807/xunshu-build-script-validation/package-linux-x64.TDYXgPIaOs"
+    }
+  ],
+  "overlay_fixture_guard": {
+    "exit": 1,
+    "refused": true,
+    "policy_not_relaxed": true
+  },
+  "windows_scripts": {
+    "ascii_for_powershell_51": true,
+    "runtime_execution": false,
+    "reason": "No Windows or PowerShell runtime in the current executor; GNU cross-build evidence is separate."
+  }
+}

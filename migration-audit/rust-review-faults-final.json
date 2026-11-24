@@ -1,0 +1,52 @@
+{
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-puiqou48",
+  "fsync": {
+    "initial": {
+      "returncode": 0,
+      "stdout": "{\n  \"durability_warning\": null,\n  \"durable\": true,\n  \"generation\": 1,\n  \"imported\": 1,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:fault-review\",\n  \"replaced_source_prefix\": false,\n  \"total\": 1\n}\n",
+      "stderr": ""
+    },
+    "injected": {
+      "returncode": 0,
+      "stdout": "{\n  \"durability_warning\": \"snapshot: file already committed at /tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-puiqou48/fsync-data/index/generation-2-6-1794118436641930588.xsi; parent directory sync failed, durability is unconfirmed: Input/output error (os error 5); CURRENT: file already committed at /tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-puiqou48/fsync-data/index/CURRENT.json; parent directory sync failed, durability is unconfirmed: Input/output error (os error 5)\",\n  \"durable\": false,\n  \"generation\": 2,\n  \"imported\": 1,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:fault-review\",\n  \"replaced_source_prefix\": false,\n  \"total\": 1\n}\n",
+      "stderr": ""
+    },
+    "before": {
+      "version": 1,
+      "file": "generation-1-5-1794118436637927893.xsi",
+      "generation": 1
+    },
+    "after": {
+      "version": 1,
+      "file": "generation-2-6-1794118436641930588.xsi",
+      "generation": 2
+    },
+    "current_changed": true,
+    "current_changed_despite_error": false,
+    "loaded_after_commit": {
+      "returncode": 0,
+      "stdout": "{\n  \"candidate_count\": 1,\n  \"candidate_count_exact\": true,\n  \"complete\": true,\n  \"elapsed_ms\": 0.009524000000000001,\n  \"examined\": 1,\n  \"generation\": 2,\n  \"index_entries\": 1,\n  \"results\": [\n    {\n      \"id\": 0,\n      \"is_dir\": false,\n      \"modified\": 0,\n      \"name\": \"second.txt\",\n      \"path\": \"C:\\\\synthetic\\\\second.txt\",\n      \"score\": 48,\n      \"size\": 2,\n      \"source\": \"offline:fault-review\"\n    }\n  ],\n  \"total\": 1,\n  \"total_relation\": \"exact\"\n}\n",
+      "stderr": ""
+    }
+  },
+  "parent_swap": {
+    "initial": {
+      "returncode": 0,
+      "stdout": "{\n  \"durability_warning\": null,\n  \"durable\": true,\n  \"generation\": 1,\n  \"imported\": 1,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"replaced_source\": \"offline:fault-review\",\n  \"replaced_source_prefix\": false,\n  \"total\": 1\n}\n",
+      "stderr": ""
+    },
+    "injected": {
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "XS_REVIEW_SWAPPED_PARENT_OPENAT\n{\"error\":\"I/O error at /tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-puiqou48/race-data/index: Not a directory (os error 20): Not a directory (os error 20)\",\"ok\":false}\n"
+    },
+    "injection_triggered": true,
+    "redirected_files": [],
+    "index_is_symlink": true,
+    "saved_current": {
+      "version": 1,
+      "file": "generation-1-8-1794118436646584322.xsi",
+      "generation": 1
+    }
+  }
+}

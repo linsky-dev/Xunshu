@@ -1,0 +1,7 @@
+   Compiling windows v0.61.3
+   Compiling accesskit_windows v0.29.2
+   Compiling accesskit_winit v0.29.2
+   Compiling egui-winit v0.33.3
+   Compiling eframe v0.33.3
+   Compiling xs-ui v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-ui)
+    Finished `release` profile [optimized] target(s) in 1m 11s

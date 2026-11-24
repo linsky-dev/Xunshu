@@ -1,0 +1,25 @@
+wsl: Failed to translate 'E:\Git\cmd'
+wsl: Failed to translate 'E:\Gety\bin'
+Traceback (most recent call last):
+  File "/var/tmp/xunshu-rust-recovery-036c199d3807/final.y70eAy2x/scripts/verify-install.py", line 68, in <module>
+    main()
+    ~~~~^^
+  File "/var/tmp/xunshu-rust-recovery-036c199d3807/final.y70eAy2x/scripts/verify-install.py", line 64, in main
+    verify(args.installer.resolve(), args.payload.resolve(), Path(directory))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/tmp/xunshu-rust-recovery-036c199d3807/final.y70eAy2x/scripts/verify-install.py", line 33, in verify
+    first = install()
+  File "/var/tmp/xunshu-rust-recovery-036c199d3807/final.y70eAy2x/scripts/verify-install.py", line 29, in install
+    run("install", str(payload), "--sha256", expected, expect_success=success)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/tmp/xunshu-rust-recovery-036c199d3807/final.y70eAy2x/scripts/verify-install.py", line 21, in run
+    raise AssertionError(f"安装命令退出码异常 {args}: {result.returncode}\n{result.stdout}\n{result.stderr}")
+AssertionError: 安装命令退出码异常 ('install', '/var/tmp/xunshu-rust-recovery-036c199d3807/payload.EBmU1Oil', '--sha256', '552d0fa493da0c153e83061d5066f72a5b17ee714a65f1ca205838a0021bf412'): 2
+
+error: the following required arguments were not provided:
+  --root <ROOT>
+
+Usage: xs-install --root <ROOT> install --sha256 <SHA256> --root <ROOT> <PAYLOAD>
+
+For more information, try '--help'.
+

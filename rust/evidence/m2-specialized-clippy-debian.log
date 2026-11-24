@@ -1,0 +1,6 @@
+wsl: Failed to translate 'E:\Git\cmd'
+wsl: Failed to translate 'E:\Gety\bin'
+    Checking xs-core v0.18.0-alpha.2 (/var/tmp/xunshu-rust-recovery-036c199d3807/m2.XeqDSMkS/crates/xs-core)
+    Checking xs-cli v0.18.0-alpha.2 (/var/tmp/xunshu-rust-recovery-036c199d3807/m2.XeqDSMkS/crates/xs-cli)
+    Checking xs-ui v0.18.0-alpha.2 (/var/tmp/xunshu-rust-recovery-036c199d3807/m2.XeqDSMkS/crates/xs-ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.56s

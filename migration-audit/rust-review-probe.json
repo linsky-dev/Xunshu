@@ -1,0 +1,92 @@
+{
+  "cancellation": {
+    "build_ms": 408.72004400000003,
+    "one_ms_budget": {
+      "complete": false,
+      "elapsed_ms": 2016.901748,
+      "examined": 0
+    },
+    "or_branches": 128,
+    "pre_cancelled": {
+      "complete": false,
+      "elapsed_ms": 2095.592884,
+      "examined": 0
+    },
+    "records": 25000
+  },
+  "corruption": {
+    "baseline": {
+      "complete": true,
+      "elapsed_ms": 0.08480800000000001,
+      "first_path_bytes": 18,
+      "load_ok": true,
+      "relation": "exact",
+      "results": 1,
+      "search_ok": true,
+      "total": 1
+    },
+    "oversize_parent": {
+      "complete": true,
+      "elapsed_ms": 0.12615900000000002,
+      "first_path_bytes": 262163,
+      "load_ok": true,
+      "relation": "exact",
+      "results": 1,
+      "search_ok": true,
+      "total": 1
+    },
+    "unterminated_postings": {
+      "error": "truncated posting list",
+      "load_ok": true,
+      "search_ok": false
+    },
+    "wrong_normalized_flag": {
+      "complete": true,
+      "elapsed_ms": 0.01349,
+      "first_path_bytes": null,
+      "load_ok": true,
+      "relation": "exact",
+      "results": 0,
+      "search_ok": true,
+      "total": 0
+    },
+    "zero_length_postings": {
+      "complete": true,
+      "elapsed_ms": 0.018839,
+      "first_path_bytes": null,
+      "load_ok": true,
+      "relation": "exact",
+      "results": 0,
+      "search_ok": true,
+      "total": 0
+    }
+  },
+  "differential": {
+    "comparisons": 185,
+    "failures": [],
+    "records": 300
+  },
+  "efu_overflow": {
+    "panicked": true
+  },
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-probe-5",
+  "scope": {
+    "empty_scope_token_with_local_record": {
+      "complete": true,
+      "elapsed_ms": 0.018007,
+      "first_path_bytes": 92,
+      "load_ok": true,
+      "relation": "exact",
+      "results": 1,
+      "search_ok": true,
+      "total": 1
+    },
+    "missing_outside_scope_open": {
+      "Err": "I/O error at /tmp/xunshu-rust-validation-036c199d3807/rust-review-probe-5/outside/missing-scope-probe.txt: No such file or directory (os error 2): No such file or directory (os error 2)"
+    },
+    "outside_fixture": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-probe-5/outside/outside-scope-probe.txt",
+    "outside_scope_open": {
+      "Err": "文件已不在当前授权目录、文件类型或排除策略内。"
+    }
+  }
+}

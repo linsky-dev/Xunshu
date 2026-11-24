@@ -1,0 +1,466 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Checking xs-content v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-content)
+    Checking xs-ui v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-ui)
+    Checking xs-cli v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.47s
+    Blocking waiting for file lock on build directory
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.229
+   Compiling syn v2.0.119
+   Compiling syn v3.0.9
+   Compiling smallvec v1.16.5
+   Compiling log v0.4.35
+   Compiling bitflags v2.13.2
+   Compiling parking_lot_core v0.9.12
+   Compiling getrandom v0.3.4
+   Compiling string_cache_codegen v0.5.4
+   Compiling web_atoms v0.1.3
+   Compiling parking_lot v0.12.5
+   Compiling darling_core v0.20.11
+   Compiling serde_derive v1.0.229
+   Compiling zerocopy-derive v0.8.63
+   Compiling phf_macros v0.11.3
+   Compiling phf v0.11.3
+   Compiling darling_macro v0.20.11
+   Compiling zerocopy v0.8.63
+   Compiling darling v0.20.11
+   Compiling thiserror-impl v2.0.21
+   Compiling serde v1.0.229
+   Compiling string_cache v0.8.9
+   Compiling thiserror v2.0.21
+   Compiling derive_builder_core v0.20.2
+   Compiling rand_core v0.9.5
+   Compiling ahash v0.8.12
+   Compiling serde_json v1.0.154
+   Compiling derive_builder_macro v0.20.2
+   Compiling derive_more-impl v2.1.1
+   Compiling monostate-impl v0.1.18
+   Compiling cssparser-macros v0.6.1
+   Compiling getrandom v0.4.3
+   Compiling once_cell v1.21.4
+   Compiling spm_precompiled v0.1.4
+   Compiling ppv-lite86 v0.2.21
+   Compiling half v2.7.1
+   Compiling rand_chacha v0.9.0
+   Compiling compact_str v0.9.1
+   Compiling rand v0.9.5
+   Compiling tiff v0.11.3
+   Compiling cssparser v0.35.0
+   Compiling clap_derive v4.6.7
+   Compiling zopfli v0.8.4
+   Compiling png v0.18.1
+   Compiling derive_more v2.1.1
+   Compiling monostate v0.1.18
+   Compiling markup5ever v0.35.0
+   Compiling derive_builder v0.20.2
+   Compiling dary_heap v0.3.9
+   Compiling match_token v0.35.0
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling bytemuck v1.25.2
+   Compiling image v0.25.10
+   Compiling tokenizers v0.21.4
+   Compiling zip v9.0.0
+   Compiling ort v2.0.0-rc.12
+   Compiling html5ever v0.35.0
+   Compiling selectors v0.31.0
+   Compiling clap v4.6.7
+   Compiling rand v0.10.3
+   Compiling xs-platform v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-platform)
+   Compiling fs2 v0.4.3
+   Compiling xs-runtime v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-runtime)
+   Compiling ttf-parser v0.25.1
+   Compiling xs-inference v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-inference)
+   Compiling rusqlite v0.41.1
+   Compiling lopdf v0.42.0
+   Compiling scraper v0.24.0
+   Compiling calamine v0.38.0
+   Compiling xs-content v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-content)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 30.39s
+    Blocking waiting for file lock on build directory
+   Compiling xs-ui v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-ui)
+   Compiling xs-cli v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-cli)
+   Compiling xs-content v0.18.0-alpha.6 (/tmp/xswork/src/Xunshu/rust/crates/xs-content)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.35s
+     Running unittests src/main.rs (target/debug/deps/xunshu-f9fa8997ec9abc54)
+
+running 4 tests
+test doctor::tests::diagnostics_do_not_create_or_leak_paths_and_export_is_create_only ... ok
+test watch::tests::settings_revision_cache_detects_replacement_invalid_data_and_removal ... ok
+test tests::empty_import_replaces_its_identity_and_preserves_unrelated_metadata ... ok
+test watch::tests::scope_revocation_cancels_prior_work_even_when_the_same_settings_return ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
+
+     Running unittests src/lib.rs (target/debug/deps/xs_content-7c2f72a98559a4d9)
+
+running 19 tests
+test connectors::tests::browser_bookmarks_skip_invalid_url_and_never_display_userinfo ... ok
+test connectors::tests::bookmarks_never_display_url_secrets ... ok
+test connectors::tests::bookmark_without_name_does_not_display_url_credentials ... ok
+test connectors::tests::connector_rank_is_stable_and_bounded ... ok
+test connectors::tests::inspects_local_git_repository_without_spawning_git ... ok
+test connectors::tests::declarative_source_import_is_bounded_and_revocable_at_caller ... ok
+test connectors::tests::parses_chrome_bookmarks_tree_offline ... ok
+test connectors::tests::static_source_manifest_rejects_executable_or_network_permissions ... ok
+test connectors::tests::redacts_git_remote_with_embedded_credentials ... ok
+test connectors::tests::web_uri_validator_rejects_credentials_and_ambiguous_urls ... ok
+test search::hybrid_rrf_tests::rrf_fuses_distinct_segments_of_same_document ... ok
+test search::lexical_cache_tests::cache_preserves_total_and_never_claims_missing_prefix_is_empty ... ok
+test search::semantic_budget_tests::semantic_budget_never_silently_truncates ... ok
+test search::hybrid_rrf_tests::hybrid_deep_pagination_has_no_artificial_200_document_ceiling ... ok
+test connectors::tests::connector_topk_equals_full_rank_on_large_input ... ok
+test semantic::tests::passages_keep_long_utf8_tail_at_its_original_offset ... ok
+test connectors::tests::bounds_bookmark_bytes_depth_and_entry_count ... ok
+test search::semantic_topk_tests::top_k_matches_full_sort_with_ties_and_multiple_windows ... ok
+test search::tests::semantic_ranking_considers_last_document_and_every_window ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+     Running unittests src/bin/worker.rs (target/debug/deps/xs_content_worker-faedd557121614f0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/content.rs (target/debug/deps/content-d045996169422e3f)
+
+running 13 tests
+
+running 1 test
+test checkpoint_survives_process_exit_and_can_be_discarded_safely ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.05s
+
+test damaged_or_reauthorized_checkpoint_is_not_reused ... ok
+test checkpoint_survives_process_exit_and_can_be_discarded_safely ... ok
+test failed_extraction_never_replaces_complete_index ... ok
+test failed_build_resumes_candidate_without_exposing_unpublished_documents ... ok
+test empty_document_is_persisted_and_noop_does_not_publish_a_new_generation ... ok
+test ipc_bounds_requests_and_resynchronizes ... ok
+test failed_scan_does_not_publish_pending_deletions_or_replacements ... ok
+test incremental_delta_add_update_delete_and_noop_preserve_results ... ok
+test real_worker_indexes_safe_formats_and_locations ... ok
+test incremental_failed_update_keeps_previous_published_generation ... ok
+test unchanged_files_reuse_verified_segments_and_changes_are_reindexed ... ok
+test replacement_scope_change_and_corruption_fail_closed ... ok
+test process_timeout_terminates_group_without_replacing_good_catalog ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running unittests src/lib.rs (target/debug/deps/xs_core-3e1d0b973711afba)
+
+running 46 tests
+test changes::tests::deleting_parent_invalidates_whole_subtree_without_child_events ... ok
+test changes::tests::append_and_move_resolve_current_paths_without_separate_stale_path_tape ... ok
+test changes::tests::deleting_unknown_parent_also_removes_its_known_orphan_subtree ... ok
+test changes::tests::file_cannot_be_used_as_parent_or_replace_nonempty_directory ... ok
+test changes::tests::corrupted_snapshot_cycle_and_unknown_fields_are_rejected ... ok
+test changes::tests::directory_rename_updates_every_descendant_path_from_stable_parent_ids ... ok
+test changes::tests::host_independent_paths_preserve_posix_backslashes_and_no_network_roots ... ok
+test changes::tests::graph_and_cursor_rollback_after_late_invalid_event ... ok
+test changes::tests::invalid_envelopes_and_names_never_advance_cursor ... ok
+test changes::tests::journal_recreation_gap_and_overlap_require_explicit_rebuild ... ok
+test changes::tests::moved_child_survives_old_parent_deletion_in_the_same_batch ... ok
+test changes::tests::rename_across_batches_replaces_the_same_id_without_old_name_record_dependency ... ok
+test changes::tests::root_changes_and_rename_without_metadata_request_rebuild ... ok
+test changes::tests::stable_id_upsert_never_duplicates_and_complete_batch_replay_is_noop ... ok
+test changes::tests::newly_added_descendants_are_included_in_same_batch_deletion ... ok
+test changes::tests::stable_identity_and_graph_json_roundtrip_validate_derived_state ... ok
+test changes::tests::unknown_parent_is_hidden_until_resolved_and_never_fabricated_at_root ... ok
+test index::intersect_tests::galloping_and_linear_intersection_match_exactly ... ok
+test index::parent_trie_tests::parent_trie_roundtrips_windows_and_posix_trees_compactly ... ok
+test index::tests::cancellation_is_honest ... ok
+test index::tests::bad_pagination_rejected ... ok
+test index::tests::malformed_postings_fail ... ok
+test index::tests::cjk_short_uses_posting ... ok
+test index::tests::missing_word_does_not_scan ... ok
+test index::tests::mixed_not_path_is_conservative ... ok
+test index::tests::or_does_not_drop_branch ... ok
+test index::tests::posix_backslash_is_a_filename_character ... ok
+test index::tests::root_path_survives ... ok
+test index::tests::u32_varint_roundtrip ... ok
+test index::tests::windows_paths_survive_linux ... ok
+test index::tests::repeated_postings_are_compact_and_exact ... ok
+test interchange::tests::efu_windows_and_network_names_never_opened ... ok
+test interchange::tests::schema4_read_only_roundtrip ... ok
+test persistence::tests::bad_pointer_cannot_escape_store ... ok
+test persistence::tests::bit_flip_detected_and_immutable_write_rejected ... ok
+test operations::tests::cancelled_first_scan_keeps_only_committed_batches_marked_partial ... ok
+test persistence::tests::mapped_reader_retains_its_generation_after_publish ... ok
+test persistence::tests::pointer_and_lock_symlinks_are_errors_not_absence ... ok
+test persistence::tests::publication_cursor_rejects_oversize_or_invalid_pointers ... ok
+test index::pinyin_inverted_tests::smart_pinyin_hits_inverted_index_without_full_scan ... ok
+test persistence::tests::stale_writer_cannot_replace_newer_generation ... ok
+test persistence::tests::published_snapshot_is_mapped_and_searchable ... ok
+test service::tests::invalid_method_is_not_a_command ... ok
+test persistence::tests::publication_cursor_does_not_map_a_corrupt_previous_snapshot ... ok
+test service::tests::oversized_request_is_bounded_and_next_line_survives ... ok
+test changes::tests::moving_directory_cannot_hide_an_overdeep_unchanged_descendant ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/adversarial.rs (target/debug/deps/adversarial-93d880bb1e8032d6)
+
+running 3 tests
+test malicious_query_never_panics ... ok
+test frecency_influences_global_top_k_before_pagination ... ok
+test inverted_candidates_equal_semantic_full_scan ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/catalog_recovery.rs (target/debug/deps/catalog_recovery-60d52ae734a3e3fe)
+
+running 9 tests
+test damaged_delta_catalog_never_looks_like_an_empty_success ... ok
+test imported_nulls_remain_unknown_inside_negated_boolean_queries ... ok
+test loads_an_m1_manifest_and_pointer_without_rewriting_them ... ok
+test cursor_and_tombstones_commit_together ... ok
+test migrate_m1_keeps_source_files_and_validates_scope_in_new_store ... ok
+test recovery_ignores_corrupt_current_and_different_scope ... ok
+test bounded_history_reclaims_unneeded_generation_files ... ok
+test delta_uses_generation_bound_ids_and_preserves_ranking_across_merge ... ok
+test packed_rows_keep_extreme_utc_times_and_attributes ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/interchange_fidelity.rs (target/debug/deps/interchange_fidelity-ba39e59b2140c37a)
+
+running 14 tests
+test directory_inference_respects_path_flavor_and_explicit_attributes ... ok
+test exporter_preflights_unrepresentable_dates_and_ambiguous_column_union ... ok
+test exporter_unions_custom_columns_and_uses_raw_empty_over_defaults ... ok
+test duplicate_headers_and_missing_or_invalid_filenames_are_rejected ... ok
+test invalid_efu_numbers_do_not_silently_become_zero ... ok
+test efu_preserves_raw_values_empty_cells_created_time_and_custom_columns ... ok
+test schema4_preserves_precision_nulls_extra_fields_and_filters_disabled_sources ... ok
+test schema4_optional_columns_and_negative_fractional_dates_work ... ok
+test schema4_rejects_nonempty_wal_instead_of_reading_stale_rows ... ok
+test schema4_invalid_extra_json_and_overflow_fail_without_changing_source ... ok
+test schema4_preserves_raw_calendar_dates_without_claiming_a_new_projection ... ok
+test unsigned_filetime_extremes_are_bounded_and_retain_exact_text ... ok
+test serialized_metadata_and_column_budgets_reject_amplified_rows ... ok
+test logical_csv_record_budget_counts_embedded_newlines_and_escaped_quotes ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/snapshot_validation.rs (target/debug/deps/snapshot_validation-cdf70e31715c5f9c)
+
+running 4 tests
+test pre_cancelled_wide_or_does_not_generate_candidates ... ok
+test sparse_metadata_survives_snapshot_and_rebuild ... ok
+test valid_crc_cannot_hide_invalid_normalization_or_postings ... ok
+test an_expired_deadline_never_claims_an_exact_empty_result ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/transactions.rs (target/debug/deps/transactions-87a5bc2208619936)
+
+running 13 tests
+test denied_scope_is_rejected_before_probing_a_missing_path ... ok
+test corrupt_settings_are_not_replaced_by_defaults ... ok
+test local_open_rechecks_current_extension_policy ... ok
+test an_empty_scope_token_cannot_admit_local_records ... ok
+test hard_link_paths_share_file_identity_and_old_revisions_refuse_open ... ok
+test rebuild_keeps_catalog_precision_and_unknown_fields ... ok
+test resident_service_revokes_a_cached_index_after_scope_change ... ok
+test file_notifications_publish_delta_without_deleting_offline_or_unauthorized_records ... ok
+test rebuilding_local_scopes_keeps_offline_catalogs_without_opening_them ... ok
+test scope_edited_mid_scan_cannot_publish_under_new_settings ... ok
+test unavailable_root_never_deletes_published_records ... ok
+test scope_change_cancellation_and_self_exclusion_are_transactional ... ok
+test repeated_equal_length_writes_to_one_path_remain_one_search_result ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (target/debug/deps/xs_inference-976752574d8adbc6)
+
+running 1 test
+test ocr::tests::ctc_blank_and_duplicate_collapse ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/install.rs (target/debug/deps/xs_install-720a86e10cb2ecdb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/worker.rs (target/debug/deps/xs_model_worker-ea0d0bf1ac3280b6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xs_platform-917ba5c79d420c55)
+
+running 8 tests
+test apps::tests::parses_desktop_entries_and_ranks_app_matches ... ok
+test apps::tests::desktop_exec_preserves_quoted_spaces_and_disallows_unknown_codes ... ok
+test local::imp::tests::failed_stream_before_commit_preserves_the_old_destination ... ok
+test local::imp::tests::directory_sync_failure_after_replace_is_reported_as_committed ... ok
+test local::imp::tests::directory_sync_failure_after_create_only_never_rolls_back_the_file ... ok
+test volume::tests::mount_parser_decodes_paths_and_rejects_network ... ok
+test local::imp::tests::new_and_lock_creation_remain_on_the_pinned_parent_at_the_race_boundary ... ok
+test watcher::imp::tests::queue_overflow_and_truncated_records_require_reconciliation ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contracts.rs (target/debug/deps/contracts-37b7ebf712d261d1)
+
+running 36 tests
+test cancellation_before_and_during_scan_is_always_incomplete ... ok
+test application_data_is_hard_excluded_even_with_smart_excludes_disabled ... ok
+test bounded_scan_delivers_cancelled_prefix_without_retaining_entries ... ok
+test atomic_create_only_and_replace_preserve_identity_contract ... ok
+test cleanup_only_removes_an_owned_file_and_stream_replacement_keeps_old_on_error ... ok
+test default_settings_never_start_a_disk_scan ... ok
+test linux::failed_stream_cleanup_cannot_follow_a_swapped_parent_to_an_outside_file ... ok
+test linux::invalid_utf8_is_explicitly_counted_without_lossy_index_entries ... ok
+test linux::opened_file_stays_pinned_when_the_user_path_is_replaced ... ok
+test linux::new_and_lock_opens_reject_links_and_special_files_before_data_open ... ok
+test extensions_are_strict_and_empty_list_means_directories_only ... ok
+test linux::permission_error_marks_scan_incomplete_but_unreadable_file_metadata_is_indexed ... ok
+test create_new_and_lock_handles_preserve_existing_contents ... ok
+test linux::stream_commit_uses_pinned_parent_after_directory_becomes_an_external_link ... ok
+test linux::special_fifo_is_skipped_without_opening_its_data ... ok
+test linux::overlay_and_virtual_filesystems_are_not_authorized_as_data_targets ... ok
+test local_boundary_rejects_relative_parent_url_and_unc_paths ... ok
+test longest_root_owns_its_subtree_without_unioning_broader_whitelists ... ok
+test missing_root_and_regular_file_root_are_errors_not_empty_successes ... ok
+test linux::symlinks_and_ancestor_links_are_never_followed ... ok
+test name_content_scopes_and_tokens_are_independent ... ok
+test migration_is_create_only_preserves_old_file_and_does_not_infer_roots ... ok
+test native_watch_detects_root_replacement ... ok
+test scope_tokens_are_order_independent_and_duplicate_roots_are_rejected ... ok
+test scoped_probe_applies_authorization_before_access_and_detects_missing_root ... ok
+test settings_round_trip_creates_private_parent_and_normalizes_whitelist ... ok
+test native_file_watch_detects_atomic_settings_replacement_only ... ok
+test setup_reminders_stop_at_three_and_manual_reopening_is_available ... ok
+test smart_excludes_can_be_overridden_only_by_an_explicit_deeper_scope ... ok
+test staged_directory_publish_is_create_only_and_same_parent ... ok
+test streaming_create_publishes_only_complete_files_and_cleans_callback_failures ... ok
+test strict_settings_reject_unknown_duplicate_invalid_types_and_versions ... ok
+test unsupported_acceleration_modes_fail_explicitly ... ok
+test revision_tracks_hard_links_equal_length_rewrites_and_replacement ... ok
+test settings_size_limit_is_enforced_before_deserialization ... ok
+test native_watch_ignores_hard_exclusions_and_reports_selected_changes ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running unittests src/lib.rs (target/debug/deps/xs_query-b3ea1208d43ad416)
+
+running 8 tests
+test predicates::tests::civil_epoch_leap_and_roundtrip ... ok
+test phonetic::tests::fuzzy_requires_all_characters_in_order ... ok
+test phonetic::tests::typo_tolerant_fuzzy_recovers_single_character_mistake ... ok
+test predicates::tests::local_date_periods_use_local_calendar_boundaries ... ok
+test phonetic::tests::full_initial_mixed_and_polyphonic_without_cartesian_expansion ... ok
+test predicates::tests::decimal_size_is_exact_above_float_precision ... ok
+test predicates::tests::local_calendar_days_follow_daylight_saving_transitions ... ok
+test smart_query_tests::smart_and_typo_operators_unify_literal_pinyin_and_typo_recall ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/golden.rs (target/debug/deps/golden-142e7fdbc832dd61)
+
+running 13 tests
+test explicit_name_does_not_turn_a_windows_style_name_into_a_path_search ... ok
+test directory_relations_respect_component_boundaries_and_groups ... ok
+test candidate_plans_preserve_case_sensitive_combining_mark_matches ... ok
+test imported_unknown_metadata_does_not_become_a_value_under_negation ... ok
+test malformed_queries_fail_explicitly ... ok
+test path_requirement_covers_nested_negative_and_implicit_paths ... ok
+test glob_normalizes_literal_runs_as_whole_unicode_sequences ... ok
+test query_budgets_and_hostile_unicode_never_panic ... ok
+test quoted_values_are_data_and_not_reinterpreted_as_query_syntax ... ok
+test text_ranking_is_deterministic_and_nonmatch_cannot_win ... ok
+test language_neutral_golden_cases_and_candidate_soundness ... ok
+test prepared_evaluation_is_identical_for_every_golden_query ... ok
+test punctuation_fuzz_smoke_and_soundness ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running unittests src/lib.rs (target/debug/deps/xs_runtime-3f3ce3898916fc96)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/offline.rs (target/debug/deps/offline-7378c31e9bf5daf7)
+
+running 1 test
+
+running 1 test
+test tcp_udp_blocked_and_local_ipc_survives ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+test tcp_udp_blocked_and_local_ipc_survives ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/xs_ui-6249ac90730c1a1e)
+
+running 18 tests
+test activity::tests::frecency_boost_decays_with_time_and_rewards_frequency ... ok
+test desktop::tests::double_ctrl_accepts_two_taps_across_tick_wrap ... ok
+test activity::tests::histories_are_bounded_and_query_bookmarks_have_independent_lifecycle ... ok
+test desktop::tests::double_ctrl_ignores_chords_long_holds_and_key_repeat ... ok
+test diagnostics::tests::rejects_other_protocols_and_never_echoes_unknown_state ... ok
+test diagnostics::tests::missing_path_diagnoser_identifies_scope_and_extension_mismatch ... ok
+test desktop::tests::renderer_protocol_preserves_unicode_and_rejects_bad_frames ... ok
+test scope_estimate::tests::reports_cancelled_incomplete_and_volume_refusal ... ok
+test tests::archives_policy_and_global_wizard_controls_apply_cleanly ... ok
+test tests::closing_setup_defers_only_unfinished_onboarding ... ok
+test tests::custom_fonts_reject_remote_or_relative_paths ... ok
+test tests::explicit_empty_policy_never_means_all_files ... ok
+test tests::filters_group_user_or_expression ... ok
+test tests::smart_mode_wraps_plain_ascii_without_touching_explicit_syntax ... ok
+test unified_app_tests::app_queries_do_not_consume_file_query_syntax ... ok
+test tests::stale_queries_cannot_replace_new_query_or_scope ... ok
+test scope_estimate::tests::measures_selected_types_and_excludes_app_data ... ok
+test scope_estimate::tests::stops_at_visit_limit_without_claiming_total ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests xs_content
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_inference
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_platform
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_query
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

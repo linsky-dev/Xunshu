@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/xs-core", "crates/xs-query", "crates/xs-platform", "crates/xs-cli", "crates/xs-ui", "crates/xs-content", "crates/xs-runtime", "crates/xs-inference"]
+default-members = ["crates/xs-core", "crates/xs-query", "crates/xs-platform", "crates/xs-cli"]
+
+[workspace.package]
+version = "0.18.0-alpha.7"
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+debug = 1

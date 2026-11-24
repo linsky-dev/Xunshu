@@ -1,0 +1,56 @@
+{
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-h1c6h5oz",
+  "source_before": {
+    "legacy.db": "6211b9601977349adb308e4cc908163225073c372308b99397113739d09e8e02"
+  },
+  "source_after": {
+    "legacy.db": "6211b9601977349adb308e4cc908163225073c372308b99397113739d09e8e02"
+  },
+  "byte_identical_and_no_new_sidecars": true,
+  "import": {
+    "args": [
+      "import-legacy",
+      "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-h1c6h5oz/legacy.db"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"generation\": 1,\n  \"imported\": 3,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"total\": 3\n}\n",
+    "stderr": ""
+  },
+  "disabled_catalog_search": {
+    "args": [
+      "search",
+      "source:offline:schema4:efu:disabled"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"candidate_count\": 3,\n  \"complete\": true,\n  \"elapsed_ms\": 0.012728999999999999,\n  \"examined\": 3,\n  \"generation\": 1,\n  \"index_entries\": 3,\n  \"results\": [\n    {\n      \"id\": 0,\n      \"is_dir\": false,\n      \"modified\": 1700000000,\n      \"name\": \"disabled.txt\",\n      \"path\": \"C:\\\\synthetic\\\\disabled.txt\",\n      \"score\": 48,\n      \"size\": 1,\n      \"source\": \"offline:schema4:efu:disabled\"\n    }\n  ],\n  \"total\": 1,\n  \"total_relation\": \"exact\"\n}\n",
+    "stderr": ""
+  },
+  "reimport_after_source_removal": {
+    "args": [
+      "import-legacy",
+      "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-h1c6h5oz/legacy.db"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"generation\": 2,\n  \"imported\": 2,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"total\": 3\n}\n",
+    "stderr": ""
+  },
+  "removed_source_search": {
+    "args": [
+      "search",
+      "source:offline:schema4:efu:disabled"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"candidate_count\": 3,\n  \"complete\": true,\n  \"elapsed_ms\": 0.007751999999999999,\n  \"examined\": 3,\n  \"generation\": 2,\n  \"index_entries\": 3,\n  \"results\": [\n    {\n      \"id\": 0,\n      \"is_dir\": false,\n      \"modified\": 1700000000,\n      \"name\": \"disabled.txt\",\n      \"path\": \"C:\\\\synthetic\\\\disabled.txt\",\n      \"score\": 48,\n      \"size\": 1,\n      \"source\": \"offline:schema4:efu:disabled\"\n    }\n  ],\n  \"total\": 1,\n  \"total_relation\": \"exact\"\n}\n",
+    "stderr": ""
+  },
+  "nonempty_wal": true,
+  "pending_wal_import": {
+    "args": [
+      "import-legacy",
+      "/tmp/xunshu-rust-validation-036c199d3807/rust-review-legacy-h1c6h5oz/pending.db"
+    ],
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "{\"error\":\"旧数据库存在未合并的 WAL；请先退出旧程序并完成 checkpoint，再导入副本。\",\"ok\":false}\n"
+  }
+}

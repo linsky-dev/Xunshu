@@ -1,0 +1,13 @@
+{
+  "software_version": "0.18.0-alpha.1",
+  "cli_sha256": "8992326dbbdaeb009f9e96000bde166e11c05e7411d37ad8daddca8da54da52b",
+  "query_measurement": "Index.search call including query parsing/candidates/matching/ordering, excludes UI input debounce/rendering and CLI process startup",
+  "iterations_per_query": 30,
+  "baseline_iterations_per_query": 10,
+  "worker_parallelism": "other task agents paused CPU-heavy work during final benchmark",
+  "page_cache_flushed": false,
+  "host": "environment.json",
+  "benchmark": "benchmark-3m-final.json",
+  "synthetic_metadata_only": true,
+  "original_python_or_competitor_comparison": false
+}

@@ -1,0 +1,16 @@
+   Compiling xs-core v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.92s
+     Running unittests src/lib.rs (target/debug/deps/xs_core-b400ad8c76d38206)
+
+running 8 tests
+test persistence::tests::bad_pointer_cannot_escape_store ... ok
+test persistence::tests::publication_cursor_rejects_oversize_or_invalid_pointers ... ok
+test persistence::tests::pointer_and_lock_symlinks_are_errors_not_absence ... ok
+test persistence::tests::bit_flip_detected_and_immutable_write_rejected ... ok
+test persistence::tests::stale_writer_cannot_replace_newer_generation ... ok
+test persistence::tests::published_snapshot_is_mapped_and_searchable ... ok
+test persistence::tests::publication_cursor_does_not_map_a_corrupt_previous_snapshot ... ok
+test persistence::tests::mapped_reader_retains_its_generation_after_publish ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.01s
+

@@ -1,0 +1,64 @@
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "coverage_complete": true,
+  "elapsed_ms": 0.088,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 0,
+      "is_dir": true,
+      "modified": 1794316635,
+      "name": "files",
+      "path": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\\files",
+      "score": 45,
+      "size": 0,
+      "source": "local"
+    },
+    {
+      "id": 1,
+      "is_dir": false,
+      "modified": 1794316635,
+      "name": "report.txt",
+      "path": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\\files\\report.txt",
+      "score": 44,
+      "size": 16,
+      "source": "local"
+    },
+    {
+      "id": 2,
+      "is_dir": true,
+      "modified": 1794316635,
+      "name": "subdir",
+      "path": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\\files\\subdir",
+      "score": 44,
+      "size": 0,
+      "source": "local"
+    },
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794316635,
+      "name": "预算报告.pdf",
+      "path": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\\files\\预算报告.pdf",
+      "score": 44,
+      "size": 32,
+      "source": "local"
+    },
+    {
+      "id": 3,
+      "is_dir": false,
+      "modified": 1794316635,
+      "name": "notes.txt",
+      "path": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\\files\\subdir\\notes.txt",
+      "score": 43,
+      "size": 15,
+      "source": "local"
+    }
+  ],
+  "total": 5,
+  "total_relation": "exact"
+}

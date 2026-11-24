@@ -1,0 +1,27 @@
+{
+  "commit": {
+    "state": "durable"
+  },
+  "message": "范围已保存；运行 scan 后生效。正文、OCR、语义默认关闭。",
+  "ok": true,
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "txt",
+          "pdf"
+        ],
+        "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  }
+}

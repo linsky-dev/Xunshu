@@ -1,0 +1,100 @@
+{
+  "after_load_memory": {
+    "peak_rss_kib": null,
+    "rss_kib": null
+  },
+  "after_queries_memory": {
+    "peak_rss_kib": null,
+    "rss_kib": null
+  },
+  "baseline_memory": {
+    "peak_rss_kib": null,
+    "rss_kib": null
+  },
+  "iterations": 100,
+  "load_ms": 243.2807,
+  "load_note": "separate fresh process; OS page cache not forcibly evicted; includes CRC and structural validation",
+  "mapped": true,
+  "queries": [
+    {
+      "candidates": 0,
+      "complete": true,
+      "examined": 0,
+      "p50_ms": 0.0017000000000000001,
+      "p95_ms": 0.0023,
+      "p99_ms": 0.004,
+      "query": "never_present_xyz",
+      "total": 0
+    },
+    {
+      "candidates": 191,
+      "complete": true,
+      "examined": 191,
+      "p50_ms": 0.17340000000000003,
+      "p95_ms": 0.2029,
+      "p99_ms": 0.2689,
+      "query": "0001234",
+      "total": 1
+    },
+    {
+      "candidates": 0,
+      "complete": true,
+      "examined": 0,
+      "p50_ms": 0.0014,
+      "p95_ms": 0.0015,
+      "p99_ms": 0.0019,
+      "query": "预算决算不存在",
+      "total": 0
+    },
+    {
+      "candidates": 600000,
+      "complete": true,
+      "examined": 600000,
+      "p50_ms": 59.7189,
+      "p95_ms": 68.9656,
+      "p99_ms": 77.8238,
+      "query": "干部",
+      "total": 600000
+    },
+    {
+      "candidates": 44,
+      "complete": true,
+      "examined": 44,
+      "p50_ms": 0.1742,
+      "p95_ms": 0.21919999999999998,
+      "p99_ms": 0.25549999999999995,
+      "query": "project_budget_final_0000121",
+      "total": 1
+    },
+    {
+      "candidates": 0,
+      "complete": true,
+      "examined": 0,
+      "p50_ms": 0.0015999999999999999,
+      "p95_ms": 0.0025,
+      "p99_ms": 0.0038,
+      "query": "name:report ext:pdf",
+      "total": 0
+    },
+    {
+      "candidates": 600000,
+      "complete": true,
+      "examined": 600000,
+      "p50_ms": 107.7109,
+      "p95_ms": 129.1044,
+      "p99_ms": 134.1402,
+      "query": "readme ext:rs",
+      "total": 600000
+    },
+    {
+      "candidates": 1200000,
+      "complete": true,
+      "examined": 1200000,
+      "p50_ms": 198.48270000000002,
+      "p95_ms": 222.9009,
+      "p99_ms": 229.5127,
+      "query": "budget | meeting",
+      "total": 1200000
+    }
+  ]
+}

@@ -1,0 +1,257 @@
+{
+  "scope": "Linux synthetic in-memory only; no filesystem scan or real Windows USN journal",
+  "results": [
+    {
+      "id": "USN-SAME-FRN-IDEMPOTENCY",
+      "kind": "defect",
+      "expected": [
+        "/synthetic/docs/old.txt"
+      ],
+      "actual": [
+        "/synthetic/docs/old.txt",
+        "/synthetic/docs/old.txt"
+      ],
+      "matches_contract": false
+    },
+    {
+      "id": "USN-RENAME-CROSS-BATCH",
+      "kind": "defect",
+      "expected": [
+        "/synthetic/docs/new.txt"
+      ],
+      "actual": [
+        "/synthetic/docs/new.txt",
+        "/synthetic/docs/old.txt"
+      ],
+      "matches_contract": false
+    },
+    {
+      "id": "USN-DIRECTORY-RENAME-CHILD",
+      "kind": "defect",
+      "expected": [
+        "/synthetic/base/renamed/child.txt"
+      ],
+      "actual": [
+        "/synthetic/base/docs/child.txt"
+      ],
+      "matches_contract": false
+    },
+    {
+      "id": "USN-APPEND-PATH-SEARCH",
+      "kind": "defect",
+      "expected": [
+        "/synthetic/docs",
+        "/synthetic/docs/new.txt",
+        "/synthetic/docs/old.txt"
+      ],
+      "actual": [
+        "/synthetic/docs",
+        "/synthetic/docs/old.txt"
+      ],
+      "matches_contract": false
+    },
+    {
+      "id": "USN-DIRECTORY-DELETE-CHILD",
+      "kind": "defect",
+      "expected": [],
+      "actual": [
+        "/synthetic/docs/old.txt"
+      ],
+      "matches_contract": false
+    },
+    {
+      "id": "POLICY-all",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-all-directory",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-none",
+      "kind": "contract",
+      "expected": false,
+      "actual": false,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-none-directory",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-normalized",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-normalized-directory",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-EXT-NORMALIZATION",
+      "kind": "contract",
+      "expected": [
+        "pdf",
+        "txt"
+      ],
+      "actual": [
+        "pdf",
+        "txt"
+      ],
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-REJECT-null",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-REJECT-boolean-revision",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-REJECT-wildcard",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "POLICY-REJECT-unknown-field",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "QUERY-DIACRITICS-CASE",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "QUERY-alpha|beta gamma",
+      "kind": "contract",
+      "expected": [
+        "alpha gamma",
+        "beta gamma"
+      ],
+      "actual": [
+        "alpha gamma",
+        "beta gamma"
+      ],
+      "matches_contract": true
+    },
+    {
+      "id": "QUERY-< >",
+      "kind": "contract",
+      "expected": [
+        "alpha",
+        "alpha gamma",
+        "beta gamma",
+        "gamma"
+      ],
+      "actual": [
+        "alpha",
+        "alpha gamma",
+        "beta gamma",
+        "gamma"
+      ],
+      "matches_contract": true
+    },
+    {
+      "id": "QUERY-alpha|",
+      "kind": "contract",
+      "expected": [
+        "alpha",
+        "alpha gamma",
+        "beta gamma",
+        "gamma"
+      ],
+      "actual": [
+        "alpha",
+        "alpha gamma",
+        "beta gamma",
+        "gamma"
+      ],
+      "matches_contract": true
+    },
+    {
+      "id": "QUERY-<alpha|beta gamma",
+      "kind": "contract",
+      "expected": [
+        "alpha gamma",
+        "beta gamma"
+      ],
+      "actual": [
+        "alpha gamma",
+        "beta gamma"
+      ],
+      "matches_contract": true
+    },
+    {
+      "id": "QUERY-UNKNOWN-PREFIX-LITERAL",
+      "kind": "contract",
+      "expected": [
+        "foo:bar"
+      ],
+      "actual": [
+        "foo:bar"
+      ],
+      "matches_contract": true
+    },
+    {
+      "id": "SETTINGS-valid",
+      "kind": "contract",
+      "expected": false,
+      "actual": false,
+      "matches_contract": true
+    },
+    {
+      "id": "SETTINGS-bool-count",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "SETTINGS-relative-root",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    },
+    {
+      "id": "SETTINGS-nan-elapsed",
+      "kind": "contract",
+      "expected": true,
+      "actual": true,
+      "matches_contract": true
+    }
+  ],
+  "counts": {
+    "defects_reproduced": 5,
+    "contracts_passed": 21,
+    "contracts_failed": 0
+  }
+}

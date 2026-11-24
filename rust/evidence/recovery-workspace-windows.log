@@ -1,0 +1,371 @@
+   Compiling serde_core v1.0.229
+   Compiling aho-corasick v1.1.5
+   Compiling zerocopy-derive v0.8.63
+   Compiling num-traits v0.2.19
+   Compiling ahash v0.8.12
+   Compiling tempfile v3.27.0
+   Compiling zune-core v0.5.3
+   Compiling quick-error v2.0.1
+   Compiling darling_core v0.20.11
+   Compiling crossbeam-utils v0.8.23
+   Compiling fax v0.2.7
+   Compiling either v1.19.0
+   Compiling minimal-lexical v0.2.1
+   Compiling bit-vec v0.8.0
+   Compiling rawpointer v0.2.1
+   Compiling castaway v0.2.4
+   Compiling image-webp v0.2.4
+   Compiling matrixmultiply v0.3.11
+   Compiling monostate-impl v0.1.18
+   Compiling zune-jpeg v0.5.15
+   Compiling nom v7.1.3
+   Compiling itertools v0.14.0
+   Compiling bit-set v0.8.0
+   Compiling base64 v0.13.1
+   Compiling macro_rules_attribute v0.2.3
+   Compiling crossbeam-epoch v0.9.21
+   Compiling esaxx-rs v0.1.10
+   Compiling ort-sys v2.0.0-rc.12
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling moxcms v0.8.1
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling regex-automata v0.4.18
+   Compiling libloading v0.9.0
+   Compiling crossbeam-deque v0.8.8
+   Compiling unicode_categories v0.1.1
+   Compiling xs-runtime v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-runtime)
+   Compiling rayon-core v1.13.0
+   Compiling ndarray v0.17.2
+   Compiling rayon v1.12.0
+   Compiling zerocopy v0.8.63
+   Compiling darling_macro v0.20.11
+   Compiling darling v0.20.11
+   Compiling derive_builder_core v0.20.2
+   Compiling derive_builder_macro v0.20.2
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling csv v1.4.0
+   Compiling monostate v0.1.18
+   Compiling derive_builder v0.20.2
+   Compiling string_cache v0.8.9
+   Compiling calamine v0.30.1
+   Compiling dary_heap v0.3.9
+   Compiling compact_str v0.9.1
+   Compiling spm_precompiled v0.1.4
+   Compiling rayon-cond v0.4.0
+   Compiling web_atoms v0.1.3
+   Compiling regex v1.13.1
+   Compiling fancy-regex v0.14.0
+   Compiling xs-platform v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-platform)
+   Compiling xs-query v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-query)
+   Compiling markup5ever v0.35.0
+   Compiling html5ever v0.35.0
+   Compiling ort v2.0.0-rc.12
+   Compiling xs-core v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-core)
+   Compiling scraper v0.24.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling half v2.7.1
+   Compiling epaint v0.33.3
+   Compiling tiff v0.11.3
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.5
+   Compiling lopdf v0.38.0
+   Compiling tokenizers v0.21.4
+   Compiling egui v0.33.3
+   Compiling image v0.25.10
+   Compiling xs-content v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-content)
+   Compiling arboard v3.7.0
+   Compiling egui_glow v0.33.3
+   Compiling egui-winit v0.33.3
+   Compiling xs-inference v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-inference)
+   Compiling eframe v0.33.3
+   Compiling xs-cli v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-cli)
+   Compiling xs-ui v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.17s
+     Running unittests src\main.rs (rust/target\debug\deps\xunshu-528a97b8deae751f.exe)
+
+running 1 test
+test tests::empty_import_replaces_its_identity_and_preserves_unrelated_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src\lib.rs (rust/target\debug\deps\xs_content-8b6e58a6815569a4.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\worker.rs (rust/target\debug\deps\xs_content_worker-b642b15f1c94a261.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\content.rs (rust/target\debug\deps\content-e1f77a2b2f15898f.exe)
+
+running 3 tests
+test ipc_bounds_requests_and_resynchronizes ... ok
+test replacement_scope_change_and_corruption_fail_closed ... ok
+test real_worker_indexes_safe_formats_and_locations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+     Running unittests src\lib.rs (rust/target\debug\deps\xs_core-00ad6596bdf05fe4.exe)
+
+running 41 tests
+test changes::tests::stable_id_upsert_never_duplicates_and_complete_batch_replay_is_noop ... ok
+test changes::tests::host_independent_paths_preserve_posix_backslashes_and_no_network_roots ... ok
+test changes::tests::root_changes_and_rename_without_metadata_request_rebuild ... ok
+test changes::tests::deleting_unknown_parent_also_removes_its_known_orphan_subtree ... ok
+test changes::tests::journal_recreation_gap_and_overlap_require_explicit_rebuild ... ok
+test changes::tests::graph_and_cursor_rollback_after_late_invalid_event ... ok
+test changes::tests::moved_child_survives_old_parent_deletion_in_the_same_batch ... ok
+test changes::tests::deleting_parent_invalidates_whole_subtree_without_child_events ... ok
+test changes::tests::file_cannot_be_used_as_parent_or_replace_nonempty_directory ... ok
+test changes::tests::directory_rename_updates_every_descendant_path_from_stable_parent_ids ... ok
+test changes::tests::invalid_envelopes_and_names_never_advance_cursor ... ok
+test changes::tests::rename_across_batches_replaces_the_same_id_without_old_name_record_dependency ... ok
+test changes::tests::append_and_move_resolve_current_paths_without_separate_stale_path_tape ... ok
+test changes::tests::newly_added_descendants_are_included_in_same_batch_deletion ... ok
+test changes::tests::unknown_parent_is_hidden_until_resolved_and_never_fabricated_at_root ... ok
+test changes::tests::corrupted_snapshot_cycle_and_unknown_fields_are_rejected ... ok
+test changes::tests::stable_identity_and_graph_json_roundtrip_validate_derived_state ... ok
+test index::tests::posix_backslash_is_a_filename_character ... ok
+test index::tests::malformed_postings_fail ... ok
+test index::tests::mixed_not_path_is_conservative ... ok
+test index::tests::or_does_not_drop_branch ... ok
+test index::tests::bad_pagination_rejected ... ok
+test index::tests::cjk_short_uses_posting ... ok
+test index::tests::missing_word_does_not_scan ... ok
+test index::tests::windows_paths_survive_linux ... ok
+test index::tests::root_path_survives ... ok
+test index::tests::repeated_postings_are_compact_and_exact ... ok
+test index::tests::u32_varint_roundtrip ... ok
+test index::tests::cancellation_is_honest ... ok
+test service::tests::invalid_method_is_not_a_command ... ok
+test service::tests::oversized_request_is_bounded_and_next_line_survives ... ok
+test interchange::tests::efu_windows_and_network_names_never_opened ... ok
+test persistence::tests::bad_pointer_cannot_escape_store ... ok
+test persistence::tests::publication_cursor_rejects_oversize_or_invalid_pointers ... ok
+test persistence::tests::bit_flip_detected_and_immutable_write_rejected ... ok
+test interchange::tests::schema4_read_only_roundtrip ... ok
+test persistence::tests::published_snapshot_is_mapped_and_searchable ... ok
+test persistence::tests::stale_writer_cannot_replace_newer_generation ... ok
+test persistence::tests::mapped_reader_retains_its_generation_after_publish ... ok
+test persistence::tests::publication_cursor_does_not_map_a_corrupt_previous_snapshot ... ok
+test changes::tests::moving_directory_cannot_hide_an_overdeep_unchanged_descendant ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests\adversarial.rs (rust/target\debug\deps\adversarial-c7948467e3d537cb.exe)
+
+running 2 tests
+test malicious_query_never_panics ... ok
+test inverted_candidates_equal_semantic_full_scan ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\catalog_recovery.rs (rust/target\debug\deps\catalog_recovery-d9a8bab90ba744e8.exe)
+
+running 6 tests
+test imported_nulls_remain_unknown_inside_negated_boolean_queries ... ok
+test loads_an_m1_manifest_and_pointer_without_rewriting_them ... ok
+test cursor_and_tombstones_commit_together ... ok
+test recovery_ignores_corrupt_current_and_different_scope ... ok
+test bounded_history_reclaims_unneeded_generation_files ... ok
+test delta_uses_generation_bound_ids_and_preserves_ranking_across_merge ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
+
+     Running tests\interchange_fidelity.rs (rust/target\debug\deps\interchange_fidelity-7f751b780e429418.exe)
+
+running 14 tests
+test exporter_unions_custom_columns_and_uses_raw_empty_over_defaults ... ok
+test exporter_preflights_unrepresentable_dates_and_ambiguous_column_union ... ok
+test directory_inference_respects_path_flavor_and_explicit_attributes ... ok
+test efu_preserves_raw_values_empty_cells_created_time_and_custom_columns ... ok
+test serialized_metadata_and_column_budgets_reject_amplified_rows ... ok
+test invalid_efu_numbers_do_not_silently_become_zero ... ok
+test unsigned_filetime_extremes_are_bounded_and_retain_exact_text ... ok
+test duplicate_headers_and_missing_or_invalid_filenames_are_rejected ... ok
+test schema4_preserves_raw_calendar_dates_without_claiming_a_new_projection ... ok
+test schema4_rejects_nonempty_wal_instead_of_reading_stale_rows ... ok
+test schema4_optional_columns_and_negative_fractional_dates_work ... ok
+test logical_csv_record_budget_counts_embedded_newlines_and_escaped_quotes ... ok
+test schema4_preserves_precision_nulls_extra_fields_and_filters_disabled_sources ... ok
+test schema4_invalid_extra_json_and_overflow_fail_without_changing_source ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests\snapshot_validation.rs (rust/target\debug\deps\snapshot_validation-af46c509b5987706.exe)
+
+running 4 tests
+test pre_cancelled_wide_or_does_not_generate_candidates ... ok
+test sparse_metadata_survives_snapshot_and_rebuild ... ok
+test valid_crc_cannot_hide_invalid_normalization_or_postings ... ok
+test an_expired_deadline_never_claims_an_exact_empty_result ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests\transactions.rs (rust/target\debug\deps\transactions-83ef20d237a74fce.exe)
+
+running 10 tests
+test denied_scope_is_rejected_before_probing_a_missing_path ... ok
+test local_open_rechecks_current_extension_policy ... ok
+test corrupt_settings_are_not_replaced_by_defaults ... ok
+test resident_service_revokes_a_cached_index_after_scope_change ... ok
+test an_empty_scope_token_cannot_admit_local_records ... ok
+test scope_edited_mid_scan_cannot_publish_under_new_settings ... ok
+test unavailable_root_never_deletes_published_records ... ok
+test rebuilding_local_scopes_keeps_offline_catalogs_without_opening_them ... ok
+test rebuild_keeps_catalog_precision_and_unknown_fields ... ok
+test scope_change_cancellation_and_self_exclusion_are_transactional ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running unittests src\lib.rs (rust/target\debug\deps\xs_inference-66a18e9027c68285.exe)
+
+running 1 test
+test ocr::tests::ctc_blank_and_duplicate_collapse ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\worker.rs (rust/target\debug\deps\xs_model_worker-6fdb83b7b9cea7c3.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (rust/target\debug\deps\xs_platform-35feef13312f444d.exe)
+
+running 2 tests
+test journal::tests::usn_pages_preserve_v2_and_v3_ids_and_reject_unbounded_fields ... ok
+test journal::tests::native_authorization_rejects_partial_scopes_and_implicit_volume_reads ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contracts.rs (rust/target\debug\deps\contracts-464c7224afcc83f8.exe)
+
+running 25 tests
+test default_settings_never_start_a_disk_scan ... ok
+test name_content_scopes_and_tokens_are_independent ... ok
+test local_boundary_rejects_relative_parent_url_and_unc_paths ... ok
+test existing_drive_root_is_validated_without_a_create_attempt ... ok
+test scope_tokens_are_order_independent_and_duplicate_roots_are_rejected ... ok
+test cancellation_before_and_during_scan_is_always_incomplete ... ok
+test missing_root_and_regular_file_root_are_errors_not_empty_successes ... ok
+test cleanup_only_removes_an_owned_file_and_stream_replacement_keeps_old_on_error ... ok
+test atomic_create_only_and_replace_preserve_identity_contract ... ok
+test unsupported_acceleration_modes_fail_explicitly ... ok
+test application_data_is_hard_excluded_even_with_smart_excludes_disabled ... ok
+test longest_root_owns_its_subtree_without_unioning_broader_whitelists ... ok
+test create_new_and_lock_handles_preserve_existing_contents ... ok
+test extensions_are_strict_and_empty_list_means_directories_only ... ok
+test native_watch_ignores_hard_exclusions_and_reports_selected_changes ... ok
+test settings_size_limit_is_enforced_before_deserialization ... ok
+test setup_reminders_stop_at_three_and_manual_reopening_is_available ... ok
+test bounded_scan_delivers_cancelled_prefix_without_retaining_entries ... ok
+test settings_round_trip_creates_private_parent_and_normalizes_whitelist ... ok
+test revision_tracks_hard_links_equal_length_rewrites_and_replacement ... ok
+test migration_is_create_only_preserves_old_file_and_does_not_infer_roots ... ok
+test smart_excludes_can_be_overridden_only_by_an_explicit_deeper_scope ... ok
+test streaming_create_publishes_only_complete_files_and_cleans_callback_failures ... ok
+test strict_settings_reject_unknown_duplicate_invalid_types_and_versions ... ok
+test native_watch_detects_root_replacement ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
+
+     Running unittests src\lib.rs (rust/target\debug\deps\xs_query-e346fc8a0fa0c2c0.exe)
+
+running 4 tests
+test predicates::tests::civil_epoch_leap_and_roundtrip ... ok
+test predicates::tests::decimal_size_is_exact_above_float_precision ... ok
+test phonetic::tests::fuzzy_requires_all_characters_in_order ... ok
+test phonetic::tests::full_initial_mixed_and_polyphonic_without_cartesian_expansion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\golden.rs (rust/target\debug\deps\golden-d42d14bd2fbb6e56.exe)
+
+running 13 tests
+test explicit_name_does_not_turn_a_windows_style_name_into_a_path_search ... ok
+test imported_unknown_metadata_does_not_become_a_value_under_negation ... ok
+test candidate_plans_preserve_case_sensitive_combining_mark_matches ... ok
+test text_ranking_is_deterministic_and_nonmatch_cannot_win ... ok
+test directory_relations_respect_component_boundaries_and_groups ... ok
+test malformed_queries_fail_explicitly ... ok
+test quoted_values_are_data_and_not_reinterpreted_as_query_syntax ... ok
+test query_budgets_and_hostile_unicode_never_panic ... ok
+test path_requirement_covers_nested_negative_and_implicit_paths ... ok
+test glob_normalizes_literal_runs_as_whole_unicode_sequences ... ok
+test prepared_evaluation_is_identical_for_every_golden_query ... ok
+test language_neutral_golden_cases_and_candidate_soundness ... ok
+test punctuation_fuzz_smoke_and_soundness ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running unittests src\lib.rs (rust/target\debug\deps\xs_runtime-2b653b0d3c9018c2.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\offline.rs (rust/target\debug\deps\offline-bc49dc08860ffb19.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (rust/target\debug\deps\xs_ui-79ed3da70ca40b29.exe)
+
+running 10 tests
+test desktop::tests::double_ctrl_accepts_two_taps_across_tick_wrap ... ok
+test desktop::tests::double_ctrl_ignores_chords_long_holds_and_key_repeat ... ok
+test tests::closing_setup_defers_only_unfinished_onboarding ... ok
+test tests::stale_queries_cannot_replace_new_query_or_scope ... ok
+test desktop::windows::tests::single_instance_key_normalizes_windows_path_spelling ... ok
+test desktop::windows::tests::login_arguments_quote_spaces_quotes_and_trailing_slashes ... ok
+test tests::filters_group_user_or_expression ... ok
+test tests::custom_fonts_reject_remote_or_relative_paths ... ok
+test tests::explicit_empty_policy_never_means_all_files ... ok
+test desktop::tests::renderer_protocol_preserves_unicode_and_rejects_bad_frames ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_content
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_inference
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_platform
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_query
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

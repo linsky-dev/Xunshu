@@ -1,0 +1,304 @@
+PE headers and import tables (unwind tables omitted).
+
+/workspace/scratch/036c199d3807/xunshu/rust/target-windows/x86_64-pc-windows-gnu/release/xunshu.exe:     file format pei-x86-64
+
+Characteristics 0x22e
+	executable
+	line numbers stripped
+	symbols stripped
+	large address aware
+	debugging information removed
+
+Time/Date		Sun Nov  8 14:03:49 2026
+Magic			020b	(PE32+)
+MajorLinkerVersion	2
+MinorLinkerVersion	44
+SizeOfCode		00000000003c6e00
+SizeOfInitializedData	000000000018bc00
+SizeOfUninitializedData	0000000000000400
+AddressOfEntryPoint	00000000000013f0
+BaseOfCode		0000000000001000
+ImageBase		0000000140000000
+SectionAlignment	00001000
+FileAlignment		00000200
+MajorOSystemVersion	4
+MinorOSystemVersion	0
+MajorImageVersion	0
+MinorImageVersion	0
+MajorSubsystemVersion	5
+MinorSubsystemVersion	2
+Win32Version		00000000
+SizeOfImage		00559000
+SizeOfHeaders		00000400
+CheckSum		0055f428
+Subsystem		00000003	(Windows CUI)
+DllCharacteristics	00000160
+					HIGH_ENTROPY_VA
+					DYNAMIC_BASE
+					NX_COMPAT
+SizeOfStackReserve	0000000000200000
+SizeOfStackCommit	0000000000001000
+SizeOfHeapReserve	0000000000100000
+SizeOfHeapCommit	0000000000001000
+LoaderFlags		00000000
+NumberOfRvaAndSizes	00000010
+
+The Data Directory
+Entry 0 0000000000000000 00000000 Export Directory [.edata (or where ever we found it)]
+Entry 1 000000000054d000 00001e1c Import Directory [parts of .idata]
+Entry 2 0000000000000000 00000000 Resource Directory [.rsrc]
+Entry 3 0000000000515000 0000f528 Exception Directory [.pdata]
+Entry 4 0000000000000000 00000000 Security Directory
+Entry 5 0000000000550000 0000820c Base Relocation Directory [.reloc]
+Entry 6 0000000000000000 00000000 Debug Directory
+Entry 7 0000000000000000 00000000 Description Directory
+Entry 8 0000000000000000 00000000 Special Directory
+Entry 9 00000000005095a0 00000028 Thread Storage Directory [.tls]
+Entry a 0000000000000000 00000000 Load Configuration Directory
+Entry b 0000000000000000 00000000 Bound Import Directory
+Entry c 000000000054d708 00000650 Import Address Table Directory
+Entry d 0000000000000000 00000000 Delay Import Directory
+Entry e 0000000000000000 00000000 CLR Runtime Header
+Entry f 0000000000000000 00000000 Reserved
+
+There is an import table in .idata at 0x14054d000
+
+The Import Tables (interpreted .idata section contents)
+ vma:            Hint    Time      Forward  DLL       First
+                 Table   Stamp     Chain    Name      Thunk
+ 0054d000	0054d0b8 00000000 00000000 0054eb20 0054d708
+
+	DLL Name: KERNEL32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054d708  <none>  0011  AddVectoredExceptionHandler
+	0054d710  <none>  00ab  CreateToolhelp32Snapshot
+	0054d718  <none>  00c0  DeleteCriticalSection
+	0054d720  <none>  00e1  EnterCriticalSection
+	0054d728  <none>  0153  FormatMessageA
+	0054d730  <none>  0154  FormatMessageW
+	0054d738  <none>  0157  FreeEnvironmentStringsW
+	0054d740  <none>  017a  GetCommandLineW
+	0054d748  <none>  01a5  GetCurrentDirectoryW
+	0054d750  <none>  01c7  GetEnvironmentStringsW
+	0054d758  <none>  01c9  GetEnvironmentVariableW
+	0054d760  <none>  0201  GetModuleFileNameW
+	0054d768  <none>  0202  GetModuleHandleA
+	0054d770  <none>  0204  GetModuleHandleExW
+	0054d778  <none>  0205  GetModuleHandleW
+	0054d780  <none>  023a  GetProcAddress
+	0054d788  <none>  026c  GetSystemDirectoryW
+	0054d790  <none>  026f  GetSystemInfo
+	0054d798  <none>  0273  GetSystemTime
+	0054d7a0  <none>  0275  GetSystemTimeAsFileTime
+	0054d7a8  <none>  0276  GetSystemTimePreciseAsFileTime
+	0054d7b0  <none>  0293  GetTickCount
+	0054d7b8  <none>  02b1  GetWindowsDirectoryW
+	0054d7c0  <none>  02e5  InitializeCriticalSection
+	0054d7c8  <none>  032e  LeaveCriticalSection
+	0054d7d0  <none>  0332  LoadLibraryA
+	0054d7d8  <none>  0335  LoadLibraryW
+	0054d7e0  <none>  0352  Module32FirstW
+	0054d7e8  <none>  0354  Module32NextW
+	0054d7f0  <none>  037b  OutputDebugStringA
+	0054d7f8  <none>  037c  OutputDebugStringW
+	0054d800  <none>  03ac  QueryPerformanceCounter
+	0054d808  <none>  03ad  QueryPerformanceFrequency
+	0054d810  <none>  03f2  RtlCaptureContext
+	0054d818  <none>  03f9  RtlLookupFunctionEntry
+	0054d820  <none>  0400  RtlVirtualUnwind
+	0054d828  <none>  0487  SetUnhandledExceptionFilter
+	0054d830  <none>  049d  SystemTimeToFileTime
+	0054d838  <none>  04ae  TryEnterCriticalSection
+
+ 0054d014	0054d1f8 00000000 00000000 0054eb40 0054d848
+
+	DLL Name: KERNEL32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054d848  <none>  049b  RaiseException
+	0054d850  <none>  04f0  RtlUnwindEx
+	0054d858  <none>  05f8  VirtualQuery
+	0054d860  <none>  0652  __C_specific_handler
+
+ 0054d028	0054d220 00000000 00000000 0054ebf0 0054d870
+
+	DLL Name: msvcrt.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054d870  <none>  0092  __getmainargs
+	0054d878  <none>  0093  __initenv
+	0054d880  <none>  0094  __iob_func
+	0054d888  <none>  00a1  __set_app_type
+	0054d890  <none>  00a3  __setusermatherr
+	0054d898  <none>  00c0  _amsg_exit
+	0054d8a0  <none>  00ce  _beginthreadex
+	0054d8a8  <none>  00d3  _cexit
+	0054d8b0  <none>  00e1  _commode
+	0054d8b8  <none>  0108  _endthreadex
+	0054d8c0  <none>  010b  _errno
+	0054d8c8  <none>  012d  _fmode
+	0054d8d0  <none>  0130  _fpreset
+	0054d8d8  <none>  017c  _initterm
+	0054d8e0  <none>  01e2  _localtime64
+	0054d8e8  <none>  028c  _onexit
+	0054d8f0  <none>  0411  abort
+	0054d8f8  <none>  0421  calloc
+	0054d900  <none>  042d  exit
+	0054d908  <none>  043f  fprintf
+	0054d910  <none>  0445  free
+	0054d918  <none>  044d  fwrite
+	0054d920  <none>  047a  malloc
+	0054d928  <none>  047e  memchr
+	0054d930  <none>  047f  memcmp
+	0054d938  <none>  0480  memcpy
+	0054d940  <none>  0481  memmove
+	0054d948  <none>  0482  memset
+	0054d950  <none>  048f  qsort
+	0054d958  <none>  0492  realloc
+	0054d960  <none>  049b  signal
+	0054d968  <none>  04a6  strchr
+	0054d970  <none>  04a7  strcmp
+	0054d978  <none>  04aa  strcspn
+	0054d980  <none>  04ad  strlen
+	0054d988  <none>  04af  strncmp
+	0054d990  <none>  04b2  strrchr
+	0054d998  <none>  04b3  strspn
+	0054d9a0  <none>  04d1  vfprintf
+	0054d9a8  <none>  04e3  wcslen
+
+ 0054d03c	0054d368 00000000 00000000 0054ec0c 0054d9b8
+
+	DLL Name: ntdll.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054d9b8  <none>  0149  NtCreateNamedPipeFile
+	0054d9c0  <none>  01ca  NtOpenFile
+	0054d9c8  <none>  0233  NtReadFile
+	0054d9d0  <none>  02c2  NtWriteFile
+
+ 0054d050	0054d390 00000000 00000000 0054ec1c 0054d9e0
+
+	DLL Name: bcryptprimitives.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054d9e0  <none>  0000  ProcessPrng
+
+ 0054d064	0054d3a0 00000000 00000000 0054ec40 0054d9f0
+
+	DLL Name: api-ms-win-core-synch-l1-2-0.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054d9f0  <none>  0000  WaitOnAddress
+	0054d9f8  <none>  0001  WakeByAddressAll
+	0054da00  <none>  0002  WakeByAddressSingle
+
+ 0054d078	0054d3c0 00000000 00000000 0054edfc 0054da10
+
+	DLL Name: kernel32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054da10  <none>  000f  AreFileApisANSI
+	0054da18  <none>  0019  CancelIo
+	0054da20  <none>  0024  CloseHandle
+	0054da28  <none>  0031  CompareStringOrdinal
+	0054da30  <none>  0049  CreateDirectoryW
+	0054da38  <none>  004d  CreateEventW
+	0054da40  <none>  0051  CreateFileA
+	0054da48  <none>  0052  CreateFileMappingA
+	0054da50  <none>  0056  CreateFileMappingW
+	0054da58  <none>  0059  CreateFileW
+	0054da60  <none>  0063  CreateMutexW
+	0054da68  <none>  0067  CreateProcessW
+	0054da70  <none>  006b  CreateSemaphoreA
+	0054da78  <none>  0074  CreateThread
+	0054da80  <none>  0088  DeleteFileA
+	0054da88  <none>  008b  DeleteFileW
+	0054da90  <none>  0099  DuplicateHandle
+	0054da98  <none>  00b7  ExitProcess
+	0054daa0  <none>  00c1  FindClose
+	0054daa8  <none>  00c7  FindFirstFileExW
+	0054dab0  <none>  00d8  FindNextFileW
+	0054dab8  <none>  00e1  FlsAlloc
+	0054dac0  <none>  00e2  FlsFree
+	0054dac8  <none>  00e4  FlsSetValue
+	0054dad0  <none>  00e6  FlushFileBuffers
+	0054dad8  <none>  00e8  FlushViewOfFile
+	0054dae0  <none>  00ec  FreeLibrary
+	0054dae8  <none>  0118  GetConsoleMode
+	0054daf0  <none>  011b  GetConsoleOutputCP
+	0054daf8  <none>  011d  GetConsoleScreenBufferInfo
+	0054db00  <none>  0128  GetCurrentProcess
+	0054db08  <none>  0129  GetCurrentProcessId
+	0054db10  <none>  012b  GetCurrentThread
+	0054db18  <none>  012c  GetCurrentThreadId
+	0054db20  <none>  0132  GetDiskFreeSpaceA
+	0054db28  <none>  0135  GetDiskFreeSpaceW
+	0054db30  <none>  0139  GetDriveTypeW
+	0054db38  <none>  013c  GetExitCodeProcess
+	0054db40  <none>  0140  GetFileAttributesA
+	0054db48  <none>  0142  GetFileAttributesExW
+	0054db50  <none>  0145  GetFileAttributesW
+	0054db58  <none>  0147  GetFileInformationByHandle
+	0054db60  <none>  0148  GetFileInformationByHandleEx
+	0054db68  <none>  014b  GetFileSize
+	0054db70  <none>  014e  GetFileType
+	0054db78  <none>  0151  GetFullPathNameA
+	0054db80  <none>  0154  GetFullPathNameW
+	0054db88  <none>  015b  GetLastError
+	0054db90  <none>  0161  GetLogicalDrives
+	0054db98  <none>  017b  GetOverlappedResult
+	0054dba0  <none>  0183  GetProcessHeap
+	0054dba8  <none>  0197  GetStdHandle
+	0054dbb0  <none>  01ab  GetTempPathA
+	0054dbb8  <none>  01ac  GetTempPathW
+	0054dbc0  <none>  01c7  GetVolumeInformationW
+	0054dbc8  <none>  01e0  HeapAlloc
+	0054dbd0  <none>  01e1  HeapCompact
+	0054dbd8  <none>  01e2  HeapCreate
+	0054dbe0  <none>  01e3  HeapDestroy
+	0054dbe8  <none>  01e4  HeapFree
+	0054dbf0  <none>  01e7  HeapReAlloc
+	0054dbf8  <none>  01e9  HeapSize
+	0054dc00  <none>  01ec  HeapValidate
+	0054dc08  <none>  01f0  InitOnceBeginInitialize
+	0054dc10  <none>  01f1  InitOnceComplete
+	0054dc18  <none>  0204  IsThreadAFiber
+	0054dc20  <none>  021c  LocalFree
+	0054dc28  <none>  0223  LockFile
+	0054dc30  <none>  0224  LockFileEx
+	0054dc38  <none>  0227  MapViewOfFile
+	0054dc40  <none>  022d  MoveFileExW
+	0054dc48  <none>  0233  MultiByteToWideChar
+	0054dc50  <none>  0260  ReadConsoleW
+	0054dc58  <none>  0263  ReadFile
+	0054dc60  <none>  0264  ReadFileEx
+	0054dc68  <none>  026d  ReleaseSemaphore
+	0054dc70  <none>  0286  SetConsoleCtrlHandler
+	0054dc78  <none>  028b  SetConsoleMode
+	0054dc80  <none>  0291  SetConsoleTextAttribute
+	0054dc88  <none>  0296  SetEndOfFile
+	0054dc90  <none>  02a1  SetFileInformationByHandle
+	0054dc98  <none>  02a3  SetFilePointer
+	0054dca0  <none>  02a7  SetFileTime
+	0054dca8  <none>  02aa  SetLastError
+	0054dcb0  <none>  02cc  SetThreadStackGuarantee
+	0054dcb8  <none>  02e0  Sleep
+	0054dcc0  <none>  02e2  SleepEx
+	0054dcc8  <none>  02ea  TlsAlloc
+	0054dcd0  <none>  02eb  TlsFree
+	0054dcd8  <none>  02ec  TlsGetValue
+	0054dce0  <none>  02ed  TlsSetValue
+	0054dce8  <none>  02f2  UnlockFile
+	0054dcf0  <none>  02f3  UnlockFileEx
+	0054dcf8  <none>  02f4  UnmapViewOfFile
+	0054dd00  <none>  0304  VirtualProtect
+	0054dd08  <none>  0309  WaitForMultipleObjects
+	0054dd10  <none>  030b  WaitForSingleObject
+	0054dd18  <none>  030c  WaitForSingleObjectEx
+	0054dd20  <none>  0313  WideCharToMultiByte
+	0054dd28  <none>  0321  WriteConsoleW
+	0054dd30  <none>  0322  WriteFile
+	0054dd38  <none>  0323  WriteFileEx
+
+ 0054d08c	0054d6f8 00000000 00000000 0054ee10 0054dd48
+
+	DLL Name: ntdll.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0054dd48  <none>  0005  RtlNtStatusToDosError
+
+ 0054d0a0	00000000 00000000 00000000 00000000 00000000
+

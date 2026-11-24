@@ -1,0 +1,32 @@
+{
+  "version": "0.18.0-alpha.2",
+  "source_checkpoint": "f6327dd",
+  "verified_date": "2026-11-10",
+  "artifacts": [
+    {
+      "name": "windows_manifest",
+      "bytes": 3365,
+      "sha256": "0d80d9375b0a000ef0d5dded0911d04af5fe1b4dda329272b203768f59ef82ff"
+    },
+    {
+      "name": "debian_manifest",
+      "bytes": 3349,
+      "sha256": "7efbebe57270b6556e93b14756b0db995245b4dea6a2eaa7d6441707c74d6ed6"
+    },
+    {
+      "name": "windows_installer",
+      "bytes": 1161216,
+      "sha256": "7069c5b5b55ce2d3cfc1b26015ca98fc47388af9b8afa49be35cebcf391087dc"
+    },
+    {
+      "name": "debian_installer",
+      "bytes": 1176992,
+      "sha256": "afae4d661caa6c049d01699ab57823b3adf046486136428195ab21d3f84b9dac"
+    },
+    {
+      "name": "cargo_lock",
+      "bytes": 115377,
+      "sha256": "4a2160f57362f4fb8af03768dfcf90bd1145e32e0982c20d8851b58d13d1cc9d"
+    }
+  ]
+}

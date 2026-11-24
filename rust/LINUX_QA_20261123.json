@@ -1,0 +1,21 @@
+{
+  "project": "Xunshu",
+  "baseline": "0.18.0-alpha.3",
+  "verification_date": "2026-11-23",
+  "environment": "Debian 13 x86_64, Rust 1.99.1; Cargo vendor offline",
+  "cargo_check_workspace": "PASS",
+  "cargo_test_workspace": "PASS",
+  "tests_passed": 192,
+  "tests_failed": 0,
+  "code_changes": [
+    "update stale pinyin inverted-index test to FileRecord API",
+    "add configurable protected worker path for integration testing",
+    "test forced extraction and fail-closed stale-hit behaviour"
+  ],
+  "limitations": [
+    "cargo fmt --check did not pass: formatting differences remain in source; formatting not automatically applied to avoid unrelated code churn",
+    "no Windows/MSVC compilation or Windows installer validation",
+    "no UOS/Kylin real system verification",
+    "no GUI interaction test nor million-file performance reproduction"
+  ]
+}

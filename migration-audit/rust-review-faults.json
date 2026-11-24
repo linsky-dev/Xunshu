@@ -1,0 +1,42 @@
+{
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-a59rnzlk",
+  "fsync": {
+    "initial": {
+      "returncode": 0,
+      "stdout": "{\n  \"generation\": 1,\n  \"imported\": 1,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"total\": 1\n}\n",
+      "stderr": ""
+    },
+    "injected": {
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "{\"error\":\"I/O error at /tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-a59rnzlk/fsync-data/index: Input/output error (os error 5): Input/output error (os error 5)\",\"ok\":false}\n"
+    },
+    "before": {
+      "version": 1,
+      "file": "generation-1-5-1794116425548955821.xsi",
+      "generation": 1
+    },
+    "after": {
+      "version": 1,
+      "file": "generation-2-6-1794116425552527557.xsi",
+      "generation": 2
+    },
+    "current_changed_despite_error": true
+  },
+  "parent_swap": {
+    "initial": {
+      "returncode": 0,
+      "stdout": "{\n  \"generation\": 1,\n  \"imported\": 1,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"total\": 1\n}\n",
+      "stderr": ""
+    },
+    "injected": {
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "XS_REVIEW_SWAPPED_PARENT\n{\"error\":\"I/O error at /tmp/xunshu-rust-validation-036c199d3807/rust-review-faults-a59rnzlk/race-data/index: Not a directory (os error 20): Not a directory (os error 20)\",\"ok\":false}\n"
+    },
+    "redirected_files": [
+      "generation-2-8-1794116425558185209.xsi"
+    ],
+    "index_is_symlink": true
+  }
+}

@@ -1,0 +1,1103 @@
+{
+  "schema_version": 1,
+  "timezone": "UTC",
+  "now_unix_utc": 1794139200,
+  "records": [
+    {
+      "id": 1,
+      "name": "annual_report_2026.pdf",
+      "path": "C:\\Docs\\annual_report_2026.pdf",
+      "size": 2097152,
+      "modified": 1794132000,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 2,
+      "name": "Annual Report.docx",
+      "path": "C:\\Docs\\Annual Report.docx",
+      "size": 1536,
+      "modified": 1794095999,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 3,
+      "name": "report_final.pdf",
+      "path": "C:\\Docs\\Drafts\\report_final.pdf",
+      "size": 524288,
+      "modified": 1794096000,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 4,
+      "name": "年度报告.docx",
+      "path": "D:/工作资料/年度报告.docx",
+      "size": 0,
+      "modified": 1793491199,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 5,
+      "name": "寻枢设计.md",
+      "path": "D:\\工作资料\\寻枢设计.md",
+      "size": 2048,
+      "modified": 1793491200,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 6,
+      "name": "重庆计划.txt",
+      "path": "D:/工作资料/重庆计划.txt",
+      "size": 4096,
+      "modified": 1709208000,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 7,
+      "name": "Reports",
+      "path": "C:\\Docs\\Reports",
+      "size": 0,
+      "modified": 1794139200,
+      "is_dir": true,
+      "source": "local"
+    },
+    {
+      "id": 8,
+      "name": "README",
+      "path": "C:\\Code\\README",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 9,
+      "name": "readme.md",
+      "path": "/work/readme.md",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 10,
+      "name": "café.txt",
+      "path": "/work/café.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 11,
+      "name": "café.txt",
+      "path": "/work/café.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 12,
+      "name": "ＲＥＰＯＲＴ.txt",
+      "path": "/work/ＲＥＰＯＲＴ.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 13,
+      "name": "invoice_001.pdf",
+      "path": "E:\\Archive\\invoice_001.pdf",
+      "size": 1048576,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "efu:archive"
+    },
+    {
+      "id": 14,
+      "name": ".gitignore",
+      "path": "/work/.gitignore",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 15,
+      "name": "no_extension",
+      "path": "/work/no_extension",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 16,
+      "name": "some(ab).txt",
+      "path": "/work/some(ab).txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 17,
+      "name": "x:y.txt",
+      "path": "/work/x:y.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 18,
+      "name": "中文文件.pdf",
+      "path": "D:\\工作资料\\中文文件.pdf",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 19,
+      "name": "foobar.txt",
+      "path": "C:\\Docs\\foobar.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 20,
+      "name": "foo baz.txt",
+      "path": "C:\\Docs\\foo baz.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 21,
+      "name": "bar baz.txt",
+      "path": "C:\\Docs\\bar baz.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 22,
+      "name": "ä.txt",
+      "path": "/work/ä.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 23,
+      "name": "literal\\backslash.txt",
+      "path": "/work/literal\\backslash.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 24,
+      "name": "report_old.pdf",
+      "path": "C:\\Archive\\report_old.pdf",
+      "size": 3145728,
+      "modified": 1577836800,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 25,
+      "name": "huge.bin",
+      "path": "/work/huge.bin",
+      "size": 18446744073709551615,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 26,
+      "name": "zero.log",
+      "path": "/work/zero.log",
+      "size": 0,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 27,
+      "name": "a.txt",
+      "path": "/a.txt",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    },
+    {
+      "id": 28,
+      "name": "Report.pdf",
+      "path": "/work/Report.pdf",
+      "size": 100,
+      "modified": 1735689600,
+      "is_dir": false,
+      "source": "local"
+    }
+  ],
+  "cases": [
+    {
+      "query": "",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ]
+    },
+    {
+      "query": "report",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        12,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "REPORT",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        12,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "报告",
+      "expected": [
+        4
+      ]
+    },
+    {
+      "query": "\"Annual Report\"",
+      "expected": [
+        2
+      ]
+    },
+    {
+      "query": "\"some(ab)\"",
+      "expected": [
+        16
+      ]
+    },
+    {
+      "query": "\"x:y\"",
+      "expected": [
+        17
+      ]
+    },
+    {
+      "query": "name:\"x:y\"",
+      "expected": [
+        17
+      ]
+    },
+    {
+      "query": "ext:docx;pdf",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        13,
+        18,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "ext:.PDF",
+      "expected": [
+        1,
+        3,
+        13,
+        18,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "ext:",
+      "expected": [
+        8,
+        14,
+        15
+      ]
+    },
+    {
+      "query": "folder:",
+      "expected": [
+        7
+      ]
+    },
+    {
+      "query": "file:report",
+      "expected": [
+        1,
+        2,
+        3,
+        12,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "folder:report",
+      "expected": [
+        7
+      ]
+    },
+    {
+      "query": "file:!report",
+      "expected": [
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "query": "NOT ext:pdf",
+      "expected": [
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "query": "!folder:",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ]
+    },
+    {
+      "query": "foo|bar baz",
+      "expected": [
+        20,
+        21
+      ]
+    },
+    {
+      "query": "foo OR bar baz",
+      "expected": [
+        20,
+        21
+      ]
+    },
+    {
+      "query": "foo AND bar OR baz",
+      "expected": [
+        19,
+        20
+      ]
+    },
+    {
+      "query": "(foo bar)|baz",
+      "expected": [
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "<foo bar>|baz",
+      "expected": [
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "name:<foo|bar>",
+      "expected": [
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "report NOT (old|final)",
+      "expected": [
+        1,
+        2,
+        7,
+        12,
+        28
+      ]
+    },
+    {
+      "query": "*.pdf",
+      "expected": [
+        1,
+        3,
+        13,
+        18,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "??????.pdf",
+      "expected": [
+        28
+      ]
+    },
+    {
+      "query": "report*.pdf",
+      "expected": [
+        3,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "case:Report",
+      "expected": [
+        2,
+        7,
+        28
+      ]
+    },
+    {
+      "query": "case:<Report|README>",
+      "expected": [
+        2,
+        7,
+        8,
+        28
+      ]
+    },
+    {
+      "query": "case:report*.pdf",
+      "expected": [
+        3,
+        24
+      ]
+    },
+    {
+      "query": "case:ＲＥＰＯＲＴ",
+      "expected": [
+        12
+      ]
+    },
+    {
+      "query": "regex:\"(?i)^report.*\\.pdf$\"",
+      "expected": [
+        3,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "case:regex:\"^Report.*\\.pdf$\"",
+      "expected": [
+        28
+      ]
+    },
+    {
+      "query": "regex:^(report|annual).*\\.pdf$",
+      "expected": [
+        1,
+        3,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "regex:\"\\p{Han}\"",
+      "expected": [
+        4,
+        5,
+        6,
+        18
+      ]
+    },
+    {
+      "query": "parent:C:\\Docs",
+      "expected": [
+        1,
+        2,
+        7,
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "parent:\"c:/docs/\"",
+      "expected": [
+        1,
+        2,
+        7,
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "path:docs",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "C:\\Docs\\",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "C:/Docs/",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "c:",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        8,
+        19,
+        20,
+        21,
+        24
+      ]
+    },
+    {
+      "query": "parent:/work",
+      "expected": [
+        9,
+        10,
+        11,
+        12,
+        14,
+        15,
+        16,
+        17,
+        22,
+        23,
+        25,
+        26,
+        28
+      ]
+    },
+    {
+      "query": "parent:/",
+      "expected": [
+        27
+      ]
+    },
+    {
+      "query": "name:literal\\backslash",
+      "expected": [
+        23
+      ]
+    },
+    {
+      "query": "source:efu:archive",
+      "expected": [
+        13
+      ]
+    },
+    {
+      "query": "source:local ext:pdf",
+      "expected": [
+        1,
+        3,
+        18,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "size:>1MB ext:pdf",
+      "expected": [
+        1,
+        24
+      ]
+    },
+    {
+      "query": "size:1.5KB",
+      "expected": [
+        2
+      ]
+    },
+    {
+      "query": "size:1KB..2KB",
+      "expected": [
+        2,
+        5
+      ]
+    },
+    {
+      "query": "size:0",
+      "expected": [
+        4,
+        7,
+        26
+      ]
+    },
+    {
+      "query": "size:>9007199254740992",
+      "expected": [
+        25
+      ]
+    },
+    {
+      "query": "size:18446744073709551615",
+      "expected": [
+        25
+      ]
+    },
+    {
+      "query": "size:..0",
+      "expected": [
+        4,
+        7,
+        26
+      ]
+    },
+    {
+      "query": "size:3MB..",
+      "expected": [
+        24,
+        25
+      ]
+    },
+    {
+      "query": "size:!=100",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        13,
+        24,
+        25,
+        26
+      ]
+    },
+    {
+      "query": "dm:today",
+      "expected": [
+        1,
+        3,
+        7
+      ]
+    },
+    {
+      "query": "dm:yesterday",
+      "expected": [
+        2
+      ]
+    },
+    {
+      "query": "dm:2026-11",
+      "expected": [
+        1,
+        2,
+        3,
+        5,
+        7
+      ]
+    },
+    {
+      "query": "dm:>2026-11-07",
+      "expected": [
+        1,
+        3,
+        7
+      ]
+    },
+    {
+      "query": "dm:>=2026-11-07",
+      "expected": [
+        1,
+        2,
+        3,
+        7
+      ]
+    },
+    {
+      "query": "dm:2026-10-31..2026-11-01",
+      "expected": [
+        4,
+        5
+      ]
+    },
+    {
+      "query": "dm:2024-02",
+      "expected": [
+        6
+      ]
+    },
+    {
+      "query": "dm:7days",
+      "expected": [
+        1,
+        2,
+        3,
+        7
+      ]
+    },
+    {
+      "query": "dm:thisyear",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7
+      ]
+    },
+    {
+      "query": "dm:thismonth",
+      "expected": [
+        1,
+        2,
+        3,
+        5,
+        7
+      ]
+    },
+    {
+      "query": "mtime:2026-11-08T10:00:00Z",
+      "expected": [
+        1
+      ]
+    },
+    {
+      "query": "mtime:@1794132000",
+      "expected": [
+        1
+      ]
+    },
+    {
+      "query": "pinyin:xssj",
+      "expected": [
+        5
+      ]
+    },
+    {
+      "query": "pinyin:\"xun shu she ji\"",
+      "expected": [
+        5
+      ]
+    },
+    {
+      "query": "pinyin:xun枢sj",
+      "expected": [
+        5
+      ]
+    },
+    {
+      "query": "pinyin:bg",
+      "expected": [
+        4
+      ]
+    },
+    {
+      "query": "pinyin:cq",
+      "expected": [
+        6
+      ]
+    },
+    {
+      "query": "pinyin:zhongqing",
+      "expected": [
+        6
+      ]
+    },
+    {
+      "query": "pinyin:zw",
+      "expected": [
+        18
+      ]
+    },
+    {
+      "query": "fuzzy:rpt",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        12,
+        24,
+        28
+      ]
+    },
+    {
+      "query": "fuzzy:年度",
+      "expected": [
+        4
+      ]
+    },
+    {
+      "query": "café",
+      "expected": [
+        10,
+        11
+      ]
+    },
+    {
+      "query": "café",
+      "expected": [
+        10,
+        11
+      ]
+    },
+    {
+      "query": "Ä",
+      "expected": [
+        22
+      ]
+    },
+    {
+      "query": "missing_word_非命中",
+      "expected": []
+    },
+    {
+      "query": "foo | source:efu:archive",
+      "expected": [
+        13,
+        19,
+        20
+      ]
+    },
+    {
+      "query": "NOT (foo|bar)",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ]
+    },
+    {
+      "query": "\\Docs",
+      "expected": [
+        1,
+        2,
+        3,
+        7,
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "query": "path:Docs\\Drafts",
+      "expected": [
+        3
+      ]
+    }
+  ],
+  "invalid_queries": [
+    "unknown:value",
+    "content:secret",
+    "OR",
+    "AND foo",
+    "foo AND",
+    "foo OR",
+    "foo||bar",
+    "()",
+    "<>",
+    "(foo",
+    "<foo",
+    "foo)",
+    "foo>",
+    "(foo>",
+    "\"unfinished",
+    "name:",
+    "pinyin:",
+    "pinyin:a",
+    "pinyin:a*",
+    "case:pinyin:wd",
+    "path:pinyin:wd",
+    "fuzzy:",
+    "case:fuzzy:abc",
+    "path:fuzzy:abc",
+    "size:",
+    "size:-1",
+    "size:NaN",
+    "size:1e3",
+    "size:1XB",
+    "size:1.2.3KB",
+    "size:2KB..1KB",
+    "size:..",
+    "size:18446744073709551616",
+    "dm:",
+    "dm:2026-02-29",
+    "dm:1900-02-29",
+    "dm:2026-13",
+    "dm:2026-11-08..2026-11-07",
+    "dm:2026-11-08T25:00:00Z",
+    "regex:\"(\"",
+    "regex:\"(?=secret)\"",
+    "regex:\"(a)\\1\"",
+    "parent:*",
+    "ext:../pdf",
+    "ext:p*",
+    "regex:size:>1KB"
+  ]
+}

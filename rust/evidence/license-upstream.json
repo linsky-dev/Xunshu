@@ -1,0 +1,212 @@
+{
+  "groups": 22,
+  "supplemented_packages": 15,
+  "errors": [
+    {
+      "package": "dispatch@0.2.0",
+      "repository": "SSheldon/rust-dispatch",
+      "error": "no root license files"
+    },
+    {
+      "package": "hexf-parse@0.2.1",
+      "repository": "lifthrasiir/hexf",
+      "error": "no root license files"
+    },
+    {
+      "package": "jni@0.22.4",
+      "repository": "jni-rs/jni-rs",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "jni-macros@0.22.4",
+      "repository": "jni-rs/jni-rs",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "jni-sys-macros@0.4.1",
+      "repository": "jni-rs/jni-sys",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "khronos_api@3.1.0",
+      "repository": "brendanzab/gl-rs",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "ndk@0.9.0",
+      "repository": "rust-mobile/ndk",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "ndk-sys@0.6.0+11769913",
+      "repository": "rust-mobile/ndk",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "ndk-context@0.1.1",
+      "repository": "rust-windowing/android-ndk-rs",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2@0.5.3",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2@0.6.5",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-app-kit@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-cloud-kit@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-contacts@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-core-data@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-core-image@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-core-location@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-foundation@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-link-presentation@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-metal@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-quartz-core@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-symbols@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-ui-kit@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-uniform-type-identifiers@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-user-notifications@0.2.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-app-kit@0.3.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-core-foundation@0.3.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-core-graphics@0.3.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-foundation@0.3.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-io-surface@0.3.2",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "objc2-encode@4.1.0",
+      "repository": "madsmtm/objc2",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "profiling@1.0.18",
+      "repository": "aclysma/profiling",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "r-efi@5.3.0",
+      "repository": "r-efi/r-efi",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "package": "r-efi@6.0.0",
+      "repository": "r-efi/r-efi",
+      "error": "HTTP Error 403: Forbidden"
+    }
+  ],
+  "packages_without_notice": [
+    "dispatch@0.2.0",
+    "hexf-parse@0.2.1",
+    "jni@0.22.4",
+    "jni-macros@0.22.4",
+    "jni-sys-macros@0.4.1",
+    "khronos_api@3.1.0",
+    "ndk@0.9.0",
+    "ndk-context@0.1.1",
+    "ndk-sys@0.6.0+11769913",
+    "objc2@0.5.3",
+    "objc2@0.6.5",
+    "objc2-app-kit@0.2.2",
+    "objc2-app-kit@0.3.2",
+    "objc2-cloud-kit@0.2.2",
+    "objc2-contacts@0.2.2",
+    "objc2-core-data@0.2.2",
+    "objc2-core-foundation@0.3.2",
+    "objc2-core-graphics@0.3.2",
+    "objc2-core-image@0.2.2",
+    "objc2-core-location@0.2.2",
+    "objc2-encode@4.1.0",
+    "objc2-foundation@0.2.2",
+    "objc2-foundation@0.3.2",
+    "objc2-io-surface@0.3.2",
+    "objc2-link-presentation@0.2.2",
+    "objc2-metal@0.2.2",
+    "objc2-quartz-core@0.2.2",
+    "objc2-symbols@0.2.2",
+    "objc2-ui-kit@0.2.2",
+    "objc2-uniform-type-identifiers@0.2.2",
+    "objc2-user-notifications@0.2.2",
+    "profiling@1.0.18",
+    "r-efi@5.3.0",
+    "r-efi@6.0.0"
+  ]
+}

@@ -1,0 +1,457 @@
+xs-cli v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+anyhow v1.0.104
+clap v4.6.7
+clap_builder v4.6.7
+anstream v1.0.0
+anstyle v1.0.14
+anstyle-parse v1.0.0
+utf8parse v0.2.2
+anstyle-query v1.1.5
+colorchoice v1.0.5
+is_terminal_polyfill v1.70.2
+utf8parse v0.2.2
+anstyle v1.0.14
+clap_lex v1.1.1
+strsim v0.11.1
+clap_derive v4.6.7 (proc-macro)
+heck v0.5.0
+proc-macro2 v1.0.107
+unicode-ident v1.0.27
+quote v1.0.47
+proc-macro2 v1.0.107 (*)
+syn v3.0.9
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+unicode-ident v1.0.27
+ctrlc v3.5.2
+nix v0.31.3
+bitflags v2.13.2
+cfg-if v1.0.5
+libc v0.2.191
+cfg_aliases v0.2.2
+serde v1.0.229
+serde_core v1.0.229
+serde_derive v1.0.229 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+serde_json v1.0.154
+itoa v1.0.18
+memchr v2.8.3
+serde_core v1.0.229
+zmij v1.0.23
+xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+anyhow v1.0.104
+crc32fast v1.5.4
+cfg-if v1.0.5
+csv v1.4.0
+csv-core v0.1.13
+memchr v2.8.3
+itoa v1.0.18
+ryu v1.0.23
+serde_core v1.0.229
+fs2 v0.4.3
+libc v0.2.191
+memmap2 v0.9.12
+libc v0.2.191
+rusqlite v0.37.0
+bitflags v2.13.2
+fallible-iterator v0.3.0
+fallible-streaming-iterator v0.1.9
+hashlink v0.10.0
+hashbrown v0.15.5
+foldhash v0.1.5
+libsqlite3-sys v0.35.0
+cc v1.11.1
+find-msvc-tools v0.1.15
+shlex v2.0.1
+pkg-config v0.3.34
+vcpkg v0.2.15
+smallvec v1.16.5
+serde v1.0.229 (*)
+serde_json v1.0.154 (*)
+xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+libc v0.2.191
+serde v1.0.229 (*)
+serde_json v1.0.154 (*)
+thiserror v2.0.21
+thiserror-impl v2.0.21 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+pinyin v0.11.0
+regex v1.13.1
+aho-corasick v1.1.5
+memchr v2.8.3
+memchr v2.8.3
+regex-automata v0.4.18
+aho-corasick v1.1.5 (*)
+memchr v2.8.3
+regex-syntax v0.8.11
+regex-syntax v0.8.11
+unicode-normalization v0.1.26
+tinyvec v1.13.3
+xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform) (*)
+xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query) (*)
+
+xs-ui v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+anyhow v1.0.104
+eframe v0.33.3
+ahash v0.8.12
+cfg-if v1.0.5
+getrandom v0.3.4
+cfg-if v1.0.5
+libc v0.2.191
+once_cell v1.21.4
+zerocopy v0.8.63
+version_check v0.9.5
+document-features v0.2.12 (proc-macro)
+litrs v1.0.1
+egui v0.33.3
+ahash v0.8.12 (*)
+bitflags v2.13.2
+emath v0.33.3
+bytemuck v1.25.2
+bytemuck_derive v1.12.1 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+epaint v0.33.3
+ab_glyph v0.2.32
+ab_glyph_rasterizer v0.1.10
+owned_ttf_parser v0.25.1
+ttf-parser v0.25.1
+ahash v0.8.12 (*)
+bytemuck v1.25.2 (*)
+ecolor v0.33.3
+bytemuck v1.25.2 (*)
+emath v0.33.3 (*)
+emath v0.33.3 (*)
+epaint_default_fonts v0.33.3
+log v0.4.35
+nohash-hasher v0.2.0
+parking_lot v0.12.5
+lock_api v0.4.14
+scopeguard v1.2.0
+parking_lot_core v0.9.12
+cfg-if v1.0.5
+libc v0.2.191
+smallvec v1.16.5
+profiling v1.0.18
+log v0.4.35
+nohash-hasher v0.2.0
+profiling v1.0.18
+smallvec v1.16.5
+unicode-segmentation v1.13.3
+egui-winit v0.33.3
+arboard v3.7.0
+image v0.25.10
+bytemuck v1.25.2 (*)
+byteorder-lite v0.1.0
+moxcms v0.8.1
+num-traits v0.2.19
+autocfg v1.5.1
+pxfm v0.1.30
+num-traits v0.2.19 (*)
+png v0.18.1
+bitflags v2.13.2
+crc32fast v1.5.4 (*)
+fdeflate v0.3.7
+simd-adler32 v0.3.10
+flate2 v1.1.11
+crc32fast v1.5.4 (*)
+miniz_oxide v0.9.1
+adler2 v2.0.1
+simd-adler32 v0.3.10
+miniz_oxide v0.8.9
+adler2 v2.0.1
+simd-adler32 v0.3.10
+log v0.4.35
+parking_lot v0.12.5 (*)
+percent-encoding v2.3.2
+x11rb v0.13.2
+as-raw-xcb-connection v1.0.1
+gethostname v1.1.0
+rustix v1.1.6
+bitflags v2.13.2
+linux-raw-sys v0.12.1
+libc v0.2.191
+libloading v0.8.9
+cfg-if v1.0.5
+once_cell v1.21.4
+rustix v1.1.6 (*)
+x11rb-protocol v0.13.2
+bytemuck v1.25.2 (*)
+egui v0.33.3 (*)
+log v0.4.35
+profiling v1.0.18
+raw-window-handle v0.6.2
+smithay-clipboard v0.7.3
+libc v0.2.191
+smithay-client-toolkit v0.20.0
+bitflags v2.13.2
+calloop v0.14.5
+bitflags v2.13.2
+polling v3.11.0
+cfg-if v1.0.5
+rustix v1.1.6 (*)
+rustix v1.1.6 (*)
+tracing v0.1.44
+log v0.4.35
+pin-project-lite v0.2.17
+tracing-core v0.1.36
+calloop-wayland-source v0.4.1
+calloop v0.14.5 (*)
+rustix v1.1.6 (*)
+wayland-backend v0.3.17
+downcast-rs v1.2.1
+rustix v1.1.6 (*)
+scoped-tls v1.0.1
+smallvec v1.16.5
+wayland-sys v0.31.11
+dlib v0.5.3
+libloading v0.8.9 (*)
+log v0.4.35
+once_cell v1.21.4
+pkg-config v0.3.34
+cc v1.11.1 (*)
+wayland-client v0.31.15
+bitflags v2.13.2
+rustix v1.1.6 (*)
+wayland-backend v0.3.17 (*)
+wayland-scanner v0.31.11 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quick-xml v0.41.0
+memchr v2.8.3
+quote v1.0.47 (*)
+cursor-icon v1.2.0
+libc v0.2.191
+log v0.4.35
+memmap2 v0.9.12 (*)
+rustix v1.1.6 (*)
+thiserror v2.0.21 (*)
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-csd-frame v0.3.0
+bitflags v2.13.2
+cursor-icon v1.2.0
+wayland-backend v0.3.17 (*)
+wayland-cursor v0.31.14
+rustix v1.1.6 (*)
+wayland-client v0.31.15 (*)
+xcursor v0.3.11
+wayland-protocols v0.32.13
+bitflags v2.13.2
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+wayland-protocols-experimental v20250721.0.1
+bitflags v2.13.2
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-protocols v0.32.13 (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+wayland-protocols-misc v0.3.12
+bitflags v2.13.2
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-protocols v0.32.13 (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+wayland-protocols-wlr v0.3.12
+bitflags v2.13.2
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-protocols v0.32.13 (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+xkeysym v0.2.1
+wayland-backend v0.3.17 (*)
+web-time v1.1.0
+webbrowser v1.2.6
+log v0.4.35
+url v2.5.8
+form_urlencoded v1.2.2
+percent-encoding v2.3.2
+idna v1.1.0
+idna_adapter v1.2.2
+icu_normalizer v2.4.0
+icu_collections v2.4.0
+displaydoc v0.2.7 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+potential_utf v0.1.6
+zerovec v0.11.9
+yoke v0.8.4
+stable_deref_trait v1.2.1
+yoke-derive v0.8.4 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+synstructure v0.14.0
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+zerofrom v0.1.8
+zerofrom-derive v0.1.8 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+synstructure v0.14.0 (*)
+zerofrom v0.1.8 (*)
+zerovec-derive v0.11.7 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.9 (*)
+utf8_iter v1.1.0
+utf_types v1.0.0
+yoke v0.8.4 (*)
+zerofrom v0.1.8 (*)
+zerovec v0.11.9 (*)
+icu_normalizer_data v2.4.0
+icu_provider v2.4.0
+displaydoc v0.2.7 (proc-macro) (*)
+icu_locale_core v2.4.0
+displaydoc v0.2.7 (proc-macro) (*)
+litemap v0.8.3
+tinystr v0.8.5
+displaydoc v0.2.7 (proc-macro) (*)
+zerovec v0.11.9 (*)
+writeable v0.6.4
+zerovec v0.11.9 (*)
+writeable v0.6.4
+yoke v0.8.4 (*)
+zerofrom v0.1.8 (*)
+zerotrie v0.2.5
+displaydoc v0.2.7 (proc-macro) (*)
+yoke v0.8.4 (*)
+zerofrom v0.1.8 (*)
+zerovec v0.11.9 (*)
+smallvec v1.16.5
+zerovec v0.11.9 (*)
+icu_properties v2.4.0
+displaydoc v0.2.7 (proc-macro) (*)
+icu_collections v2.4.0 (*)
+icu_locale_core v2.4.0 (*)
+icu_properties_data v2.4.0
+icu_provider v2.4.0 (*)
+zerotrie v0.2.5 (*)
+zerovec v0.11.9 (*)
+smallvec v1.16.5
+utf8_iter v1.1.0 (*)
+percent-encoding v2.3.2
+winit v0.30.13
+ahash v0.8.12 (*)
+bitflags v2.13.2
+bytemuck v1.25.2 (*)
+calloop v0.13.0
+bitflags v2.13.2
+log v0.4.35
+polling v3.11.0 (*)
+rustix v0.38.44
+bitflags v2.13.2
+linux-raw-sys v0.4.15
+slab v0.4.12
+thiserror v1.0.69
+thiserror-impl v1.0.69 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v2.0.119
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+unicode-ident v1.0.27
+cursor-icon v1.2.0
+dpi v0.1.2
+libc v0.2.191
+memmap2 v0.9.12 (*)
+percent-encoding v2.3.2
+raw-window-handle v0.6.2
+rustix v0.38.44 (*)
+smithay-client-toolkit v0.19.2
+bitflags v2.13.2
+calloop v0.13.0 (*)
+calloop-wayland-source v0.3.0
+calloop v0.13.0 (*)
+rustix v0.38.44 (*)
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+cursor-icon v1.2.0
+libc v0.2.191
+log v0.4.35
+memmap2 v0.9.12 (*)
+rustix v0.38.44 (*)
+thiserror v1.0.69 (*)
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-csd-frame v0.3.0 (*)
+wayland-cursor v0.31.14 (*)
+wayland-protocols v0.32.13 (*)
+wayland-protocols-wlr v0.3.12 (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+xkeysym v0.2.1
+smol_str v0.2.2
+tracing v0.1.44 (*)
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-protocols v0.32.13 (*)
+wayland-protocols-plasma v0.3.12
+bitflags v2.13.2
+wayland-backend v0.3.17 (*)
+wayland-client v0.31.15 (*)
+wayland-protocols v0.32.13 (*)
+wayland-scanner v0.31.11 (proc-macro) (*)
+x11-dl v2.21.0
+libc v0.2.191
+once_cell v1.21.4
+pkg-config v0.3.34
+x11rb v0.13.2 (*)
+xkbcommon-dl v0.4.2
+bitflags v2.13.2
+dlib v0.5.3 (*)
+log v0.4.35
+once_cell v1.21.4
+xkeysym v0.2.1
+cfg_aliases v0.2.2
+egui_glow v0.33.3
+bytemuck v1.25.2 (*)
+egui v0.33.3 (*)
+glow v0.16.0
+log v0.4.35
+memoffset v0.9.1
+autocfg v1.5.1
+profiling v1.0.18
+glow v0.16.0
+glutin v0.32.3
+bitflags v2.13.2
+glutin_egl_sys v0.7.1
+gl_generator v0.14.0
+khronos_api v3.1.0
+log v0.4.35
+xml-rs v0.8.29
+glutin_glx_sys v0.6.1
+x11-dl v2.21.0 (*)
+gl_generator v0.14.0 (*)
+libloading v0.8.9 (*)
+once_cell v1.21.4
+raw-window-handle v0.6.2
+wayland-sys v0.31.11 (*)
+x11-dl v2.21.0 (*)
+cfg_aliases v0.2.2
+glutin-winit v0.5.0
+glutin v0.32.3 (*)
+raw-window-handle v0.6.2
+winit v0.30.13 (*)
+cfg_aliases v0.2.2
+image v0.25.10 (*)
+log v0.4.35
+parking_lot v0.12.5 (*)
+profiling v1.0.18
+raw-window-handle v0.6.2
+static_assertions v1.1.0
+web-time v1.1.0
+winit v0.30.13 (*)
+serde_json v1.0.154 (*)
+xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core) (*)
+xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform) (*)
+xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query) (*)

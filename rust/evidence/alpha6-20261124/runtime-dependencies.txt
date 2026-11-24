@@ -1,0 +1,39 @@
+===== xs-content-worker =====
+/tmp/xswork/package/linux-x64/xs-content-worker: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=860c1c82f43926770d86c50b1cdda97f3c92562b, not stripped
+	linux-vdso.so.1 (0x00007f768e16e000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f768d515000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f768d425000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f768d231000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f768e170000)
+GLIBC_2.34
+===== xs-install =====
+/tmp/xswork/package/linux-x64/xs-install: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=a82054284a6808ecf991a86c6c7479a2796058eb, not stripped
+	linux-vdso.so.1 (0x00007fd86f2de000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fd86ef62000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fd86ed6e000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fd86f2e0000)
+GLIBC_2.34
+===== xs-model-worker =====
+/tmp/xswork/package/linux-x64/xs-model-worker: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=af720fb559cc1943188932e04c5440f1fc5d21e3, not stripped
+	linux-vdso.so.1 (0x00007fdc0982a000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fdc08ac8000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fdc089d8000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fdc087e4000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fdc0982c000)
+GLIBC_2.34
+===== xs-ui =====
+/tmp/xswork/package/linux-x64/xs-ui: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=2249f9ae44ab86554535034dc52e9319969fc729, not stripped
+	linux-vdso.so.1 (0x00007f516b6b3000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f51690ad000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f5168fbd000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f5168dc9000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f516b6b5000)
+GLIBC_2.35
+===== xunshu =====
+/tmp/xswork/package/linux-x64/xunshu: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=331f3bcfbdb5499d7581449a698078025c68468c, not stripped
+	linux-vdso.so.1 (0x00007fb037f06000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fb03702f000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fb036f3f000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fb036d4b000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fb037f08000)
+GLIBC_2.34

@@ -1,0 +1,263 @@
+    Updating crates.io index
+     Locking 15 packages to highest compatible versions
+    Updating atoi_simd v0.16.1 -> v0.18.1
+    Updating calamine v0.30.1 -> v0.38.0
+      Adding chacha20 v0.10.2
+      Adding cpufeatures v0.3.1
+    Updating hashlink v0.10.0 -> v0.12.2
+    Updating libsqlite3-sys v0.35.0 -> v0.39.1
+    Updating lopdf v0.38.0 -> v0.42.0 (available: v0.47.0)
+    Updating quick-xml v0.37.5 -> v0.42.0
+      Adding rand v0.10.3
+      Adding rand_core v0.10.1
+      Adding rsqlite-vfs v0.2.0
+    Updating rusqlite v0.37.0 -> v0.41.1
+      Adding sqlite-wasm-rs v0.6.3
+      Adding typed-path v0.12.4
+    Updating zip v4.6.1 -> v9.0.0 (available: v9.5.0)
+ Downloading crates ...
+  Downloaded atoi_simd v0.18.1
+  Downloaded calamine v0.38.0
+  Downloaded chacha20 v0.10.2
+  Downloaded rand v0.10.3
+  Downloaded typed-path v0.12.4
+  Downloaded libsqlite3-sys v0.39.1
+  Downloaded rand_core v0.10.1
+  Downloaded hashlink v0.12.2
+  Downloaded cpufeatures v0.3.1
+  Downloaded rusqlite v0.41.1
+  Downloaded quick-xml v0.42.0
+  Downloaded lopdf v0.42.0
+  Downloaded zip v9.0.0
+    Checking memchr v2.8.3
+    Checking foldhash v0.2.0
+   Compiling getrandom v0.4.3
+    Checking rand_core v0.10.1
+   Compiling libsqlite3-sys v0.39.1
+    Checking xs-runtime v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-runtime)
+    Checking cpufeatures v0.3.1
+    Checking typed-path v0.12.4
+    Checking atoi_simd v0.18.1
+    Checking hashbrown v0.17.1
+    Checking chacha20 v0.10.2
+    Checking aho-corasick v1.1.5
+    Checking serde_json v1.0.154
+    Checking nom v7.1.3
+    Checking quick-xml v0.42.0
+    Checking nom v8.0.0
+    Checking quick-xml v0.41.0
+    Checking csv-core v0.1.13
+    Checking indexmap v2.14.2
+    Checking hashlink v0.12.2
+    Checking rand v0.10.3
+    Checking csv v1.4.0
+    Checking zip v9.0.0
+    Checking xs-platform v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-platform)
+    Checking regex-automata v0.4.18
+    Checking spm_precompiled v0.1.4
+    Checking calamine v0.38.0
+    Checking lopdf v0.42.0
+    Checking regex v1.13.1
+    Checking fancy-regex v0.14.0
+    Checking xs-query v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-query)
+    Checking tokenizers v0.21.4
+    Checking xs-inference v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-inference)
+    Checking rusqlite v0.41.1
+    Checking xs-content v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-content)
+    Checking xs-core v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-core)
+error[E0308]: mismatched types
+   --> crates\xs-content\src\extract.rs:435:9
+    |
+433 |     match reference.as_ref() {
+    |           ------------------ this expression has type `&[u8; 3]`
+434 |         b"amp" => Ok('&'),
+435 |         b"lt" => Ok('<'),
+    |         ^^^^^ expected an array with a size of 3, found one with a size of 2
+
+error[E0308]: mismatched types
+   --> crates\xs-content\src\extract.rs:436:9
+    |
+433 |     match reference.as_ref() {
+    |           ------------------ this expression has type `&[u8; 3]`
+...
+436 |         b"gt" => Ok('>'),
+    |         ^^^^^ expected an array with a size of 3, found one with a size of 2
+
+error[E0308]: mismatched types
+   --> crates\xs-content\src\extract.rs:437:9
+    |
+433 |     match reference.as_ref() {
+    |           ------------------ this expression has type `&[u8; 3]`
+...
+437 |         b"quot" => Ok('"'),
+    |         ^^^^^^^ expected an array with a size of 3, found one with a size of 4
+
+error[E0308]: mismatched types
+   --> crates\xs-content\src\extract.rs:438:9
+    |
+433 |     match reference.as_ref() {
+    |           ------------------ this expression has type `&[u8; 3]`
+...
+438 |         b"apos" => Ok('\''),
+    |         ^^^^^^^ expected an array with a size of 3, found one with a size of 4
+
+error[E0277]: the trait bound `[u8]: AsRef<[u8; 3]>` is not satisfied
+    --> crates\xs-content\src\extract.rs:433:21
+     |
+ 433 |     match reference.as_ref() {
+     |                     ^^^^^^ the trait `AsRef<[u8; 3]>` is not implemented for `[u8]`
+     |
+help: the trait `AsRef<[u8; 3]>` is not implemented for `[u8]`
+      but trait `AsRef<typed_path::common::non_utf8::path::Path<_>>` is implemented for it
+    --> D:\Xunshu\.recovery-tools\windows\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\typed-path-0.12.4\src\common\non_utf8\path.rs:1048:1
+     |
+1048 | / impl<T> AsRef<Path<T>> for [u8]
+1049 | | where
+1050 | |     T: Encoding,
+     | |________________^
+     = help: for that trait implementation, expected `typed_path::common::non_utf8::path::Path<_>`, found `[u8; 3]`
+
+error[E0277]: the trait bound `usize: FromSql` is not satisfied
+   --> crates\xs-content\src\search.rs:323:31
+    |
+323 |             window: Some((row.get(2)?, row.get(3)?)),
+    |                               ^^^ the trait `FromSql` is not implemented for `usize`
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `rusqlite::Row::<'_>::get`
+   --> D:\Xunshu\.recovery-tools\windows\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rusqlite-0.41.1\src\row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+error[E0277]: the trait bound `usize: FromSql` is not satisfied
+   --> crates\xs-content\src\search.rs:323:44
+    |
+323 |             window: Some((row.get(2)?, row.get(3)?)),
+    |                                            ^^^ the trait `FromSql` is not implemented for `usize`
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `rusqlite::Row::<'_>::get`
+   --> D:\Xunshu\.recovery-tools\windows\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rusqlite-0.41.1\src\row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+   --> crates\xs-content\src\lib.rs:186:9
+    |
+186 | /         params![
+187 | |             policy.token,
+188 | |             generation,
+189 | |             model.as_ref().map(semantic::ModelClient::fingerprint)
+190 | |         ],
+    | |_________^ the trait `ToSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `ToSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+    = note: required for the cast from `&u64` to `&dyn ToSql`
+    = note: this error originates in the macro `params` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `usize: ToSql` is not satisfied
+   --> crates\xs-content\src\lib.rs:263:47
+    |
+263 |                           insert_vector.execute(params![
+    |  _______________________________________________^
+264 | |                             doc,
+265 | |                             id,
+266 | |                             offset + window.start,
+267 | |                             offset + window.end,
+268 | |                             window.bytes()
+269 | |                         ])?;
+    | |_________________________^ the trait `ToSql` is not implemented for `usize`
+    |
+    = help: the following other types implement trait `ToSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+    = note: required for the cast from `&usize` to `&dyn ToSql`
+    = note: this error originates in the macro `params` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `u64: FromSql` is not satisfied
+   --> crates\xs-content\src\lib.rs:435:28
+    |
+435 |                 r.get::<_, u64>(1)?,
+    |                   ---      ^^^ the trait `FromSql` is not implemented for `u64`
+    |                   |
+    |                   required by a bound introduced by this call
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `rusqlite::Row::<'_>::get`
+   --> D:\Xunshu\.recovery-tools\windows\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rusqlite-0.41.1\src\row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+error[E0596]: cannot borrow `catalog.db` as mutable, as it is behind a `&` reference
+   --> crates\xs-content\src\search.rs:234:9
+    |
+234 | /         catalog
+235 | |             .db
+    | |_______________^ `catalog` is a `&` reference, so it cannot be borrowed as mutable
+    |
+help: consider specifying this binding's type
+    |
+195 |         let catalog: &mut Cached = self.cached.as_ref().expect("正文库已加载");
+    |                    +++++++++++++
+
+error[E0596]: cannot borrow `catalog.db` as mutable, as it is behind a `&` reference
+   --> crates\xs-content\src\search.rs:249:9
+    |
+249 |         catalog.db.progress_handler(0, None::<fn() -> bool>);
+    |         ^^^^^^^^^^ `catalog` is a `&` reference, so it cannot be borrowed as mutable
+    |
+help: consider specifying this binding's type
+    |
+195 |         let catalog: &mut Cached = self.cached.as_ref().expect("正文库已加载");
+    |                    +++++++++++++
+
+Some errors have detailed explanations: E0277, E0308, E0596.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `xs-content` (lib) due to 12 previous errors
+warning: build failed, waiting for other jobs to finish...

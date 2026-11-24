@@ -1,0 +1,707 @@
+$ rustc -vV
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: rustc
+commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+commit-date: 2026-10-13
+host: x86_64-unknown-linux-gnu
+release: 1.99.1
+LLVM version: 23.1.1
+fixture_filesystem=tmpfs
+fixture_directory=/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o
+$ cargo test --locked --offline --workspace --target x86_64-unknown-linux-gnu --target-dir /workspace/scratch/036c199d3807/xunshu/rust/target
+   Compiling syn v3.0.9
+   Compiling cfg-if v1.0.5
+   Compiling bitflags v2.13.2
+   Compiling libc v0.2.191
+   Compiling smallvec v1.16.5
+   Compiling once_cell v1.21.4
+   Compiling rustix v1.1.6
+   Compiling linux-raw-sys v0.12.1
+   Compiling log v0.4.35
+   Compiling libloading v0.8.9
+   Compiling memchr v2.8.3
+   Compiling dlib v0.5.3
+   Compiling wayland-sys v0.31.11
+   Compiling serde_core v1.0.229
+   Compiling wayland-backend v0.3.17
+   Compiling synstructure v0.14.0
+   Compiling downcast-rs v1.2.1
+   Compiling scoped-tls v1.0.1
+   Compiling zmij v1.0.23
+   Compiling thiserror v2.0.21
+   Compiling zerofrom-derive v0.1.8
+   Compiling quick-xml v0.41.0
+   Compiling thiserror-impl v2.0.21
+   Compiling wayland-client v0.31.15
+   Compiling itoa v1.0.18
+   Compiling serde v1.0.229
+   Compiling zerofrom v0.1.8
+   Compiling serde_json v1.0.154
+   Compiling wayland-scanner v0.31.11
+   Compiling yoke-derive v0.8.4
+   Compiling serde_derive v1.0.229
+   Compiling stable_deref_trait v1.2.1
+   Compiling cfg_aliases v0.2.2
+   Compiling yoke v0.8.4
+   Compiling crc32fast v1.5.4
+   Compiling memmap2 v0.9.12
+   Compiling zerovec-derive v0.11.7
+   Compiling aho-corasick v1.1.5
+   Compiling regex-syntax v0.8.11
+   Compiling pinyin v0.11.0
+   Compiling zerovec v0.11.9
+   Compiling displaydoc v0.2.7
+   Compiling tinyvec v1.13.3
+   Compiling regex-automata v0.4.18
+   Compiling unicode-normalization v0.1.26
+   Compiling bytemuck_derive v1.12.1
+   Compiling autocfg v1.5.1
+   Compiling khronos_api v3.1.0
+   Compiling wayland-protocols v0.32.13
+   Compiling regex v1.13.1
+   Compiling bytemuck v1.25.2
+   Compiling polling v3.11.0
+   Compiling foldhash v0.1.5
+   Compiling hashbrown v0.15.5
+   Compiling xs-query v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+   Compiling libsqlite3-sys v0.35.0
+   Compiling tinystr v0.8.5
+   Compiling xs-platform v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling utf_types v1.0.0
+   Compiling xml-rs v0.8.29
+   Compiling writeable v0.6.4
+   Compiling zerocopy v0.8.63
+   Compiling getrandom v0.3.4
+   Compiling litemap v0.8.3
+   Compiling version_check v0.9.5
+   Compiling ahash v0.8.12
+   Compiling gl_generator v0.14.0
+   Compiling icu_locale_core v2.4.0
+   Compiling utf8_iter v1.1.0
+   Compiling anyhow v1.0.104
+   Compiling hashlink v0.10.0
+   Compiling zerotrie v0.2.5
+   Compiling potential_utf v0.1.6
+   Compiling csv-core v0.1.13
+   Compiling syn v2.0.119
+   Compiling ryu v1.0.23
+   Compiling tracing-core v0.1.36
+   Compiling fallible-iterator v0.3.0
+   Compiling rustix v0.38.44
+   Compiling simd-adler32 v0.3.10
+   Compiling pin-project-lite v0.2.17
+   Compiling icu_properties_data v2.4.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling icu_normalizer_data v2.4.0
+   Compiling parking_lot_core v0.9.12
+   Compiling thiserror v1.0.69
+   Compiling rusqlite v0.37.0
+   Compiling tracing v0.1.44
+   Compiling getrandom v0.4.3
+   Compiling csv v1.4.0
+   Compiling thiserror-impl v1.0.69
+   Compiling icu_collections v2.4.0
+   Compiling icu_provider v2.4.0
+   Compiling fs2 v0.4.3
+   Compiling x11-dl v2.21.0
+   Compiling linux-raw-sys v0.4.15
+   Compiling xcursor v0.3.11
+   Compiling cursor-icon v1.2.0
+   Compiling scopeguard v1.2.0
+   Compiling xkeysym v0.2.1
+   Compiling adler2 v2.0.1
+   Compiling percent-encoding v2.3.2
+   Compiling lock_api v0.4.14
+   Compiling wayland-csd-frame v0.3.0
+   Compiling wayland-cursor v0.31.14
+   Compiling wayland-protocols-wlr v0.3.12
+   Compiling num-traits v0.2.19
+   Compiling fastrand v2.5.0
+   Compiling ttf-parser v0.25.1
+   Compiling slab v0.4.12
+   Compiling tempfile v3.27.0
+   Compiling parking_lot v0.12.5
+   Compiling calloop v0.13.0
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling owned_ttf_parser v0.25.1
+   Compiling miniz_oxide v0.9.1
+   Compiling xs-core v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+   Compiling emath v0.33.3
+   Compiling gethostname v1.1.0
+   Compiling ab_glyph_rasterizer v0.1.10
+   Compiling as-raw-xcb-connection v1.0.1
+   Compiling x11rb-protocol v0.13.2
+   Compiling smithay-client-toolkit v0.19.2
+   Compiling ab_glyph v0.2.32
+   Compiling ecolor v0.33.3
+   Compiling flate2 v1.1.11
+   Compiling idna_adapter v1.2.2
+   Compiling calloop-wayland-source v0.3.0
+   Compiling miniz_oxide v0.8.9
+   Compiling calloop v0.14.5
+   Compiling fdeflate v0.3.7
+   Compiling glutin_egl_sys v0.7.1
+   Compiling glutin_glx_sys v0.6.1
+   Compiling winit v0.30.13
+   Compiling epaint_default_fonts v0.33.3
+   Compiling nohash-hasher v0.2.0
+   Compiling pxfm v0.1.30
+   Compiling raw-window-handle v0.6.2
+   Compiling profiling v1.0.18
+   Compiling smithay-client-toolkit v0.20.0
+   Compiling epaint v0.33.3
+   Compiling moxcms v0.8.1
+   Compiling calloop-wayland-source v0.4.1
+   Compiling png v0.18.1
+   Compiling x11rb v0.13.2
+   Compiling idna v1.1.0
+   Compiling xkbcommon-dl v0.4.2
+   Compiling form_urlencoded v1.2.2
+   Compiling wayland-protocols-plasma v0.3.12
+   Compiling wayland-protocols-misc v0.3.12
+   Compiling wayland-protocols-experimental v20250721.0.1
+   Compiling memoffset v0.9.1
+   Compiling glutin v0.32.3
+   Compiling dpi v0.1.2
+   Compiling byteorder-lite v0.1.0
+   Compiling unicode-segmentation v1.13.3
+   Compiling smol_str v0.2.2
+   Compiling utf8parse v0.2.2
+   Compiling egui v0.33.3
+   Compiling anstyle-parse v1.0.0
+   Compiling image v0.25.10
+   Compiling url v2.5.8
+   Compiling nix v0.31.3
+   Compiling glutin-winit v0.5.0
+   Compiling anstyle-query v1.1.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling anstyle v1.0.14
+   Compiling anstream v1.0.0
+   Compiling smithay-clipboard v0.7.3
+   Compiling webbrowser v1.2.6
+   Compiling arboard v3.7.0
+   Compiling clap_lex v1.1.1
+   Compiling heck v0.5.0
+   Compiling glow v0.16.0
+   Compiling web-time v1.1.0
+   Compiling litrs v1.0.1
+   Compiling strsim v0.11.1
+   Compiling document-features v0.2.12
+   Compiling clap_builder v4.6.7
+   Compiling egui-winit v0.33.3
+   Compiling egui_glow v0.33.3
+   Compiling clap_derive v4.6.7
+   Compiling static_assertions v1.1.0
+   Compiling eframe v0.33.3
+   Compiling clap v4.6.7
+   Compiling ctrlc v3.5.2
+   Compiling xs-cli v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+   Compiling xs-ui v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 45.49s
+     Running unittests src/main.rs (target/x86_64-unknown-linux-gnu/debug/deps/xunshu-db3e0a60205de7cd)
+
+running 1 test
+test tests::empty_import_replaces_its_identity_and_preserves_unrelated_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/x86_64-unknown-linux-gnu/debug/deps/xs_core-c905bb44eaecc733)
+
+running 41 tests
+test changes::tests::append_and_move_resolve_current_paths_without_separate_stale_path_tape ... ok
+test changes::tests::corrupted_snapshot_cycle_and_unknown_fields_are_rejected ... ok
+test changes::tests::deleting_unknown_parent_also_removes_its_known_orphan_subtree ... ok
+test changes::tests::deleting_parent_invalidates_whole_subtree_without_child_events ... ok
+test changes::tests::graph_and_cursor_rollback_after_late_invalid_event ... ok
+test changes::tests::file_cannot_be_used_as_parent_or_replace_nonempty_directory ... ok
+test changes::tests::host_independent_paths_preserve_posix_backslashes_and_no_network_roots ... ok
+test changes::tests::invalid_envelopes_and_names_never_advance_cursor ... ok
+test changes::tests::directory_rename_updates_every_descendant_path_from_stable_parent_ids ... ok
+test changes::tests::journal_recreation_gap_and_overlap_require_explicit_rebuild ... ok
+test changes::tests::moved_child_survives_old_parent_deletion_in_the_same_batch ... ok
+test changes::tests::unknown_parent_is_hidden_until_resolved_and_never_fabricated_at_root ... ok
+test changes::tests::rename_across_batches_replaces_the_same_id_without_old_name_record_dependency ... ok
+test changes::tests::stable_id_upsert_never_duplicates_and_complete_batch_replay_is_noop ... ok
+test changes::tests::newly_added_descendants_are_included_in_same_batch_deletion ... ok
+test index::tests::malformed_postings_fail ... ok
+test index::tests::missing_word_does_not_scan ... ok
+test index::tests::cjk_short_uses_posting ... ok
+test index::tests::mixed_not_path_is_conservative ... ok
+test index::tests::cancellation_is_honest ... ok
+test changes::tests::root_changes_and_rename_without_metadata_request_rebuild ... ok
+test changes::tests::stable_identity_and_graph_json_roundtrip_validate_derived_state ... ok
+test index::tests::bad_pagination_rejected ... ok
+test index::tests::posix_backslash_is_a_filename_character ... ok
+test index::tests::or_does_not_drop_branch ... ok
+test index::tests::root_path_survives ... ok
+test index::tests::u32_varint_roundtrip ... ok
+test index::tests::windows_paths_survive_linux ... ok
+test interchange::tests::efu_windows_and_network_names_never_opened ... ok
+test persistence::tests::bad_pointer_cannot_escape_store ... ok
+test persistence::tests::bit_flip_detected_and_immutable_write_rejected ... ok
+test persistence::tests::pointer_and_lock_symlinks_are_errors_not_absence ... ok
+test interchange::tests::schema4_read_only_roundtrip ... ok
+test service::tests::invalid_method_is_not_a_command ... ok
+test persistence::tests::publication_cursor_rejects_oversize_or_invalid_pointers ... ok
+test service::tests::oversized_request_is_bounded_and_next_line_survives ... ok
+test persistence::tests::published_snapshot_is_mapped_and_searchable ... ok
+test persistence::tests::mapped_reader_retains_its_generation_after_publish ... ok
+test persistence::tests::publication_cursor_does_not_map_a_corrupt_previous_snapshot ... ok
+test persistence::tests::stale_writer_cannot_replace_newer_generation ... ok
+test changes::tests::moving_directory_cannot_hide_an_overdeep_unchanged_descendant ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/adversarial.rs (target/x86_64-unknown-linux-gnu/debug/deps/adversarial-ce84403360302669)
+
+running 2 tests
+test malicious_query_never_panics ... ok
+test inverted_candidates_equal_semantic_full_scan ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/interchange_fidelity.rs (target/x86_64-unknown-linux-gnu/debug/deps/interchange_fidelity-cce65697ab60ab78)
+
+running 14 tests
+test exporter_preflights_unrepresentable_dates_and_ambiguous_column_union ... ok
+test exporter_unions_custom_columns_and_uses_raw_empty_over_defaults ... ok
+test directory_inference_respects_path_flavor_and_explicit_attributes ... ok
+test efu_preserves_raw_values_empty_cells_created_time_and_custom_columns ... ok
+test schema4_rejects_nonempty_wal_instead_of_reading_stale_rows ... ok
+test schema4_optional_columns_and_negative_fractional_dates_work ... ok
+test schema4_preserves_raw_calendar_dates_without_claiming_a_new_projection ... ok
+test schema4_preserves_precision_nulls_extra_fields_and_filters_disabled_sources ... ok
+test duplicate_headers_and_missing_or_invalid_filenames_are_rejected ... ok
+test invalid_efu_numbers_do_not_silently_become_zero ... ok
+test schema4_invalid_extra_json_and_overflow_fail_without_changing_source ... ok
+test unsigned_filetime_extremes_are_bounded_and_retain_exact_text ... ok
+test serialized_metadata_and_column_budgets_reject_amplified_rows ... ok
+test logical_csv_record_budget_counts_embedded_newlines_and_escaped_quotes ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/snapshot_validation.rs (target/x86_64-unknown-linux-gnu/debug/deps/snapshot_validation-d67492581a6c53d2)
+
+running 4 tests
+test pre_cancelled_wide_or_does_not_generate_candidates ... ok
+test sparse_metadata_survives_snapshot_and_rebuild ... ok
+test valid_crc_cannot_hide_invalid_normalization_or_postings ... ok
+test an_expired_deadline_never_claims_an_exact_empty_result ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/transactions.rs (target/x86_64-unknown-linux-gnu/debug/deps/transactions-aede27642088f75e)
+
+running 10 tests
+test denied_scope_is_rejected_before_probing_a_missing_path ... ok
+test local_open_rechecks_current_extension_policy ... ok
+test corrupt_settings_are_not_replaced_by_defaults ... ok
+test an_empty_scope_token_cannot_admit_local_records ... ok
+test scope_edited_mid_scan_cannot_publish_under_new_settings ... ok
+test rebuilding_local_scopes_keeps_offline_catalogs_without_opening_them ... ok
+test unavailable_root_never_deletes_published_records ... ok
+test resident_service_revokes_a_cached_index_after_scope_change ... ok
+test rebuild_keeps_catalog_precision_and_unknown_fields ... ok
+test scope_change_cancellation_and_self_exclusion_are_transactional ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (target/x86_64-unknown-linux-gnu/debug/deps/xs_platform-24312a1b3f9dd358)
+
+running 5 tests
+test volume::tests::mount_parser_decodes_paths_and_rejects_network ... ok
+test local::imp::tests::failed_stream_before_commit_preserves_the_old_destination ... ok
+test local::imp::tests::directory_sync_failure_after_replace_is_reported_as_committed ... ok
+test local::imp::tests::directory_sync_failure_after_create_only_never_rolls_back_the_file ... ok
+test local::imp::tests::new_and_lock_creation_remain_on_the_pinned_parent_at_the_race_boundary ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contracts.rs (target/x86_64-unknown-linux-gnu/debug/deps/contracts-bbb7395e114419a7)
+
+running 28 tests
+test default_settings_never_start_a_disk_scan ... ok
+test linux::invalid_utf8_is_explicitly_counted_without_lossy_index_entries ... ok
+test application_data_is_hard_excluded_even_with_smart_excludes_disabled ... ok
+test cancellation_before_and_during_scan_is_always_incomplete ... ok
+test linux::new_and_lock_opens_reject_links_and_special_files_before_data_open ... ok
+test extensions_are_strict_and_empty_list_means_directories_only ... ok
+test linux::special_fifo_is_skipped_without_opening_its_data ... ok
+test linux::overlay_and_virtual_filesystems_are_not_authorized_as_data_targets ... ok
+test linux::permission_error_marks_scan_incomplete_but_unreadable_file_metadata_is_indexed ... ok
+test atomic_create_only_and_replace_preserve_identity_contract ... ok
+test create_new_and_lock_handles_preserve_existing_contents ... ok
+test linux::opened_file_stays_pinned_when_the_user_path_is_replaced ... ok
+test linux::failed_stream_cleanup_cannot_follow_a_swapped_parent_to_an_outside_file ... ok
+test scope_tokens_are_order_independent_and_duplicate_roots_are_rejected ... ok
+test missing_root_and_regular_file_root_are_errors_not_empty_successes ... ok
+test name_content_scopes_and_tokens_are_independent ... ok
+test local_boundary_rejects_relative_parent_url_and_unc_paths ... ok
+test linux::stream_commit_uses_pinned_parent_after_directory_becomes_an_external_link ... ok
+test longest_root_owns_its_subtree_without_unioning_broader_whitelists ... ok
+test unsupported_acceleration_modes_fail_explicitly ... ok
+test smart_excludes_can_be_overridden_only_by_an_explicit_deeper_scope ... ok
+test linux::symlinks_and_ancestor_links_are_never_followed ... ok
+test setup_reminders_stop_at_three_and_manual_reopening_is_available ... ok
+test settings_round_trip_creates_private_parent_and_normalizes_whitelist ... ok
+test migration_is_create_only_preserves_old_file_and_does_not_infer_roots ... ok
+test streaming_create_publishes_only_complete_files_and_cleans_callback_failures ... ok
+test strict_settings_reject_unknown_duplicate_invalid_types_and_versions ... ok
+test settings_size_limit_is_enforced_before_deserialization ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/x86_64-unknown-linux-gnu/debug/deps/xs_query-134e1761c5d09561)
+
+running 4 tests
+test predicates::tests::civil_epoch_leap_and_roundtrip ... ok
+test phonetic::tests::full_initial_mixed_and_polyphonic_without_cartesian_expansion ... ok
+test predicates::tests::decimal_size_is_exact_above_float_precision ... ok
+test phonetic::tests::fuzzy_requires_all_characters_in_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/golden.rs (target/x86_64-unknown-linux-gnu/debug/deps/golden-dd9d34588935317e)
+
+running 11 tests
+test explicit_name_does_not_turn_a_windows_style_name_into_a_path_search ... ok
+test candidate_plans_preserve_case_sensitive_combining_mark_matches ... ok
+test malformed_queries_fail_explicitly ... ok
+test text_ranking_is_deterministic_and_nonmatch_cannot_win ... ok
+test quoted_values_are_data_and_not_reinterpreted_as_query_syntax ... ok
+test path_requirement_covers_nested_negative_and_implicit_paths ... ok
+test query_budgets_and_hostile_unicode_never_panic ... ok
+test glob_normalizes_literal_runs_as_whole_unicode_sequences ... ok
+test prepared_evaluation_is_identical_for_every_golden_query ... ok
+test language_neutral_golden_cases_and_candidate_soundness ... ok
+test punctuation_fuzz_smoke_and_soundness ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src/main.rs (target/x86_64-unknown-linux-gnu/debug/deps/xs_ui-57ca18dbf3479c7b)
+
+running 5 tests
+test tests::closing_setup_defers_only_unfinished_onboarding ... ok
+test tests::custom_fonts_reject_remote_or_relative_paths ... ok
+test tests::stale_queries_cannot_replace_new_query_or_scope ... ok
+test tests::filters_group_user_or_expression ... ok
+test tests::explicit_empty_policy_never_means_all_files ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_platform
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xs_query
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo build --locked --offline -p xs-cli -p xs-ui --target x86_64-unknown-linux-gnu --target-dir /workspace/scratch/036c199d3807/xunshu/rust/target
+   Compiling xs-ui v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+   Compiling xs-cli v0.18.0-alpha.1 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.19s
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --help
+寻枢 · Rust 原生离线文件搜索（显式范围，无联网）
+
+Usage: xunshu [OPTIONS] <COMMAND>
+
+Commands:
+  init              创建收录配置；不会扫描，已有配置需显式 --replace
+  volumes           显示本地卷能力；不会扫描卷
+  status            显示设置与实际索引代次
+  scan              只扫描当前已保存范围，Ctrl-C 取消，失败保留原索引
+  search            搜索现有索引；查询语法错误显式返回
+  import-efu        EFU 目录作为不可打开的离线元数据导入，保留其他来源
+  import-legacy     只读导入旧 schema4；替换上次 schema4 导入的全部来源，不改旧数据库
+  export-efu        导出当前有效范围内全部元数据
+  migrate-settings  迁移旧设置到独立新文件，旧文件保持不变
+  serve             纯本地 JSON-lines 子进程服务，不开放 TCP/HTTP
+  benchmark         工作区合成基准，不访问文件名对应路径
+  help              Print this message or the help of the given subcommand(s)
+
+Options:
+      --data-dir <DATA_DIR>  
+  -h, --help                 Print help
+  -V, --version              Print version
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xs-ui --help
+寻枢 Rust 原生界面
+
+xs-ui [--data-dir ABSOLUTE_PATH] [--query TEXT] [--font LOCAL_TTC_OR_TTF] [--smoke-test]
+
+与 xs-cli 共用 settings.json 与 index/。启动不会扫描目录。
+--smoke-test 仅验证原生窗口启动，5 秒后退出，不启动扫描。
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private init --root /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files --ext txt\,pdf
+{
+  "commit": {
+    "state": "durable"
+  },
+  "message": "范围已保存；运行 scan 后生效。正文、OCR、语义默认关闭。",
+  "ok": true,
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "txt",
+          "pdf"
+        ],
+        "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  }
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private scan
+{
+  "durability_warning": null,
+  "durable": true,
+  "elapsed_ms": 5.163298999999999,
+  "generation": 1,
+  "indexed": 5,
+  "published": true,
+  "report": {
+    "cancelled": false,
+    "complete": true,
+    "entries": [],
+    "errors": [],
+    "skipped_excluded": 2,
+    "skipped_links": 0,
+    "skipped_mounts": 0,
+    "skipped_non_utf8": 0,
+    "skipped_special": 0
+  }
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private search ''
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "elapsed_ms": 0.027912,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 0,
+      "is_dir": true,
+      "modified": 1794118232,
+      "name": "files",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files",
+      "score": 46,
+      "size": 0,
+      "source": "local"
+    },
+    {
+      "id": 1,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "report.txt",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/report.txt",
+      "score": 45,
+      "size": 17,
+      "source": "local"
+    },
+    {
+      "id": 2,
+      "is_dir": true,
+      "modified": 1794118232,
+      "name": "subdir",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/subdir",
+      "score": 45,
+      "size": 0,
+      "source": "local"
+    },
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "预算报告.pdf",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/预算报告.pdf",
+      "score": 45,
+      "size": 42,
+      "source": "local"
+    },
+    {
+      "id": 3,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "notes.txt",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/subdir/notes.txt",
+      "score": 44,
+      "size": 16,
+      "source": "local"
+    }
+  ],
+  "total": 5,
+  "total_relation": "exact"
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private search ext:txt
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "elapsed_ms": 0.056825,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 1,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "report.txt",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/report.txt",
+      "score": 45,
+      "size": 17,
+      "source": "local"
+    },
+    {
+      "id": 3,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "notes.txt",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/subdir/notes.txt",
+      "score": 44,
+      "size": 16,
+      "source": "local"
+    }
+  ],
+  "total": 2,
+  "total_relation": "exact"
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private search ext:pdf
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "elapsed_ms": 0.027381000000000003,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "预算报告.pdf",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/预算报告.pdf",
+      "score": 45,
+      "size": 42,
+      "source": "local"
+    }
+  ],
+  "total": 1,
+  "total_relation": "exact"
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private status
+{
+  "capabilities": {
+    "filename_search": true,
+    "legacy_query_full_parity": false,
+    "mft_usn": false,
+    "mmap_snapshot": true,
+    "native_ui": true,
+    "ocr": false,
+    "semantic": false,
+    "stdio_ipc": true
+  },
+  "data_dir": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private",
+  "index": {
+    "entries": 5,
+    "generation": 1,
+    "mapped": true,
+    "scope_matches": true,
+    "snapshot_bytes": 1729
+  },
+  "network": false,
+  "runtime": "Rust",
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "pdf",
+          "txt"
+        ],
+        "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  },
+  "version": "0.18.0-alpha.1"
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private export-efu /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/fixture.efu
+{
+  "commit": {
+    "state": "durable"
+  },
+  "exported": 5,
+  "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/fixture.efu"
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/catalog-data import-efu /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/fixture.efu --name fixture
+{
+  "durability_warning": null,
+  "durable": true,
+  "generation": 1,
+  "imported": 5,
+  "mode": "metadata_only",
+  "opened_catalog_paths": 0,
+  "replaced_source": "offline:fixture",
+  "replaced_source_prefix": false,
+  "total": 5
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/catalog-data search ext:pdf
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "elapsed_ms": 0.053651,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "预算报告.pdf",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/预算报告.pdf",
+      "score": 45,
+      "size": 42,
+      "source": "offline:fixture"
+    }
+  ],
+  "total": 1,
+  "total_relation": "exact"
+}
+$ /workspace/scratch/036c199d3807/xunshu/rust/target/x86_64-unknown-linux-gnu/debug/xunshu --data-dir /tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/app-private search unknown_field:value
+{"error":"不支持的搜索字段：unknown_field:（字节位置 0）","ok":false}
+PASS: Rust workspace tests and synthetic CLI contracts. Desktop runtime acceptance was not performed.
+verification_exit_code=0

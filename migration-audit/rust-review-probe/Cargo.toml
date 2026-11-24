@@ -1,0 +1,14 @@
+[package]
+name = "xunshu-independent-review"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+xs-core = { path = "../../rust/crates/xs-core" }
+xs-query = { path = "../../rust/crates/xs-query" }
+xs-platform = { path = "../../rust/crates/xs-platform" }
+anyhow = "1"
+serde_json = "1"
+crc32fast = "1"
+

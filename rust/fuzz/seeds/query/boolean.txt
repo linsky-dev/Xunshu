@@ -1,0 +1,1 @@
+ext:pdf (name:预算 | pinyin:ys) !regex:temp[0-9]

@@ -1,0 +1,78 @@
+{
+  "binary": "/workspace/scratch/036c199d3807/xunshu/rust/target/release/xunshu",
+  "binary_sha256": "94b74320023a6215624baf0ed63e7ea637d7132543478da99c4fc2a7d76b4a1f",
+  "fixture_dir": "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-t9f04nsv",
+  "source_unchanged": true,
+  "input_efu": "Filename,Size,Date Modified,Date Created,Attributes,Project\n\"C:\\synthetic\\precise.txt\",123,133444736000000001,133444736123456789,34,项目甲\n\"C:\\synthetic\\unknown.txt\",,,,,\n",
+  "output_efu": "Filename,Size,Date Modified,Date Created,Attributes\nC:\\synthetic\\precise.txt,123,133444736000000000,,0\nC:\\synthetic\\unknown.txt,0,116444736000000000,,0\n",
+  "roundtrip_rows": [
+    {
+      "Filename": "C:\\synthetic\\precise.txt",
+      "Size": "123",
+      "Date Modified": "133444736000000000",
+      "Date Created": "",
+      "Attributes": "0"
+    },
+    {
+      "Filename": "C:\\synthetic\\unknown.txt",
+      "Size": "0",
+      "Date Modified": "116444736000000000",
+      "Date Created": "",
+      "Attributes": "0"
+    }
+  ],
+  "empty_reimport_total": 2,
+  "events": [
+    {
+      "args": [
+        "import-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-t9f04nsv/original.efu",
+        "--name",
+        "review"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"generation\": 1,\n  \"imported\": 2,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"total\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "export-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-t9f04nsv/exported.efu"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"exported\": 2,\n  \"path\": \"/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-t9f04nsv/exported.efu\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "import-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-t9f04nsv/empty.efu",
+        "--name",
+        "review"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"generation\": 2,\n  \"imported\": 0,\n  \"mode\": \"metadata_only\",\n  \"opened_catalog_paths\": 0,\n  \"total\": 2\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "search",
+        "source:offline:review"
+      ],
+      "returncode": 0,
+      "stdout": "{\n  \"candidate_count\": 2,\n  \"complete\": true,\n  \"elapsed_ms\": 0.010165,\n  \"examined\": 2,\n  \"generation\": 2,\n  \"index_entries\": 2,\n  \"results\": [\n    {\n      \"id\": 0,\n      \"is_dir\": false,\n      \"modified\": 1700000000,\n      \"name\": \"precise.txt\",\n      \"path\": \"C:\\\\synthetic\\\\precise.txt\",\n      \"score\": 48,\n      \"size\": 123,\n      \"source\": \"offline:review\"\n    },\n    {\n      \"id\": 1,\n      \"is_dir\": false,\n      \"modified\": 0,\n      \"name\": \"unknown.txt\",\n      \"path\": \"C:\\\\synthetic\\\\unknown.txt\",\n      \"score\": 48,\n      \"size\": 0,\n      \"source\": \"offline:review\"\n    }\n  ],\n  \"total\": 2,\n  \"total_relation\": \"exact\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "import-efu",
+        "/tmp/xunshu-rust-validation-036c199d3807/rust-review-cli-t9f04nsv/extreme.efu",
+        "--name",
+        "extreme"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "{\"error\":\"number too large to fit in target type\",\"ok\":false}\n"
+    }
+  ]
+}

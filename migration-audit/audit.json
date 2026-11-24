@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "source_version": "0.17.0",
+  "date": "2026-11-08",
+  "scope": "synthetic-only Linux workspace audit",
+  "original_source_modified": false,
+  "baseline": {
+    "tests_run": 78,
+    "passed": 50,
+    "failed": 3,
+    "test_errors": 24,
+    "skipped": 1,
+    "additional_class_setup_errors": 1,
+    "error_records": 25,
+    "environment_error_causes": {
+      "unknown_overlay_backend": 22,
+      "missing_pcre1": 1,
+      "missing_pyqt5": 2
+    },
+    "log": "core-baseline.log"
+  },
+  "pure_baseline": {
+    "tests_run": 39,
+    "passed": 39,
+    "overlaps_primary_baseline": true,
+    "log": "pure-baseline.log"
+  },
+  "probe_summary": {
+    "defects_reproduced": 5,
+    "contracts_passed": 21,
+    "contracts_failed": 0
+  },
+  "probe_results": "probes.json",
+  "probe_script": "probe_original.py",
+  "reproduced_defects": [
+    {
+      "id": "PATH-01",
+      "sources": [
+        "linsearch/compact_index.py:62",
+        "linsearch/compact_index.py:108",
+        "linsearch/live_index.py:57"
+      ],
+      "summary": "Host OS path separator corrupts foreign Windows lexical paths"
+    },
+    {
+      "id": "USN-SAME-FRN-IDEMPOTENCY",
+      "expected": [
+        "/synthetic/docs/old.txt"
+      ],
+      "actual": [
+        "/synthetic/docs/old.txt",
+        "/synthetic/docs/old.txt"
+      ],
+      "source": "linsearch/live_index.py:84-136"
+    },
+    {
+      "id": "USN-RENAME-CROSS-BATCH",
+      "expected": [
+        "/synthetic/docs/new.txt"
+      ],
+      "actual": [
+        "/synthetic/docs/new.txt",
+        "/synthetic/docs/old.txt"
+      ],
+      "source": "linsearch/live_index.py:84-136"
+    },
+    {
+      "id": "USN-DIRECTORY-RENAME-CHILD",
+      "expected": [
+        "/synthetic/base/renamed/child.txt"
+      ],
+      "actual": [
+        "/synthetic/base/docs/child.txt"
+      ],
+      "source": "linsearch/live_index.py:84-136"
+    },
+    {
+      "id": "USN-APPEND-PATH-SEARCH",
+      "expected": [
+        "/synthetic/docs",
+        "/synthetic/docs/new.txt",
+        "/synthetic/docs/old.txt"
+      ],
+      "actual": [
+        "/synthetic/docs",
+        "/synthetic/docs/old.txt"
+      ],
+      "source": "linsearch/live_index.py:84-136"
+    },
+    {
+      "id": "USN-DIRECTORY-DELETE-CHILD",
+      "expected": [],
+      "actual": [
+        "/synthetic/docs/old.txt"
+      ],
+      "source": "linsearch/live_index.py:84-136"
+    }
+  ],
+  "static_findings": [
+    {
+      "id": "WIZARD-01",
+      "source": "linsearch/auto_index_ui.py:209",
+      "summary": "Cancellation marks setup complete"
+    },
+    {
+      "id": "WIZARD-02",
+      "source": "linsearch/gui.py:4116",
+      "summary": "Existing roots suppress incomplete setup"
+    },
+    {
+      "id": "SCOPE-01",
+      "source": "windows_support/runtime.py:148",
+      "summary": "Fast service chooses SystemDrive independently of user scope"
+    }
+  ],
+  "contracts": [
+    "PathFlavor Windows/POSIX",
+    "ScopeSnapshot revision plus roots/policies",
+    "None vs empty whitelist",
+    "Directory traversal retained",
+    "Strict policy validation",
+    "Three-state wizard with bounded reminders",
+    "Stable file identity and idempotent mutations",
+    "Atomic journal cursor/index checkpoint",
+    "OR precedence over AND compatibility",
+    "Explicit regex capability boundaries",
+    "Generation-aware asynchronous results",
+    "Atomic settings and policy updates"
+  ],
+  "not_verified": [
+    "Windows 10/11 and UOS target runtime",
+    "Real NTFS MFT/USN ingestion and privilege transitions",
+    "Global hotkeys/tray/autostart",
+    "3M-entry latency and memory targets",
+    "Real filesystem concurrency and interrupted-write recovery",
+    "Native Qt UI behavior"
+  ],
+  "conclusion": "Preserve verified contracts, fix reproduced and statically confirmed defects in Rust; platform and performance claims require later measurements."
+}

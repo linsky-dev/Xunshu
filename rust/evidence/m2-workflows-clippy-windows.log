@@ -1,0 +1,8 @@
+    Checking windows v0.61.3
+    Checking xs-core v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-core)
+    Checking accesskit_windows v0.29.2
+    Checking accesskit_winit v0.29.2
+    Checking egui-winit v0.33.3
+    Checking eframe v0.33.3
+    Checking xs-ui v0.18.0-alpha.2 (D:\Xunshu\rust\crates\xs-ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.93s

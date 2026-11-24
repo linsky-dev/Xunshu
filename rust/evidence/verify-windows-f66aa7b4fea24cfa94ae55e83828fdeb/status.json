@@ -1,0 +1,52 @@
+{
+  "capabilities": {
+    "content_search": true,
+    "directory_watch": true,
+    "fast_service": false,
+    "filename_search": true,
+    "legacy_query_full_parity": false,
+    "mcp_content": true,
+    "mft_usn": true,
+    "mmap_snapshot": true,
+    "native_ui": true,
+    "ocr": true,
+    "semantic": true,
+    "stdio_ipc": true,
+    "stdio_ipc_v2": true
+  },
+  "data_dir": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-ca3eeb9f408a4fbcab5835bc427ef73d\\files\\app-private",
+  "index": {
+    "coverage_complete": true,
+    "entries": 5,
+    "generation": 1,
+    "mapped": true,
+    "scope_matches": true,
+    "snapshot_bytes": 2242
+  },
+  "model_resources": {
+    "state": "checked_on_use"
+  },
+  "network": false,
+  "runtime": "Rust",
+  "settings": {
+    "content_enabled": false,
+    "content_roots": [],
+    "mode": "standard",
+    "ocr_enabled": false,
+    "reminder_count": 0,
+    "roots": [
+      {
+        "extensions": [
+          "pdf",
+          "txt"
+        ],
+        "path": "D:\\Xunshu\\rust\\test-tmp\\xunshu-verify-ca3eeb9f408a4fbcab5835bc427ef73d\\files",
+        "smart_excludes": true
+      }
+    ],
+    "semantic_enabled": false,
+    "setup_state": "completed",
+    "version": 1
+  },
+  "version": "0.18.0-alpha.2"
+}

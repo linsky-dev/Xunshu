@@ -1,0 +1,19 @@
+{
+  "durability_warning": null,
+  "durable": true,
+  "elapsed_ms": 32.038900000000005,
+  "generation": 1,
+  "indexed": 5,
+  "published": true,
+  "report": {
+    "cancelled": false,
+    "complete": true,
+    "entries": [],
+    "errors": [],
+    "skipped_excluded": 2,
+    "skipped_links": 0,
+    "skipped_mounts": 0,
+    "skipped_non_utf8": 0,
+    "skipped_special": 0
+  }
+}

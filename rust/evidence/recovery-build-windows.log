@@ -1,0 +1,8 @@
+    Blocking waiting for file lock on build directory
+   Compiling xs-platform v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-platform)
+   Compiling xs-inference v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-inference)
+   Compiling xs-core v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-core)
+   Compiling xs-content v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-content)
+   Compiling xs-cli v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-cli)
+   Compiling xs-ui v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.40s

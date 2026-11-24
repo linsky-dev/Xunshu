@@ -1,0 +1,175 @@
+{
+  "arch": "x86_64",
+  "build_ms": 6209.9485,
+  "build_process_memory": {
+    "peak_rss_kib": null,
+    "rss_kib": null
+  },
+  "bytes_per_entry": 28.674285666666666,
+  "dataset": "deterministic synthetic mixed Chinese/English filenames; no real files scanned",
+  "entries": 3000000,
+  "persist_ms": 119.07860000000001,
+  "platform": "windows",
+  "read_process": {
+    "after_load_memory": {
+      "peak_rss_kib": null,
+      "rss_kib": null
+    },
+    "after_queries_memory": {
+      "peak_rss_kib": null,
+      "rss_kib": null
+    },
+    "baseline_memory": {
+      "peak_rss_kib": null,
+      "rss_kib": null
+    },
+    "first_screen_core_queries": [
+      {
+        "p50_ms": 0.0027,
+        "p95_ms": 0.0031,
+        "p99_ms": 0.005,
+        "partial_samples": 0,
+        "query": "never_present_xyz"
+      },
+      {
+        "p50_ms": 0.1958,
+        "p95_ms": 0.2569,
+        "p99_ms": 0.2842,
+        "partial_samples": 0,
+        "query": "0001234"
+      },
+      {
+        "p50_ms": 0.0018,
+        "p95_ms": 0.002,
+        "p99_ms": 0.0027,
+        "partial_samples": 0,
+        "query": "预算决算不存在"
+      },
+      {
+        "p50_ms": 0.2246,
+        "p95_ms": 0.2619,
+        "p99_ms": 0.29119999999999996,
+        "partial_samples": 100,
+        "query": "干部"
+      },
+      {
+        "p50_ms": 0.1894,
+        "p95_ms": 0.2353,
+        "p99_ms": 0.296,
+        "partial_samples": 0,
+        "query": "project_budget_final_0000121"
+      },
+      {
+        "p50_ms": 0.0021,
+        "p95_ms": 0.0024,
+        "p99_ms": 0.0031,
+        "partial_samples": 0,
+        "query": "name:report ext:pdf"
+      },
+      {
+        "p50_ms": 0.273,
+        "p95_ms": 0.4377,
+        "p99_ms": 0.4769,
+        "partial_samples": 100,
+        "query": "readme ext:rs"
+      },
+      {
+        "p50_ms": 0.2098,
+        "p95_ms": 0.4016,
+        "p99_ms": 0.4113,
+        "partial_samples": 100,
+        "query": "budget | meeting"
+      }
+    ],
+    "first_screen_note": "core only; excludes input, IPC and presentation",
+    "iterations": 100,
+    "load_ms": 251.57790000000003,
+    "load_note": "separate fresh process; OS page cache not forcibly evicted; includes CRC and structural validation",
+    "mapped": true,
+    "queries": [
+      {
+        "candidates": 0,
+        "complete": true,
+        "examined": 0,
+        "p50_ms": 0.0019,
+        "p95_ms": 0.0022,
+        "p99_ms": 0.0029,
+        "query": "never_present_xyz",
+        "total": 0
+      },
+      {
+        "candidates": 191,
+        "complete": true,
+        "examined": 191,
+        "p50_ms": 0.2018,
+        "p95_ms": 0.25339999999999996,
+        "p99_ms": 0.28669999999999995,
+        "query": "0001234",
+        "total": 1
+      },
+      {
+        "candidates": 0,
+        "complete": true,
+        "examined": 0,
+        "p50_ms": 0.0016,
+        "p95_ms": 0.0016,
+        "p99_ms": 0.0017,
+        "query": "预算决算不存在",
+        "total": 0
+      },
+      {
+        "candidates": 600000,
+        "complete": true,
+        "examined": 600000,
+        "p50_ms": 65.6097,
+        "p95_ms": 79.04990000000001,
+        "p99_ms": 82.83659999999999,
+        "query": "干部",
+        "total": 600000
+      },
+      {
+        "candidates": 44,
+        "complete": true,
+        "examined": 44,
+        "p50_ms": 0.1951,
+        "p95_ms": 0.26689999999999997,
+        "p99_ms": 0.3341,
+        "query": "project_budget_final_0000121",
+        "total": 1
+      },
+      {
+        "candidates": 0,
+        "complete": true,
+        "examined": 0,
+        "p50_ms": 0.0018,
+        "p95_ms": 0.002,
+        "p99_ms": 0.002,
+        "query": "name:report ext:pdf",
+        "total": 0
+      },
+      {
+        "candidates": 600000,
+        "complete": true,
+        "examined": 600000,
+        "p50_ms": 127.2426,
+        "p95_ms": 151.9544,
+        "p99_ms": 166.7191,
+        "query": "readme ext:rs",
+        "total": 600000
+      },
+      {
+        "candidates": 1200000,
+        "complete": true,
+        "examined": 1200000,
+        "p50_ms": 220.6372,
+        "p95_ms": 244.0956,
+        "p99_ms": 255.71310000000005,
+        "query": "budget | meeting",
+        "total": 1200000
+      }
+    ]
+  },
+  "snapshot_bytes": 86022857,
+  "target_metrics_are_not_acceptance": true,
+  "version": 1
+}

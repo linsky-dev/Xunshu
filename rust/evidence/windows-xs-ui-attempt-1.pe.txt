@@ -1,0 +1,460 @@
+Selected objdump -p output: PE headers and import tables. Reproducible relocation/unwind tables omitted.
+
+/workspace/scratch/036c199d3807/xunshu/rust/target-windows/x86_64-pc-windows-gnu/release/xs-ui.exe:     file format pei-x86-64
+
+Characteristics 0x22e
+	executable
+	line numbers stripped
+	symbols stripped
+	large address aware
+	debugging information removed
+
+Time/Date		Sun Nov  8 13:39:46 2026
+Magic			020b	(PE32+)
+MajorLinkerVersion	2
+MinorLinkerVersion	44
+SizeOfCode		0000000000380600
+SizeOfInitializedData	0000000000323600
+SizeOfUninitializedData	0000000000000400
+AddressOfEntryPoint	00000000000013f0
+BaseOfCode		0000000000001000
+ImageBase		0000000140000000
+SectionAlignment	00001000
+FileAlignment		00000200
+MajorOSystemVersion	4
+MinorOSystemVersion	0
+MajorImageVersion	0
+MinorImageVersion	0
+MajorSubsystemVersion	5
+MinorSubsystemVersion	2
+Win32Version		00000000
+SizeOfImage		006a9000
+SizeOfHeaders		00000400
+CheckSum		006b347f
+Subsystem		00000003	(Windows CUI)
+DllCharacteristics	00000160
+					HIGH_ENTROPY_VA
+					DYNAMIC_BASE
+					NX_COMPAT
+SizeOfStackReserve	0000000000200000
+SizeOfStackCommit	0000000000001000
+SizeOfHeapReserve	0000000000100000
+SizeOfHeapCommit	0000000000001000
+LoaderFlags		00000000
+NumberOfRvaAndSizes	00000010
+
+The Data Directory
+Entry 0 0000000000000000 00000000 Export Directory [.edata (or where ever we found it)]
+Entry 1 000000000069c000 00002d5c Import Directory [parts of .idata]
+Entry 2 0000000000000000 00000000 Resource Directory [.rsrc]
+Entry 3 000000000065b000 0000f120 Exception Directory [.pdata]
+Entry 4 0000000000000000 00000000 Security Directory
+Entry 5 00000000006a0000 00008954 Base Relocation Directory [.reloc]
+Entry 6 0000000000000000 00000000 Debug Directory
+Entry 7 0000000000000000 00000000 Description Directory
+Entry 8 0000000000000000 00000000 Special Directory
+Entry 9 000000000065a680 00000028 Thread Storage Directory [.tls]
+Entry a 0000000000000000 00000000 Load Configuration Directory
+Entry b 0000000000000000 00000000 Bound Import Directory
+Entry c 000000000069cb30 00000950 Import Address Table Directory
+Entry d 0000000000000000 00000000 Delay Import Directory
+Entry e 0000000000000000 00000000 CLR Runtime Header
+Entry f 0000000000000000 00000000 Reserved
+
+There is an import table in .idata at 0x14069c000
+
+The Import Tables (interpreted .idata section contents)
+ vma:            Hint    Time      Forward  DLL       First
+                 Table   Stamp     Chain    Name      Thunk
+ 0069c000	0069c1e0 00000000 00000000 0069e818 0069cb30
+
+	DLL Name: KERNEL32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cb30  <none>  0011  AddVectoredExceptionHandler
+	0069cb38  <none>  00ab  CreateToolhelp32Snapshot
+	0069cb40  <none>  0154  FormatMessageW
+	0069cb48  <none>  0157  FreeEnvironmentStringsW
+	0069cb50  <none>  017a  GetCommandLineW
+	0069cb58  <none>  01a5  GetCurrentDirectoryW
+	0069cb60  <none>  01c7  GetEnvironmentStringsW
+	0069cb68  <none>  01c9  GetEnvironmentVariableW
+	0069cb70  <none>  0205  GetModuleHandleW
+	0069cb78  <none>  026c  GetSystemDirectoryW
+	0069cb80  <none>  026f  GetSystemInfo
+	0069cb88  <none>  0276  GetSystemTimePreciseAsFileTime
+	0069cb90  <none>  02b1  GetWindowsDirectoryW
+	0069cb98  <none>  0332  LoadLibraryA
+	0069cba0  <none>  0335  LoadLibraryW
+	0069cba8  <none>  0352  Module32FirstW
+	0069cbb0  <none>  0354  Module32NextW
+	0069cbb8  <none>  03ac  QueryPerformanceCounter
+	0069cbc0  <none>  03ad  QueryPerformanceFrequency
+	0069cbc8  <none>  03f2  RtlCaptureContext
+	0069cbd0  <none>  03f9  RtlLookupFunctionEntry
+	0069cbd8  <none>  0400  RtlVirtualUnwind
+	0069cbe0  <none>  0487  SetUnhandledExceptionFilter
+
+ 0069c014	0069c2a0 00000000 00000000 0069e834 0069cbf0
+
+	DLL Name: USER32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cbf0  <none>  0046  CloseTouchInputHandle
+	0069cbf8  <none>  0186  GetTouchInputInfo
+	0069cc00  <none>  0249  RegisterTouchWindow
+
+ 0069c028	0069c2c0 00000000 00000000 0069e848 0069cc10
+
+	DLL Name: dwmapi.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cc10  <none>  0000  DwmEnableBlurBehindWindow
+	0069cc18  <none>  0000  DwmSetWindowAttribute
+
+ 0069c03c	0069c2d8 00000000 00000000 0069e86c 0069cc28
+
+	DLL Name: imm32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cc28  <none>  0000  ImmAssociateContextEx
+	0069cc30  <none>  0000  ImmGetCompositionStringW
+	0069cc38  <none>  0000  ImmGetContext
+	0069cc40  <none>  0000  ImmReleaseContext
+	0069cc48  <none>  0000  ImmSetCandidateWindow
+	0069cc50  <none>  0000  ImmSetCompositionWindow
+
+ 0069c050	0069c310 00000000 00000000 0069e884 0069cc60
+
+	DLL Name: ntdll.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cc60  <none>  0000  NtOpenFile
+	0069cc68  <none>  0000  NtReadFile
+	0069cc70  <none>  0000  NtWriteFile
+
+ 0069c064	0069c330 00000000 00000000 0069e894 0069cc80
+
+	DLL Name: uxtheme.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cc80  <none>  0000  SetWindowTheme
+
+ 0069c078	0069c340 00000000 00000000 0069e8b0 0069cc90
+
+	DLL Name: GDI32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cc90  <none>  0019  ChoosePixelFormat
+	0069cc98  <none>  0184  DescribePixelFormat
+	0069cca0  <none>  038a  SetPixelFormat
+	0069cca8  <none>  03a5  SwapBuffers
+
+ 0069c08c	0069c368 00000000 00000000 0069e8dc 0069ccb8
+
+	DLL Name: KERNEL32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069ccb8  <none>  0124  DeleteCriticalSection
+	0069ccc0  <none>  014a  EnterCriticalSection
+	0069ccc8  <none>  0391  InitializeCriticalSection
+	0069ccd0  <none>  03ef  LeaveCriticalSection
+	0069ccd8  <none>  049b  RaiseException
+	0069cce0  <none>  04f0  RtlUnwindEx
+	0069cce8  <none>  05f8  VirtualQuery
+	0069ccf0  <none>  0652  __C_specific_handler
+
+ 0069c0a0	0069c3b0 00000000 00000000 0069e978 0069cd00
+
+	DLL Name: msvcrt.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cd00  <none>  0092  __getmainargs
+	0069cd08  <none>  0093  __initenv
+	0069cd10  <none>  0094  __iob_func
+	0069cd18  <none>  00a1  __set_app_type
+	0069cd20  <none>  00a3  __setusermatherr
+	0069cd28  <none>  00c0  _amsg_exit
+	0069cd30  <none>  00d3  _cexit
+	0069cd38  <none>  00e1  _commode
+	0069cd40  <none>  010b  _errno
+	0069cd48  <none>  012d  _fmode
+	0069cd50  <none>  0130  _fpreset
+	0069cd58  <none>  0176  _hypot
+	0069cd60  <none>  017c  _initterm
+	0069cd68  <none>  028c  _onexit
+	0069cd70  <none>  0411  abort
+	0069cd78  <none>  0421  calloc
+	0069cd80  <none>  042d  exit
+	0069cd88  <none>  042e  exp
+	0069cd90  <none>  043f  fprintf
+	0069cd98  <none>  0445  free
+	0069cda0  <none>  0447  frexp
+	0069cda8  <none>  044d  fwrite
+	0069cdb0  <none>  0471  ldexp
+	0069cdb8  <none>  047a  malloc
+	0069cdc0  <none>  047f  memcmp
+	0069cdc8  <none>  0480  memcpy
+	0069cdd0  <none>  0481  memmove
+	0069cdd8  <none>  0482  memset
+	0069cde0  <none>  0487  pow
+	0069cde8  <none>  049b  signal
+	0069cdf0  <none>  04ab  strerror
+	0069cdf8  <none>  04ad  strlen
+	0069ce00  <none>  04af  strncmp
+	0069ce08  <none>  04d1  vfprintf
+	0069ce10  <none>  04e3  wcslen
+
+ 0069c0b4	0069c4d0 00000000 00000000 0069e988 0069ce20
+
+	DLL Name: ntdll.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069ce20  <none>  0149  NtCreateNamedPipeFile
+
+ 0069c0c8	0069c4e0 00000000 00000000 0069e9b0 0069ce30
+
+	DLL Name: OPENGL32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069ce30  <none>  0159  wglCreateContext
+	0069ce38  <none>  015b  wglDeleteContext
+	0069ce40  <none>  015e  wglGetCurrentContext
+	0069ce48  <none>  015f  wglGetCurrentDC
+	0069ce50  <none>  0163  wglGetProcAddress
+	0069ce58  <none>  0164  wglMakeCurrent
+	0069ce60  <none>  0168  wglShareLists
+
+ 0069c0dc	0069c520 00000000 00000000 0069e9dc 0069ce70
+
+	DLL Name: kernel32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069ce70  <none>  0000  FreeLibrary
+	0069ce78  <none>  0001  GetLastError
+	0069ce80  <none>  0002  GetModuleFileNameW
+	0069ce88  <none>  0003  GetModuleHandleExW
+	0069ce90  <none>  0004  GetProcAddress
+	0069ce98  <none>  0005  LoadLibraryExW
+	0069cea0  <none>  0006  SetThreadErrorMode
+
+ 0069c0f0	0069c560 00000000 00000000 0069e9f0 0069ceb0
+
+	DLL Name: kernel32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069ceb0  <none>  0002  GetModuleHandleA
+
+ 0069c104	0069c570 00000000 00000000 0069ea04 0069cec0
+
+	DLL Name: bcryptprimitives.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cec0  <none>  0000  ProcessPrng
+
+ 0069c118	0069c580 00000000 00000000 0069ea20 0069ced0
+
+	DLL Name: shlwapi.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069ced0  <none>  0000  AssocQueryStringW
+
+ 0069c12c	0069c590 00000000 00000000 0069ea34 0069cee0
+
+	DLL Name: advapi32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cee0  <none>  0053  ImpersonateAnonymousToken
+	0069cee8  <none>  0084  RevertToSelf
+
+ 0069c140	0069c5a8 00000000 00000000 0069ea50 0069cef8
+
+	DLL Name: api-ms-win-core-synch-l1-2-0.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cef8  <none>  0000  WaitOnAddress
+	0069cf00  <none>  0001  WakeByAddressAll
+	0069cf08  <none>  0002  WakeByAddressSingle
+
+ 0069c154	0069c5c8 00000000 00000000 0069ea80 0069cf18
+
+	DLL Name: gdi32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cf18  <none>  0039  CreateRectRgn
+	0069cf20  <none>  0043  DeleteObject
+	0069cf28  <none>  0085  GetDeviceCaps
+
+ 0069c168	0069c5e8 00000000 00000000 0069ebac 0069cf38
+
+	DLL Name: kernel32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069cf38  <none>  0019  CancelIo
+	0069cf40  <none>  0024  CloseHandle
+	0069cf48  <none>  0031  CompareStringOrdinal
+	0069cf50  <none>  0049  CreateDirectoryW
+	0069cf58  <none>  004d  CreateEventW
+	0069cf60  <none>  0052  CreateFileMappingA
+	0069cf68  <none>  0056  CreateFileMappingW
+	0069cf70  <none>  0059  CreateFileW
+	0069cf78  <none>  0067  CreateProcessW
+	0069cf80  <none>  0074  CreateThread
+	0069cf88  <none>  0081  CreateWaitableTimerExW
+	0069cf90  <none>  008b  DeleteFileW
+	0069cf98  <none>  0099  DuplicateHandle
+	0069cfa0  <none>  00b7  ExitProcess
+	0069cfa8  <none>  00c1  FindClose
+	0069cfb0  <none>  00c7  FindFirstFileExW
+	0069cfb8  <none>  00d8  FindNextFileW
+	0069cfc0  <none>  00e1  FlsAlloc
+	0069cfc8  <none>  00e2  FlsFree
+	0069cfd0  <none>  00e4  FlsSetValue
+	0069cfd8  <none>  00e6  FlushFileBuffers
+	0069cfe0  <none>  0118  GetConsoleMode
+	0069cfe8  <none>  011b  GetConsoleOutputCP
+	0069cff0  <none>  0128  GetCurrentProcess
+	0069cff8  <none>  0129  GetCurrentProcessId
+	0069d000  <none>  012b  GetCurrentThread
+	0069d008  <none>  012c  GetCurrentThreadId
+	0069d010  <none>  0139  GetDriveTypeW
+	0069d018  <none>  013c  GetExitCodeProcess
+	0069d020  <none>  0145  GetFileAttributesW
+	0069d028  <none>  0147  GetFileInformationByHandle
+	0069d030  <none>  0148  GetFileInformationByHandleEx
+	0069d038  <none>  0154  GetFullPathNameW
+	0069d040  <none>  017b  GetOverlappedResult
+	0069d048  <none>  0183  GetProcessHeap
+	0069d050  <none>  0197  GetStdHandle
+	0069d058  <none>  01d3  GlobalAlloc
+	0069d060  <none>  01d8  GlobalFree
+	0069d068  <none>  01dc  GlobalLock
+	0069d070  <none>  01de  GlobalSize
+	0069d078  <none>  01df  GlobalUnlock
+	0069d080  <none>  01e0  HeapAlloc
+	0069d088  <none>  01e4  HeapFree
+	0069d090  <none>  01e7  HeapReAlloc
+	0069d098  <none>  01f0  InitOnceBeginInitialize
+	0069d0a0  <none>  01f1  InitOnceComplete
+	0069d0a8  <none>  0204  IsThreadAFiber
+	0069d0b0  <none>  0224  LockFileEx
+	0069d0b8  <none>  0227  MapViewOfFile
+	0069d0c0  <none>  022d  MoveFileExW
+	0069d0c8  <none>  0233  MultiByteToWideChar
+	0069d0d0  <none>  0263  ReadFile
+	0069d0d8  <none>  0264  ReadFileEx
+	0069d0e0  <none>  02a1  SetFileInformationByHandle
+	0069d0e8  <none>  02a7  SetFileTime
+	0069d0f0  <none>  02aa  SetLastError
+	0069d0f8  <none>  02cc  SetThreadStackGuarantee
+	0069d100  <none>  02dd  SetWaitableTimer
+	0069d108  <none>  02e0  Sleep
+	0069d110  <none>  02e2  SleepEx
+	0069d118  <none>  02e7  SwitchToThread
+	0069d120  <none>  02ea  TlsAlloc
+	0069d128  <none>  02eb  TlsFree
+	0069d130  <none>  02ec  TlsGetValue
+	0069d138  <none>  02ed  TlsSetValue
+	0069d140  <none>  02f4  UnmapViewOfFile
+	0069d148  <none>  0304  VirtualProtect
+	0069d150  <none>  0309  WaitForMultipleObjects
+	0069d158  <none>  030b  WaitForSingleObject
+	0069d160  <none>  0313  WideCharToMultiByte
+	0069d168  <none>  0321  WriteConsoleW
+	0069d170  <none>  0323  WriteFileEx
+
+ 0069c17c	0069c830 00000000 00000000 0069ebc0 0069d180
+
+	DLL Name: ntdll.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069d180  <none>  0005  RtlNtStatusToDosError
+
+ 0069c190	0069c840 00000000 00000000 0069ebe4 0069d190
+
+	DLL Name: ole32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069d190  <none>  000b  CoCreateInstance
+	0069d198  <none>  002a  CoInitializeEx
+	0069d1a0  <none>  004b  CoUninitialize
+	0069d1a8  <none>  007c  OleInitialize
+	0069d1b0  <none>  0092  RegisterDragDrop
+	0069d1b8  <none>  0093  RevokeDragDrop
+
+ 0069c1a4	0069c878 00000000 00000000 0069ebf8 0069d1c8
+
+	DLL Name: shell32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069d1c8  <none>  000a  DragFinish
+	0069d1d0  <none>  000c  DragQueryFileW
+
+ 0069c1b8	0069c890 00000000 00000000 0069ed50 0069d1e0
+
+	DLL Name: user32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	0069d1e0  <none>  0003  AdjustWindowRectEx
+	0069d1e8  <none>  001a  ChangeDisplaySettingsExW
+	0069d1f0  <none>  0036  ClientToScreen
+	0069d1f8  <none>  0037  ClipCursor
+	0069d200  <none>  0038  CloseClipboard
+	0069d208  <none>  0049  CreateIcon
+	0069d210  <none>  004b  CreateIconFromResourceEx
+	0069d218  <none>  0052  CreateWindowExW
+	0069d220  <none>  007b  DefWindowProcW
+	0069d228  <none>  0081  DestroyCursor
+	0069d230  <none>  0082  DestroyIcon
+	0069d238  <none>  0084  DestroyWindow
+	0069d240  <none>  008b  DispatchMessageW
+	0069d248  <none>  009c  EmptyClipboard
+	0069d250  <none>  009d  EnableMenuItem
+	0069d258  <none>  00a7  EnumDisplayMonitors
+	0069d260  <none>  00ba  FlashWindowEx
+	0069d268  <none>  00bd  GetActiveWindow
+	0069d270  <none>  00c1  GetAsyncKeyState
+	0069d278  <none>  00c8  GetClassInfoExW
+	0069d280  <none>  00cf  GetClassNameW
+	0069d288  <none>  00d1  GetClientRect
+	0069d290  <none>  00d2  GetClipCursor
+	0069d298  <none>  00d3  GetClipboardData
+	0069d2a0  <none>  00dc  GetCursorPos
+	0069d2a8  <none>  00dd  GetDC
+	0069d2b0  <none>  00e8  GetForegroundWindow
+	0069d2b8  <none>  00f2  GetKeyState
+	0069d2c0  <none>  00f3  GetKeyboardLayout
+	0069d2c8  <none>  00f7  GetKeyboardState
+	0069d2d0  <none>  00fc  GetMenu
+	0069d2d8  <none>  0110  GetMonitorInfoW
+	0069d2e0  <none>  011d  GetRawInputData
+	0069d2e8  <none>  012a  GetSystemMenu
+	0069d2f0  <none>  012b  GetSystemMetrics
+	0069d2f8  <none>  013b  GetWindowLongPtrW
+	0069d300  <none>  013c  GetWindowLongW
+	0069d308  <none>  013f  GetWindowPlacement
+	0069d310  <none>  0140  GetWindowRect
+	0069d318  <none>  0145  GetWindowTextLengthW
+	0069d320  <none>  0146  GetWindowTextW
+	0069d328  <none>  0159  InvalidateRgn
+	0069d330  <none>  0163  IsClipboardFormatAvailable
+	0069d338  <none>  0168  IsIconic
+	0069d340  <none>  016b  IsProcessDPIAware
+	0069d348  <none>  017c  LoadCursorW
+	0069d350  <none>  0191  MapVirtualKeyExW
+	0069d358  <none>  0192  MapVirtualKeyW
+	0069d360  <none>  019d  MonitorFromPoint
+	0069d368  <none>  019e  MonitorFromRect
+	0069d370  <none>  019f  MonitorFromWindow
+	0069d378  <none>  01a2  MsgWaitForMultipleObjectsEx
+	0069d380  <none>  01a9  OpenClipboard
+	0069d388  <none>  01ae  PeekMessageW
+	0069d390  <none>  01b1  PostMessageW
+	0069d398  <none>  01bb  RedrawWindow
+	0069d3a0  <none>  01be  RegisterClassExW
+	0069d3a8  <none>  01c1  RegisterClipboardFormatW
+	0069d3b0  <none>  01c6  RegisterRawInputDevices
+	0069d3b8  <none>  01c8  RegisterWindowMessageA
+	0069d3c0  <none>  01ca  ReleaseCapture
+	0069d3c8  <none>  01cb  ReleaseDC
+	0069d3d0  <none>  01d2  ScreenToClient
+	0069d3d8  <none>  01d8  SendInput
+	0069d3e0  <none>  01de  SendMessageW
+	0069d3e8  <none>  01e3  SetCapture
+	0069d3f0  <none>  01eb  SetClipboardData
+	0069d3f8  <none>  01ee  SetCursor
+	0069d400  <none>  01ef  SetCursorPos
+	0069d408  <none>  01f6  SetForegroundWindow
+	0069d410  <none>  0211  SetWindowDisplayAffinity
+	0069d418  <none>  0214  SetWindowLongPtrW
+	0069d420  <none>  0215  SetWindowLongW
+	0069d428  <none>  0216  SetWindowPlacement
+	0069d430  <none>  0217  SetWindowPos
+	0069d438  <none>  021a  SetWindowTextW
+	0069d440  <none>  0221  ShowCursor
+	0069d448  <none>  0223  ShowWindow
+	0069d450  <none>  0229  SystemParametersInfoA
+	0069d458  <none>  0231  ToUnicodeEx
+	0069d460  <none>  0232  TrackMouseEvent
+	0069d468  <none>  0238  TranslateMessage
+	0069d470  <none>  0245  ValidateRect
+
+ 0069c1cc	00000000 00000000 00000000 00000000 00000000
+

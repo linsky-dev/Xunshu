@@ -1,0 +1,21 @@
+Traceback (most recent call last):
+  File "D:\Xunshu\rust\scripts\verify-install.py", line 68, in <module>
+    main()
+  File "D:\Xunshu\rust\scripts\verify-install.py", line 64, in main
+    verify(args.installer.resolve(), args.payload.resolve(), Path(directory))
+  File "D:\Xunshu\rust\scripts\verify-install.py", line 33, in verify
+    first = install()
+            ^^^^^^^^^
+  File "D:\Xunshu\rust\scripts\verify-install.py", line 29, in install
+    run("install", str(payload), "--sha256", expected, expect_success=success)
+  File "D:\Xunshu\rust\scripts\verify-install.py", line 21, in run
+    raise AssertionError(f"安装命令退出码异常 {args}: {result.returncode}\n{result.stdout}\n{result.stderr}")
+AssertionError: 安装命令退出码异常 ('install', 'D:\\Xunshu\\.recovery-tools\\models\\windows\\payload-alpha.2', '--sha256', '38736833041759dd94a44aa84878ee3b386e21e4598326f382845e1c4285f03a'): 2
+
+error: the following required arguments were not provided:
+  --root <ROOT>
+
+Usage: xs-install.exe --root <ROOT> install --sha256 <SHA256> --root <ROOT> <PAYLOAD>
+
+For more information, try '--help'.
+

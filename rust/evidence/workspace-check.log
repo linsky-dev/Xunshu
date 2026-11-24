@@ -1,0 +1,65 @@
+    Blocking waiting for file lock on build directory
+    Checking libc v0.2.191
+    Checking zerofrom v0.1.8
+    Checking thiserror v2.0.21
+    Checking serde v1.0.229
+    Checking bytemuck v1.25.2
+    Checking yoke v0.8.4
+    Checking zerovec v0.11.9
+    Checking zerotrie v0.2.5
+    Checking xs-query v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+    Checking emath v0.33.3
+    Checking utf8parse v0.2.2
+    Checking anstyle-parse v1.0.0
+    Checking tinystr v0.8.5
+    Checking potential_utf v0.1.6
+    Checking ecolor v0.33.3
+    Checking icu_collections v2.4.0
+    Checking icu_locale_core v2.4.0
+    Checking image v0.25.10
+    Checking anstyle-query v1.1.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking colorchoice v1.0.5
+    Checking anstyle v1.0.14
+    Checking anstream v1.0.0
+    Checking clap_lex v1.1.1
+    Checking icu_provider v2.4.0
+    Checking strsim v0.11.1
+    Checking icu_normalizer v2.4.0
+    Checking icu_properties v2.4.0
+    Checking memmap2 v0.9.12
+    Checking xs-platform v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+    Checking getrandom v0.3.4
+    Checking ahash v0.8.12
+    Checking fs2 v0.4.3
+    Checking parking_lot_core v0.9.12
+    Checking parking_lot v0.12.5
+    Checking x11-dl v2.21.0
+    Checking xs-core v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+    Checking x11rb v0.13.2
+    Checking idna_adapter v1.2.2
+    Checking idna v1.1.0
+    Checking epaint v0.33.3
+    Checking smithay-client-toolkit v0.19.2
+    Checking egui v0.33.3
+    Checking url v2.5.8
+    Checking smithay-client-toolkit v0.20.0
+    Checking getrandom v0.4.3
+    Checking tempfile v3.27.0
+    Checking glutin_glx_sys v0.6.1
+    Checking winit v0.30.13
+    Checking glutin v0.32.3
+    Checking smithay-clipboard v0.7.3
+    Checking webbrowser v1.2.6
+    Checking arboard v3.7.0
+    Checking nix v0.31.3
+    Checking clap_builder v4.6.7
+    Checking ctrlc v3.5.2
+    Checking egui_glow v0.33.3
+    Checking clap v4.6.7
+    Checking xs-cli v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+    Checking glutin-winit v0.5.0
+    Checking egui-winit v0.33.3
+    Checking eframe v0.33.3
+    Checking xs-ui v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.76s

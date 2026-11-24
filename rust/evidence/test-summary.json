@@ -1,0 +1,74 @@
+{
+  "suites": [
+    {
+      "suite": "Running unittests src/main.rs (target/debug/deps/xunshu-d6703885d02c80af)",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/debug/deps/xs_core-6de26d6e798c2c49)",
+      "passed": 41,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running tests/adversarial.rs (target/debug/deps/adversarial-c8f170981238ff2d)",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running tests/interchange_fidelity.rs (target/debug/deps/interchange_fidelity-95242fa66360514b)",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running tests/snapshot_validation.rs (target/debug/deps/snapshot_validation-4fb486c6860ae35c)",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running tests/transactions.rs (target/debug/deps/transactions-130c849f156b45a3)",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/debug/deps/xs_platform-348ca80fb33833ab)",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running tests/contracts.rs (target/debug/deps/contracts-d35bcdcc962bcebb)",
+      "passed": 28,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/debug/deps/xs_query-bafb6b331d8fa3f5)",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running tests/golden.rs (target/debug/deps/golden-5e6baff380aa215e)",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/debug/deps/xs_ui-8281d8707b76cd1c)",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "total_passed": 125,
+  "total_failed": 0,
+  "total_ignored": 0,
+  "test_log": "workspace-tests-final.log"
+}

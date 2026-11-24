@@ -1,0 +1,67 @@
+{
+  "review": "RUST_REVIEW.md",
+  "scope": "task-owned synthetic Linux fixtures; not Windows/UOS runtime acceptance",
+  "findings": {
+    "R01": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R02": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R03": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R04": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R05": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R06": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R07": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R08": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R09": {
+      "status": "closed_in_targeted_regression"
+    },
+    "R10": {
+      "status": "closed_in_targeted_regression"
+    }
+  },
+  "core_tests_passed": 70,
+  "core_tests_failed": 0,
+  "debug_differential_cases": 185,
+  "release_differential_cases": 185,
+  "release_cli_sha256": "61fdaafde0081c768730f3c1eaae50494408bb52b676c16520307ec2a6b1ad79",
+  "release_cancel_ms": {
+    "build_ms": 30.890624,
+    "one_ms_budget": {
+      "complete": false,
+      "elapsed_ms": 1.0782100000000001,
+      "examined": 128
+    },
+    "or_branches": 128,
+    "pre_cancelled": {
+      "complete": false,
+      "elapsed_ms": 0.000201,
+      "examined": 0
+    },
+    "records": 25000
+  },
+  "before_evidence_preserved": true,
+  "evidence": [
+    "rust-review-cli-after.json",
+    "rust-review-legacy-after.json",
+    "rust-review-faults-after.json",
+    "rust-review-probe-after.json",
+    "rust-review-probe-release-after.json",
+    "rust-core-final.log",
+    "rust-persistence-cursor-after.log"
+  ],
+  "windows_attempt": "blocked by missing MinGW compiler PATH; final cross-build delegated to root/query agent"
+}

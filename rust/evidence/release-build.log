@@ -1,0 +1,205 @@
+   Compiling bitflags v2.13.2
+   Compiling smallvec v1.16.5
+   Compiling syn v3.0.9
+   Compiling once_cell v1.21.4
+   Compiling log v0.4.35
+   Compiling rustix v1.1.6
+   Compiling linux-raw-sys v0.12.1
+   Compiling libloading v0.8.9
+   Compiling wayland-sys v0.31.11
+   Compiling dlib v0.5.3
+   Compiling wayland-backend v0.3.17
+   Compiling scoped-tls v1.0.1
+   Compiling memchr v2.8.3
+   Compiling downcast-rs v1.2.1
+   Compiling wayland-client v0.31.15
+   Compiling stable_deref_trait v1.2.1
+   Compiling quick-xml v0.41.0
+   Compiling khronos_api v3.1.0
+   Compiling autocfg v1.5.1
+   Compiling xml-rs v0.8.29
+   Compiling wayland-scanner v0.31.11
+   Compiling utf_types v1.0.0
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling zerocopy v0.8.63
+   Compiling getrandom v0.3.4
+   Compiling version_check v0.9.5
+   Compiling utf8_iter v1.1.0
+   Compiling synstructure v0.14.0
+   Compiling ahash v0.8.12
+   Compiling gl_generator v0.14.0
+   Compiling syn v2.0.119
+   Compiling tracing-core v0.1.36
+   Compiling simd-adler32 v0.3.10
+   Compiling icu_properties_data v2.4.0
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.7
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.4
+   Compiling displaydoc v0.2.7
+   Compiling zerovec v0.11.9
+   Compiling bytemuck_derive v1.12.1
+   Compiling polling v3.11.0
+   Compiling tinystr v0.8.5
+   Compiling icu_locale_core v2.4.0
+   Compiling bytemuck v1.25.2
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling rustix v0.38.44
+   Compiling pin-project-lite v0.2.17
+   Compiling icu_normalizer_data v2.4.0
+   Compiling parking_lot_core v0.9.12
+   Compiling thiserror v1.0.69
+   Compiling tracing v0.1.44
+   Compiling icu_collections v2.4.0
+   Compiling icu_provider v2.4.0
+   Compiling wayland-protocols v0.32.13
+   Compiling thiserror-impl v1.0.69
+   Compiling thiserror-impl v2.0.21
+   Compiling x11-dl v2.21.0
+   Compiling adler2 v2.0.1
+   Compiling percent-encoding v2.3.2
+   Compiling xcursor v0.3.11
+   Compiling scopeguard v1.2.0
+   Compiling xkeysym v0.2.1
+   Compiling cursor-icon v1.2.0
+   Compiling linux-raw-sys v0.4.15
+   Compiling wayland-csd-frame v0.3.0
+   Compiling wayland-cursor v0.31.14
+   Compiling lock_api v0.4.14
+   Compiling thiserror v2.0.21
+   Compiling num-traits v0.2.19
+   Compiling slab v0.4.12
+   Compiling ttf-parser v0.25.1
+   Compiling parking_lot v0.12.5
+   Compiling icu_normalizer v2.4.0
+   Compiling wayland-protocols-wlr v0.3.12
+   Compiling owned_ttf_parser v0.25.1
+   Compiling calloop v0.13.0
+   Compiling icu_properties v2.4.0
+   Compiling miniz_oxide v0.9.1
+   Compiling emath v0.33.3
+   Compiling gethostname v1.1.0
+   Compiling smithay-client-toolkit v0.19.2
+   Compiling x11rb-protocol v0.13.2
+   Compiling ab_glyph_rasterizer v0.1.10
+   Compiling as-raw-xcb-connection v1.0.1
+   Compiling ab_glyph v0.2.32
+   Compiling flate2 v1.1.11
+   Compiling ecolor v0.33.3
+   Compiling idna_adapter v1.2.2
+   Compiling calloop-wayland-source v0.3.0
+   Compiling miniz_oxide v0.8.9
+   Compiling calloop v0.14.5
+   Compiling fdeflate v0.3.7
+   Compiling glutin_egl_sys v0.7.1
+   Compiling glutin_glx_sys v0.6.1
+   Compiling winit v0.30.13
+   Compiling smithay-client-toolkit v0.20.0
+   Compiling nohash-hasher v0.2.0
+   Compiling raw-window-handle v0.6.2
+   Compiling pxfm v0.1.30
+   Compiling profiling v1.0.18
+   Compiling epaint_default_fonts v0.33.3
+   Compiling epaint v0.33.3
+   Compiling png v0.18.1
+   Compiling calloop-wayland-source v0.4.1
+   Compiling moxcms v0.8.1
+   Compiling idna v1.1.0
+   Compiling wayland-protocols-plasma v0.3.12
+   Compiling wayland-protocols-misc v0.3.12
+   Compiling x11rb v0.13.2
+   Compiling wayland-protocols-experimental v20250721.0.1
+   Compiling xkbcommon-dl v0.4.2
+   Compiling form_urlencoded v1.2.2
+   Compiling serde_derive v1.0.229
+   Compiling memoffset v0.9.1
+   Compiling glutin v0.32.3
+   Compiling unicode-segmentation v1.13.3
+   Compiling dpi v0.1.2
+   Compiling byteorder-lite v0.1.0
+   Compiling smol_str v0.2.2
+   Compiling serde v1.0.229
+   Compiling image v0.25.10
+   Compiling egui v0.33.3
+   Compiling url v2.5.8
+   Compiling glutin-winit v0.5.0
+   Compiling rusqlite v0.37.0
+   Compiling xs-query v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-query)
+   Compiling xs-platform v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-platform)
+   Compiling smithay-clipboard v0.7.3
+   Compiling webbrowser v1.2.6
+   Compiling arboard v3.7.0
+   Compiling glow v0.16.0
+   Compiling web-time v1.1.0
+   Compiling litrs v1.0.1
+   Compiling clap_derive v4.6.7
+   Compiling egui-winit v0.33.3
+   Compiling document-features v0.2.12
+   Compiling egui_glow v0.33.3
+   Compiling xs-core v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-core)
+   Compiling nix v0.31.3
+   Compiling static_assertions v1.1.0
+   Compiling eframe v0.33.3
+   Compiling ctrlc v3.5.2
+   Compiling clap v4.6.7
+   Compiling xs-cli v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-cli)
+   Compiling xs-ui v0.18.0 (/workspace/scratch/036c199d3807/xunshu/rust/crates/xs-ui)
+warning: unused import: `SearchHit`
+  --> crates/xs-ui/src/main.rs:10:46
+   |
+10 | use xs_core::{operations, FileRecord, Index, SearchHit, SearchOptions, SearchResponse};
+   |                                              ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> crates/xs-ui/src/main.rs:408:72
+    |
+408 | ...   egui::Frame::new().fill(BACKGROUND).stroke(Stroke::new(1.0, BORDER)).corner_radius(9).inner_margin(egui::Margin::symmetric(12...
+    |                                                              ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+    = note: `#[warn(float_literal_f32_fallback)]` (part of `#[warn(future_incompatible)]`) on by default
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> crates/xs-ui/src/main.rs:537:114
+    |
+537 |             .frame(egui::Frame::new().fill(Color32::WHITE).corner_radius(14).inner_margin(26).stroke(Stroke::new(1.0, BORDER)))
+    |                                                                                                                  ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> crates/xs-ui/src/main.rs:690:90
+    |
+690 |     style.visuals.selection.bg_fill = SOFT; style.visuals.selection.stroke = Stroke::new(1.0, ACCENT);
+    |                                                                                          ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> crates/xs-ui/src/main.rs:692:60
+    |
+692 |     style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, BORDER);
+    |                                                            ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> crates/xs-ui/src/main.rs:694:59
+    |
+694 |     style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, ACCENT);
+    |                                                           ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+
+warning: `xs-ui` (bin "xs-ui") generated 6 warnings (run `cargo fix --bin "xs-ui" -p xs-ui` to apply 6 suggestions)
+    Finished `release` profile [optimized] target(s) in 59.55s

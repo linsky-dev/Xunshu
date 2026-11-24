@@ -1,0 +1,23 @@
+{
+  "candidate_count": 5,
+  "candidate_count_exact": true,
+  "complete": true,
+  "elapsed_ms": 0.053651,
+  "examined": 5,
+  "generation": 1,
+  "index_entries": 5,
+  "results": [
+    {
+      "id": 4,
+      "is_dir": false,
+      "modified": 1794118232,
+      "name": "预算报告.pdf",
+      "path": "/tmp/xunshu-rust-validation-036c199d3807/xunshu-verify.YhKIUB2N6o/files/预算报告.pdf",
+      "score": 45,
+      "size": 42,
+      "source": "offline:fixture"
+    }
+  ],
+  "total": 1,
+  "total_relation": "exact"
+}

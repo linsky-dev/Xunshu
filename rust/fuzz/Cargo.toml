@@ -1,0 +1,37 @@
+[package]
+name = "xunshu-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+xs-core = { path = "../crates/xs-core", features = ["fuzzing"] }
+xs-query = { path = "../crates/xs-query" }
+
+[[bin]]
+name = "query"
+path = "fuzz_targets/query.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "efu_csv"
+path = "fuzz_targets/efu_csv.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "usn_decode"
+path = "fuzz_targets/usn_decode.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+resolver = "2"

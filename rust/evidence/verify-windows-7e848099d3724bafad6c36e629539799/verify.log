@@ -1,0 +1,64 @@
+Using supplied local binaries. This invocation checks CLI contracts only.
+SHA256 xunshu.exe 53BDA2C389EA2B181E2B0103D40C2FED8E530C2E9F74F08738BCCF7EC121F03B
+SHA256 xs-ui.exe 4757804F759ED93E76BBAA950E22899D73A951E37FBE757C723B2508FE16A395
+$ D:\Xunshu\rust\target\release\xunshu.exe --help
+寻枢 · Rust 原生离线文件搜索（显式范围，无联网）
+
+Usage: xunshu.exe [OPTIONS] <COMMAND>
+
+Commands:
+  init               创建收录配置；不会扫描，已有配置需显式 --replace
+  volumes            显示本地卷能力；不会扫描卷
+  status             显示设置与实际索引代次
+  doctor             只读检查本机配置和索引，默认输出脱敏诊断摘要
+  scan               只扫描当前已保存范围，Ctrl-C 取消，失败保留原索引
+  watch              监听当前文件名范围，在变更、通知丢失或范围调整时校准索引
+  recover            从当前授权范围的历史完整代次恢复文件名索引
+  content-configure  独立设置正文收录范围，保留文件名范围
+  content-rebuild    由独立工作进程抽取正文并提交索引，Ctrl-C 取消
+  content-search     搜索已经发布的正文索引
+  content-serve      为桌面提供继承式正文查询进程
+  mcp                启动本地 MCP 标准输入输出服务
+  agent-inspect      查看需要逐次授权的 Agent 请求
+  agent-approve      授权一条已核对的 Agent 请求，仅限当前会话一次
+  search             搜索现有索引；查询语法错误显式返回
+  import-efu         EFU 目录作为不可打开的离线元数据导入，保留其他来源
+  import-legacy      只读导入旧 schema4；替换上次 schema4 导入的全部来源，不改旧数据库
+  export-efu         导出当前有效范围内全部元数据
+  efu-inspect        查看 EFU 行号及当前文件版本，供另存编辑时复核
+  efu-edit           修改或删除一行并另存为新的 EFU 文件
+  efu-compare        比较两个离线清单中的新增、删除与属性差异
+  folder-compare     比较两个已授权目录在当前完整文件名索引中的内容
+  migrate-settings   迁移旧设置到独立新文件，旧文件保持不变
+  migrate-m1         将 M1 的设置和索引只读复制到当前全新数据目录
+  serve              纯本地 JSON-lines 子进程服务，不开放 TCP/HTTP
+  serve-v2           可取消并自动重载的本地文件名搜索服务，协议版本 2
+  benchmark          工作区合成基准，不访问文件名对应路径
+  help               Print this message or the help of the given subcommand(s)
+
+Options:
+      --data-dir <DATA_DIR>  
+  -h, --help                 Print help
+  -V, --version              Print version
+$ D:\Xunshu\rust\target\release\xs-ui.exe --help
+寻枢 Rust 原生界面
+
+xs-ui [--data-dir 绝对路径] [--query 查询文本] [--font 本地字体] [--quick | --content] [--standalone | --background | --smoke-test]
+
+--quick 打开快捷搜索框。
+--content 直接打开正文页。
+--standalone 单独显示窗口，不启动托盘。
+--background 在 Windows 启动常驻托盘，不显示窗口。
+--smoke-test 验证原生窗口，不启动扫描。
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private init --root D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files --ext txt,pdf
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private scan
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private search file:|folder:
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private search ext:txt
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private search ext:pdf
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private status
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private doctor --json --export D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\diagnostics.json
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\files\app-private export-efu D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\fixture.efu
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\catalog-data import-efu D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\fixture.efu --name fixture
+$ xunshu --data-dir D:\Xunshu\rust\test-tmp\xunshu-verify-6cc90ecd4c254ff396389f18d3e9ef58\catalog-data search ext:pdf
+PASS: Synthetic CLI contracts.
+verification_exit_code=0

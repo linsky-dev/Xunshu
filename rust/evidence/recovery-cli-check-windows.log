@@ -1,0 +1,52 @@
+    Checking windows-sys v0.61.2
+   Compiling syn v3.0.9
+    Checking aho-corasick v1.1.5
+    Checking utf8parse v0.2.2
+    Checking once_cell_polyfill v1.70.2
+    Checking anstyle v1.0.14
+    Checking cssparser v0.35.0
+    Checking derive_more v2.1.1
+    Checking serde_json v1.0.154
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking csv-core v0.1.13
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.1
+    Checking getrandom v0.4.3
+    Checking anstyle-parse v1.0.0
+    Checking csv v1.4.0
+    Checking selectors v0.31.0
+    Checking regex-automata v0.4.18
+    Checking anstyle-query v1.1.5
+    Checking anstyle-wincon v3.0.11
+    Checking ctrlc v3.5.2
+    Checking anstream v1.0.0
+    Checking clap_builder v4.6.7
+    Checking regex v1.13.1
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+    Checking xs-query v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-query)
+    Checking thiserror v2.0.21
+    Checking lopdf v0.38.0
+    Checking clap v4.6.7
+    Checking serde v1.0.229
+    Checking string_cache v0.8.9
+    Checking xs-platform v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-platform)
+    Checking calamine v0.30.1
+    Checking web_atoms v0.1.3
+    Checking markup5ever v0.35.0
+    Checking xs-core v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-core)
+    Checking html5ever v0.35.0
+    Checking scraper v0.24.0
+    Checking xs-content v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-content)
+    Checking xs-cli v0.18.0-alpha.1 (D:\Xunshu\rust\crates\xs-cli)
+error: no rules expected `[`
+  --> crates\xs-cli\src\efu.rs:41:69
+   |
+41 |             changes.push(json!({"kind":["added","removed","changed"][kind],"path":path}));
+   |                                                                     ^ no rules expected this token in macro call
+   |
+   = note: while trying to match end of macro
+
+error: could not compile `xs-cli` (bin "xunshu") due to 1 previous error

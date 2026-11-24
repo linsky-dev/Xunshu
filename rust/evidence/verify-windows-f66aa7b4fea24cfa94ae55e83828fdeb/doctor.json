@@ -1,0 +1,32 @@
+{
+  "arch": "x86_64",
+  "disk": {
+    "data_directory": "local_accessible"
+  },
+  "hotkey": {
+    "state": "runtime_unverified"
+  },
+  "index": {
+    "coverage_complete": true,
+    "entries": 5,
+    "generation": 1,
+    "snapshot_bytes": 2242,
+    "state": "readable"
+  },
+  "network": false,
+  "os": "windows",
+  "privileged_service": {
+    "state": "unsupported"
+  },
+  "schema": 1,
+  "settings": {
+    "configured_roots": {
+      "accessible": 1,
+      "denied": 0,
+      "unavailable": 0
+    },
+    "requested_mode": "standard",
+    "state": "readable"
+  },
+  "version": "0.18.0-alpha.2"
+}
