@@ -1451,11 +1451,15 @@ impl Index {
         let Some(first) = lists.first() else {
             return Ok(None);
         };
-        let decode = |g: &[u8]| {
+        let postings = self.section(&self.manifest.postings);
+        let posting_bytes = |g: &[u8]| {
             let start = read64(g, 8) as usize;
             let len = read32(g, 16) as usize;
+            &postings[start..start + len]
+        };
+        let decode = |g: &[u8]| {
             decode_postings(
-                &self.section(&self.manifest.postings)[start..start + len],
+                posting_bytes(g),
                 read32(g, 20),
                 self.manifest.count,
                 self.manifest.rle_postings,
@@ -1471,6 +1475,16 @@ impl Index {
             }
             if selected.len() <= 32 || read32(g, 20) as usize > selected.len().saturating_mul(8) {
                 break;
+            }
+            // Identical encoded postings with equal counts describe the same IDs.
+            // The selected set is already a subset of the first posting.
+            // Bound the byte comparison so it cannot monopolize cancellation.
+            budget.check()?;
+            if read32(g, 20) == read32(first, 20)
+                && read32(g, 16) <= 4096
+                && posting_bytes(g) == posting_bytes(first)
+            {
+                continue;
             }
             let right = decode(g)?;
             selected = intersect_sorted(&selected, &right, budget)?;
@@ -1653,7 +1667,9 @@ impl Index {
                         continue;
                     }
                     match self.candidates(p, budget)? {
-                        Some(v) => all = union_sorted(&all, &v, budget)?,
+                        Some(v) if all.is_empty() => all = v,
+                        Some(v) if !v.is_empty() => all = union_sorted(&all, &v, budget)?,
+                        Some(_) => {}
                         None => return Ok(None),
                     }
                     if all.len() == self.len() {
@@ -2365,6 +2381,43 @@ mod tests {
             assert_eq!(r.total, 2);
             assert_eq!(r.results[0].path, "/tmp/project/readme.md");
         }
+    }
+    #[test]
+    fn repeated_grams_and_or_union_keep_exact_matches() {
+        let mut builder = IndexBuilder::default();
+        for i in 0..1000 {
+            let name = match i % 4 {
+                0 => "budget",
+                1 => "meeting",
+                2 => "budget_meeting",
+                _ => "archive",
+            };
+            builder
+                .add(FileRecord {
+                    path: format!("/synthetic/{name}_{i}.txt"),
+                    size: 1,
+                    modified: 0,
+                    is_dir: false,
+                    source: "offline:test".into(),
+                })
+                .unwrap();
+        }
+        let idx = builder.finish(1).unwrap();
+        for query in [
+            "budget | meeting",
+            "absent | budget | meeting | budget",
+            "meeting | budget | absent",
+        ] {
+            let r = idx.search(query, &SearchOptions::default(), None).unwrap();
+            assert!(r.complete);
+            assert_eq!(r.total, 750);
+            assert_eq!(r.candidate_count, 750);
+        }
+        let r = idx
+            .search("budget", &SearchOptions::default(), None)
+            .unwrap();
+        assert!(r.complete);
+        assert_eq!(r.total, 500);
     }
     #[test]
     fn mixed_not_path_is_conservative() {
