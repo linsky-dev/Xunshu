@@ -89,6 +89,48 @@ def verify(installer, work):
     assert user.read_bytes() == b"synthetic user data"
     assert {p.name for p in versions.iterdir()} == {v["directory"] for v in retained}
     checked.append("cleanup_preserves_active_and_previous")
+    # Simulate a process interrupted after journaling its rollback probe. This
+    # exercises the native cleanup command, not actual inference or rollback.
+    pending = {"directory": "release-rollback-" + "1" * 32, "manifest_sha256": "b" * 64}
+    unknown = {"directory": "release-old-unknown", "manifest_sha256": "c" * 64}
+    probe = root / "self-test-data" / pending["directory"]
+    probe.mkdir(parents=True)
+    (probe / ".xunshu-self-test-owner").write_text("b" * 64, encoding="ascii")
+    (probe / "synthetic.txt").write_bytes(b"owned synthetic probe")
+    unowned = root / "self-test-data" / unknown["directory"]
+    unowned.mkdir()
+    (unowned / "keep.txt").write_bytes(b"unowned synthetic data")
+    # A similarly named release must not be deleted via the probe journal.
+    unrelated = versions / pending["directory"]
+    unrelated.mkdir()
+    (unrelated / "keep.txt").write_bytes(b"unrelated release data")
+    current = json.loads(pointer.read_text(encoding="utf-8"))
+    current["retained"].append(unknown)
+    current["rollback_probes"] = [pending]
+    pointer.write_text(json.dumps(current), encoding="utf-8")
+
+    def cleanup(label, success):
+        proc = subprocess.run([str(installer), "--root", str(root), "cleanup"], capture_output=True,
+                              encoding="utf-8", errors="replace", timeout=30)
+        assert (proc.returncode == 0) == success, (label, proc.stderr)
+        assert ("历史清理完成" if success else "历史清理部分完成") in proc.stderr, (label, proc.stderr)
+        state = json.loads(pointer.read_text(encoding="utf-8"))
+        assert state["active"] == retained[0] and state["previous"] == retained[1], label
+        assert user.read_bytes() == b"synthetic user data", label
+        assert (unrelated / "keep.txt").read_bytes() == b"unrelated release data", label
+        assert not probe.exists() and not state.get("rollback_probes"), label
+        checked.append(label)
+        print(json.dumps({"case": label, "exit_code": proc.returncode, "stderr": proc.stderr}, ensure_ascii=False), flush=True)
+        return state
+
+    current = cleanup("partial_cleanup_preserves_unknown_and_reclaims_journaled_probe", False)
+    assert current["retained"] == retained + [unknown]
+    assert (unowned / "keep.txt").read_bytes() == b"unowned synthetic data"
+    # Only the test harness removes the synthetic unowned directory.
+    shutil.rmtree(unowned)
+    current = cleanup("cleanup_retry_completes", True)
+    assert current["retained"] == retained
+    cleanup("cleanup_is_idempotent", True)
     # A separate synthetic release has matching outer digests, but is not a
     # valid product. Verify launch and rollback reject it before execution.
     launch_root = work / "launch"
