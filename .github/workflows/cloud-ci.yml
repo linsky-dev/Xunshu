@@ -14,6 +14,10 @@ on:
         description: 'Run independent 3M synthetic filename benchmark and strict 50ms gate'
         type: boolean
         default: false
+      fault_validation:
+        description: 'Run Linux ENOSPC on a private, disposable mount (requires user mount namespaces)'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -104,6 +108,14 @@ jobs:
         run: |
           python scripts/verify-install-negative.py --installer target/release/xs-install.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Linux isolated ENOSPC installer fault (opt-in)
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && inputs.fault_validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$(mktemp -d /dev/shm/xs-ci-mount.XXXXXXXX)"
+          trap 'rmdir "$d"' EXIT
+          unshare -Ur -m bash -c 'set -eu; mount --make-rprivate /; mount -t tmpfs -o size=1m,mode=0700 tmpfs "$1"; python scripts/verify-install-enospc.py --installer target/release/xs-install --empty-mount "$1" --payload-temp-root "$RUNNER_TEMP"' _ "$d" | tee "$RUNNER_TEMP/xunshu-evidence/installer-enospc.json"
       - name: Linux recovery contracts
         if: runner.os == 'Linux'
         shell: bash
