@@ -1,0 +1,274 @@
+{
+  "version": "0.18.0-alpha.7",
+  "release_authorized": false,
+  "score_heuristic": 76.0,
+  "tests": {
+    "raw_successes": 220,
+    "independent_successes": 219,
+    "failures": 0,
+    "ignored": 0,
+    "note": "one cross-process child test counted twice in raw output"
+  },
+  "checks": {
+    "workspace_check": "PASS",
+    "workspace_tests": "PASS",
+    "fmt": "PASS",
+    "clippy_all_targets_D_warnings": "PASS",
+    "debug_workspace_bins": "PASS",
+    "xvfb_window_smoke": "PASS",
+    "release_cli_worker_and_content_benchmark": "PASS",
+    "version_consistency": "PASS",
+    "native_windows": "NOT_RUN",
+    "native_kylin_uos": "NOT_RUN",
+    "real_models": "NOT_RUN",
+    "full_release_desktop": "NOT_RUN",
+    "physical_power_loss": "NOT_RUN",
+    "same_machine_competitors": "NOT_RUN"
+  },
+  "name_benchmark": {
+    "arch": "x86_64",
+    "build_ms": 6458.664051999999,
+    "build_process_memory": {
+      "peak_rss_kib": 230468,
+      "rss_kib": 95176
+    },
+    "bytes_per_entry": 29.589489666666665,
+    "dataset": "deterministic synthetic mixed Chinese/English filenames; no real files scanned",
+    "entries": 3000000,
+    "persist_ms": 38.502164,
+    "platform": "linux",
+    "read_process": {
+      "after_load_memory": {
+        "peak_rss_kib": 92104,
+        "rss_kib": 92104
+      },
+      "after_queries_memory": {
+        "peak_rss_kib": 106280,
+        "rss_kib": 92636
+      },
+      "baseline_memory": {
+        "peak_rss_kib": 3472,
+        "rss_kib": 3472
+      },
+      "first_screen_core_queries": [
+        {
+          "p50_ms": 0.006059,
+          "p95_ms": 0.021813,
+          "p99_ms": 0.088534,
+          "partial_samples": 0,
+          "query": "never_present_xyz"
+        },
+        {
+          "p50_ms": 0.136836,
+          "p95_ms": 0.222406,
+          "p99_ms": 0.278221,
+          "partial_samples": 0,
+          "query": "0001234"
+        },
+        {
+          "p50_ms": 0.005919000000000001,
+          "p95_ms": 0.006771,
+          "p99_ms": 0.013971,
+          "partial_samples": 0,
+          "query": "预算决算不存在"
+        },
+        {
+          "p50_ms": 0.209287,
+          "p95_ms": 0.306343,
+          "p99_ms": 0.360915,
+          "partial_samples": 30,
+          "query": "干部"
+        },
+        {
+          "p50_ms": 0.125439,
+          "p95_ms": 0.247094,
+          "p99_ms": 1.287807,
+          "partial_samples": 0,
+          "query": "project_budget_final_0000121"
+        },
+        {
+          "p50_ms": 0.0061589999999999995,
+          "p95_ms": 0.010757,
+          "p99_ms": 0.040049999999999995,
+          "partial_samples": 0,
+          "query": "name:report ext:pdf"
+        },
+        {
+          "p50_ms": 0.217599,
+          "p95_ms": 0.315777,
+          "p99_ms": 0.579886,
+          "partial_samples": 30,
+          "query": "readme ext:rs"
+        },
+        {
+          "p50_ms": 0.202126,
+          "p95_ms": 0.462148,
+          "p99_ms": 0.779628,
+          "partial_samples": 30,
+          "query": "budget | meeting"
+        }
+      ],
+      "first_screen_note": "core only; excludes input, IPC and presentation",
+      "iterations": 30,
+      "load_ms": 342.269551,
+      "load_note": "separate fresh process; OS page cache not forcibly evicted; includes CRC and structural validation",
+      "mapped": true,
+      "queries": [
+        {
+          "candidates": 0,
+          "complete": true,
+          "examined": 0,
+          "p50_ms": 0.005449,
+          "p95_ms": 0.00634,
+          "p99_ms": 0.017997,
+          "query": "never_present_xyz",
+          "total": 0
+        },
+        {
+          "candidates": 191,
+          "complete": true,
+          "examined": 191,
+          "p50_ms": 0.136757,
+          "p95_ms": 0.261746,
+          "p99_ms": 0.30256700000000003,
+          "query": "0001234",
+          "total": 1
+        },
+        {
+          "candidates": 0,
+          "complete": true,
+          "examined": 0,
+          "p50_ms": 0.0057280000000000005,
+          "p95_ms": 0.0066,
+          "p99_ms": 0.00683,
+          "query": "预算决算不存在",
+          "total": 0
+        },
+        {
+          "candidates": 600000,
+          "complete": true,
+          "examined": 600000,
+          "p50_ms": 19.341805,
+          "p95_ms": 23.764903,
+          "p99_ms": 59.216253,
+          "query": "干部",
+          "total": 600000
+        },
+        {
+          "candidates": 44,
+          "complete": true,
+          "examined": 44,
+          "p50_ms": 0.123527,
+          "p95_ms": 0.143346,
+          "p99_ms": 0.15902,
+          "query": "project_budget_final_0000121",
+          "total": 1
+        },
+        {
+          "candidates": 0,
+          "complete": true,
+          "examined": 0,
+          "p50_ms": 0.005769,
+          "p95_ms": 0.00637,
+          "p99_ms": 0.01955,
+          "query": "name:report ext:pdf",
+          "total": 0
+        },
+        {
+          "candidates": 600000,
+          "complete": true,
+          "examined": 600000,
+          "p50_ms": 34.911542,
+          "p95_ms": 43.922105,
+          "p99_ms": 53.418295,
+          "query": "readme ext:rs",
+          "total": 600000
+        },
+        {
+          "candidates": 1200000,
+          "complete": true,
+          "examined": 1200000,
+          "p50_ms": 89.02891,
+          "p95_ms": 105.743529,
+          "p99_ms": 284.121042,
+          "query": "budget | meeting",
+          "total": 1200000
+        }
+      ]
+    },
+    "snapshot_bytes": 88768469,
+    "target_metrics_are_not_acceptance": true,
+    "version": 1
+  },
+  "content_benchmark": {
+    "catalog_bytes": 12976304,
+    "documents": 20000,
+    "first_ipc_search_ms": 26.426385,
+    "first_load_os_page_cache_flushed": false,
+    "foreground_rebuild_ms": 11770.546928,
+    "foreground_rebuild_one_core_cpu_percent": 87.28331030702297,
+    "incremental_updates": [
+      {
+        "base_rewritten": false,
+        "changed_documents": 1,
+        "delta_blocks": 17,
+        "elapsed_ms": 59.407886,
+        "physical_catalog_bytes": 13533428,
+        "publication_bytes_written": 557244,
+        "verified": true
+      },
+      {
+        "base_rewritten": false,
+        "changed_documents": 100,
+        "delta_blocks": 31,
+        "elapsed_ms": 171.174266,
+        "physical_catalog_bytes": 13992236,
+        "publication_bytes_written": 1016052,
+        "verified": true
+      },
+      {
+        "base_rewritten": false,
+        "changed_documents": 1000,
+        "delta_blocks": 60,
+        "elapsed_ms": 1057.897884,
+        "physical_catalog_bytes": 14942624,
+        "publication_bytes_written": 1966440,
+        "verified": true
+      }
+    ],
+    "platform": "linux",
+    "reaped_process_tree_cpu_seconds": 10.273723,
+    "warm_ipc": [
+      {
+        "hits": 1,
+        "max_ms": 0.819719,
+        "p95_ms": 0.7881509999999999,
+        "passes_100ms_p95": true,
+        "query": "唯一测试标识",
+        "samples": 30
+      },
+      {
+        "hits": 10000,
+        "max_ms": 13.859655,
+        "p95_ms": 5.128921,
+        "passes_100ms_p95": true,
+        "query": "项目",
+        "samples": 30
+      },
+      {
+        "hits": 10000,
+        "max_ms": 11.648434,
+        "p95_ms": 4.616502,
+        "passes_100ms_p95": true,
+        "query": "budget",
+        "samples": 30
+      }
+    ]
+  },
+  "patch": {
+    "file": "Xunshu_alpha7_Development_Checkpoint.patch",
+    "sha256": "f5801f44a25308a5e39e7fc0ac236bd1ec32aa6fefacf75d16442fc97e4ddaf1",
+    "changed_files": 15,
+    "verified_against_exact_alpha6_source": true
+  }
+}
