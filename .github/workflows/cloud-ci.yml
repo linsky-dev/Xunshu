@@ -1,0 +1,139 @@
+name: Cloud engineering CI
+on:
+  push:
+    branches: ['cloud/**', main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      model_validation:
+        description: 'Also prepare real model assets and test isolated installation (not a release)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: xunshu-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: Native ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TERM_COLOR: never
+      RUST_BACKTRACE: '1'
+      PYTHONUTF8: '1'
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - name: Native Linux development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config cmake clang libfontconfig1-dev fonts-noto-cjk xauth libxinerama-dev libx11-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libudev-dev xvfb
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+      - name: Toolchain and locked dependencies
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          rustc -vV
+          cargo -V
+          cargo fetch --locked
+      - name: Source preflight
+        run: python scripts/check_release_consistency.py
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Type check
+        run: cargo check --workspace --locked --offline
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+      - name: Linux native tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/xunshu-evidence"
+          export XS_CONTENT_TEST_ROOT="$(mktemp -d "$RUNNER_TEMP/xunshu-test.XXXXXXXX")"
+          export TMPDIR="$XS_CONTENT_TEST_ROOT"
+          cargo build --locked --offline -p xs-content --bin xs-content-worker
+          export XS_CONTENT_TEST_WORKER_PATH="$PWD/target/debug/xs-content-worker"
+          cargo test --workspace --locked --offline --no-fail-fast 2>&1 | tee "$RUNNER_TEMP/xunshu-evidence/tests.log"
+      - name: Windows native tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:XS_CONTENT_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('xunshu-test-' + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $env:XS_CONTENT_TEST_ROOT -Force | Out-Null
+          $env:TEMP = $env:XS_CONTENT_TEST_ROOT
+          $env:TMP = $env:XS_CONTENT_TEST_ROOT
+          $ev = Join-Path $env:RUNNER_TEMP 'xunshu-evidence'
+          New-Item -ItemType Directory -Path $ev -Force | Out-Null
+          cargo build --locked --offline -p xs-content --bin xs-content-worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:XS_CONTENT_TEST_WORKER_PATH = Join-Path $PWD 'target/debug/xs-content-worker.exe'
+          cargo test --workspace --locked --offline --no-fail-fast 2>&1 | Tee-Object -FilePath (Join-Path $ev 'tests.log')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native release build
+        run: cargo build --workspace --release --locked --offline
+      - name: Linux recovery contracts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify-recovery.py --bin-dir target/release --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/recovery.json"
+      - name: Windows recovery contracts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/verify-recovery.py --bin-dir target/release --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/recovery.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Linux native window smoke
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a timeout 60s target/release/xs-ui --smoke-test --data-dir "$RUNNER_TEMP/xunshu-ui-smoke" 2>&1 | tee "$RUNNER_TEMP/xunshu-evidence/ui-smoke.log"
+          grep -F 'XS_UI_SMOKE_OK' "$RUNNER_TEMP/xunshu-evidence/ui-smoke.log"
+      - name: Real model conversion dependencies (opt-in)
+        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        run: |
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install transformers==4.51.3 onnx==1.17.0 onnxruntime==1.20.1 PyYAML==6.0.2 Pillow==11.3.0
+      - name: Model, OCR and installation acceptance (opt-in)
+        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          platform=linux
+          suffix=""
+          if [[ "$RUNNER_OS" == Windows ]]; then platform=windows; suffix=".exe"; fi
+          base="$RUNNER_TEMP/xunshu-model-validation"
+          mkdir -p "$base"
+          python scripts/prepare-models.py --cache "$base/cache" --output "$base/resources" --platform "$platform"
+          # Static OTF and license from the immutable Noto CJK Sans2.004 commit.
+          python -c "import urllib.request, pathlib, sys; root=pathlib.Path(sys.argv[1]); base='https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/'; urllib.request.urlretrieve(base+'Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf', root/'font.otf'); urllib.request.urlretrieve(base+'Sans/LICENSE', root/'font-license.txt')" "$base"
+          version=$(python -c "import tomllib; print(tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version'])")
+          python scripts/make-install-payload.py --binaries target/release --resources "$base/resources" --font "$base/font.otf" --font-license "$base/font-license.txt" --output "$base/payload" --platform "$platform" --version "$version" | tee "$RUNNER_TEMP/xunshu-evidence/model-payload.json"
+          python scripts/verify-recovery.py --bin-dir "$base/payload" --temp-root "$base" --with-models | tee "$RUNNER_TEMP/xunshu-evidence/model-recovery.json"
+          python scripts/verify-install.py --installer "target/release/xs-install$suffix" --payload "$base/payload" --temp-root "$base" | tee "$RUNNER_TEMP/xunshu-evidence/install.jsonl"
+          cp "$base/resources/inference.json" "$RUNNER_TEMP/xunshu-evidence/inference.json"
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: engineering-evidence-${{ matrix.os }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/xunshu-evidence/
+          if-no-files-found: warn
+          retention-days: 14
