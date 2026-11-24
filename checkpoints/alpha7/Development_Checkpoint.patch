@@ -1,0 +1,2502 @@
+--- a/rust/Cargo.lock
++++ b/rust/Cargo.lock
+@@ -5025,7 +5025,7 @@
+ 
+ [[package]]
+ name = "xs-cli"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -5044,7 +5044,7 @@
+ 
+ [[package]]
+ name = "xs-content"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "anyhow",
+  "calamine",
+@@ -5071,7 +5071,7 @@
+ 
+ [[package]]
+ name = "xs-core"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "anyhow",
+  "crc32fast",
+@@ -5088,7 +5088,7 @@
+ 
+ [[package]]
+ name = "xs-inference"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -5106,7 +5106,7 @@
+ 
+ [[package]]
+ name = "xs-platform"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "libc",
+  "serde",
+@@ -5117,7 +5117,7 @@
+ 
+ [[package]]
+ name = "xs-query"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "chrono",
+  "chrono-tz",
+@@ -5130,14 +5130,14 @@
+ 
+ [[package]]
+ name = "xs-runtime"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "libc",
+ ]
+ 
+ [[package]]
+ name = "xs-ui"
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ dependencies = [
+  "anyhow",
+  "eframe",
+--- a/rust/Cargo.toml
++++ b/rust/Cargo.toml
+@@ -4,7 +4,7 @@
+ default-members = ["crates/xs-core", "crates/xs-query", "crates/xs-platform", "crates/xs-cli"]
+ 
+ [workspace.package]
+-version = "0.18.0-alpha.6"
++version = "0.18.0-alpha.7"
+ edition = "2021"
+ rust-version = "1.89"
+ license = "MIT"
+--- a/rust/VALIDATION.md
++++ b/rust/VALIDATION.md
+@@ -1,4 +1,6 @@
+ # 寻枢 Rust 历史验证与当前版本差异
++
++> **2026-11-24 alpha.7 开发检查点（未放行）**：当前源码版本为 `0.18.0-alpha.7`。本轮 Linux 工作区 219 项独立测试通过、0 失败、0 忽略；Rustfmt、严格 Clippy、版本一致性、Debug 原生构建和 Xvfb 窗口冒烟通过。Release CLI 和正文抽取程序实际构建，并完成 300 万条合成文件名、2 万份合成正文及 1/100/1000 文件增量发布基准。Windows、国产系统、真实模型、长时稳定性及同机竞品对跑仍未验收。参见 [ALPHA7_DEVELOPMENT.md](ALPHA7_DEVELOPMENT.md)，以下为历史资料，不用于当前发布放行。
+ 
+ > **2026-11-23 新一轮修复注记**：当前源码版本已提高至 `0.18.0-alpha.3`，本页以下历史记录仅适用于原先的 `0.18.0-alpha.2` 或标注的特定提交。新一轮修复源码改动、验证缺口和实机指令参见 [REMEDIATION_2026-11-23.md](REMEDIATION_2026-11-23.md)。**本轮未在无 Rust/Cargo 的环境中完成重新编译或实机验收。** 不可把历史通过情况转移认定为修复版通过。
+ 
+--- a/rust/crates/xs-cli/src/main.rs
++++ b/rust/crates/xs-cli/src/main.rs
+@@ -86,8 +86,16 @@
+     },
+     /// 由独立工作进程抽取正文并提交索引，Ctrl-C 取消
+     ContentRebuild,
++    /// 持久登记已知文件变更；不带路径表示要求完整校准
++    ContentEnqueue { paths: Vec<PathBuf> },
++    /// 处理持久变更队列；删除、目录或不确定事件回退到完整校准
++    ContentApply,
++    /// 前台监听已授权正文范围；退出后下次启动先完整校准
++    ContentWatch,
+     /// 删除未发布的正文检查点，不影响正式索引与用户文件
+     ContentDiscardCheckpoint,
++    /// 清除未发布检查点及变更队列，不影响正式索引
++    ContentDiscardPending,
+     /// 搜索已经发布的正文索引
+     ContentSearch {
+         query: String,
+@@ -365,24 +373,54 @@
+             settings.semantic_enabled = semantic;
+             let commit = operations::save_settings(&dir, &settings)?;
+             let checkpoint_warning = if previous_scope != settings.content_scope_token()? {
+-                xs_content::discard_pending_checkpoint(&dir).err().map(|error| format!("授权已保存，但检查点未清理：{error:#}；任务结束后执行 content-discard-checkpoint"))
++                xs_content::discard_pending_work(&dir).err().map(|error| format!("授权已保存，但待处理任务未清理：{error:#}；任务结束后执行 content-discard-pending"))
+             } else {
+                 None
+             };
+             json!({"ok":true,"content_enabled":settings.content_enabled,"commit":commit,"checkpoint_warning":checkpoint_warning})
+         }
++        Command::ContentDiscardPending => {
++            xs_content::discard_pending_work(&dir)?;
++            json!({"ok":true})
++        }
+         Command::ContentDiscardCheckpoint => {
+             xs_content::discard_pending_checkpoint(&dir)?;
+             json!({"ok":true})
+         }
+-        Command::ContentRebuild => {
++        Command::ContentEnqueue { paths } => {
++            let paths = paths
++                .into_iter()
++                .map(absolute)
++                .collect::<Result<Vec<_>>>()?;
++            let queued = xs_content::enqueue_changes(&dir, &paths)?;
++            json!({"ok":true,"queued_paths":queued})
++        }
++        Command::ContentWatch => {
++            let cancel = Arc::new(AtomicBool::new(false));
++            let signal = cancel.clone();
++            ctrlc::set_handler(move || signal.store(true, std::sync::atomic::Ordering::Relaxed))?;
++            let worker = std::env::current_exe()?
++                .with_file_name(format!("xs-content-worker{}", std::env::consts::EXE_SUFFIX));
++            xs_content::watch_changes(&dir, &worker, &cancel, |report| {
++                if let Ok(line) = serde_json::to_string(report) {
++                    println!("{line}");
++                }
++            })?;
++            json!({"ok":true,"stopped":true})
++        }
++        command @ (Command::ContentRebuild | Command::ContentApply) => {
+             let cancel = Arc::new(AtomicBool::new(false));
+             let signal = cancel.clone();
+             ctrlc::set_handler(move || signal.store(true, std::sync::atomic::Ordering::Relaxed))?;
+             let worker = std::env::current_exe()?
+                 .with_file_name(format!("xs-content-worker{}", std::env::consts::EXE_SUFFIX));
+             xs_platform::validate_local_path(&worker, false)?;
+-            serde_json::to_value(xs_content::rebuild(&dir, &worker, &cancel)?)?
++            let report = if matches!(command, Command::ContentApply) {
++                xs_content::apply_queued_changes(&dir, &worker, &cancel)?
++            } else {
++                xs_content::rebuild(&dir, &worker, &cancel)?
++            };
++            serde_json::to_value(report)?
+         }
+         Command::ContentSearch {
+             query,
+--- a/rust/crates/xs-content/examples/benchmark.rs
++++ b/rust/crates/xs-content/examples/benchmark.rs
+@@ -140,7 +140,7 @@
+         ("项目", documents / 2),
+         ("budget", documents / 2),
+     ];
+-    let query = |id, term| {
++    let query = |id: u64, term: &str| {
+         json!({
+             "id": id, "method": "search", "query": term, "options": {"limit": 40, "offset": 0}
+         })
+@@ -170,10 +170,79 @@
+         }));
+     }
+     let _ = ipc.request(&json!({"id": id, "method": "shutdown"}))?;
++    let storage_bytes = || -> Result<u64> {
++        let mut total = 0;
++        for name in ["content.idx", "content.base-a.idx", "content.base-b.idx"] {
++            match fs::metadata(data.join(name)) {
++                Ok(m) => total += m.len(),
++                Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
++                Err(e) => return Err(e.into()),
++            }
++        }
++        Ok(total)
++    };
++    let initial_catalog_bytes = storage_bytes()?;
++    let command = |args: &[&str], paths: &[PathBuf]| -> Result<Value> {
++        let result = Command::new(cli)
++            .arg("--data-dir")
++            .arg(&data)
++            .args(args)
++            .args(paths)
++            .output()?;
++        ensure!(
++            result.status.success(),
++            "基准命令失败：{}",
++            String::from_utf8_lossy(&result.stderr)
++        );
++        Ok(serde_json::from_slice(&result.stdout)?)
++    };
++    let mut increments = Vec::new();
++    for (batch, count) in [1, 100, 1000]
++        .into_iter()
++        .filter(|n| *n < documents)
++        .enumerate()
++    {
++        let marker = format!("incrementmarker{batch}");
++        let mut paths = Vec::new();
++        for index in 0..count {
++            let path = corpus
++                .join(format!("{:03}", index / 1000))
++                .join(format!("test-{index:06}.txt"));
++            fs::write(&path, format!("{}\n{marker}", TEXT[index % 4]))?;
++            paths.push(path);
++        }
++        let started = Instant::now();
++        command(&["content-enqueue"], &paths)?;
++        let report = command(&["content-apply"], &[])?;
++        let elapsed = started.elapsed().as_secs_f64() * 1000.0;
++        ensure!(
++            report["complete"] == true
++                && report["targeted_update"] == true
++                && report["updated_documents"] == count,
++            "增量更新失败：{report}"
++        );
++        let mut verify = Resident::start(cli, &data)?;
++        let found = verify.request(&query(1, &marker))?;
++        ensure!(
++            found["indexed_total"] == count && found["omitted_stale"] == 0,
++            "增量命中错误"
++        );
++        if batch > 0 {
++            let stale = verify.request(&query(2, &format!("incrementmarker{}", batch - 1)))?;
++            ensure!(stale["indexed_total"] == 0, "旧正文命中未清理");
++        }
++        ensure!(
++            verify.request(&query(3, cases[0].0))?["indexed_total"] == 1,
++            "未变化文档丢失"
++        );
++        let _ = verify.request(&json!({"id": 4, "method": "shutdown"}))?;
++        increments.push(json!({"changed_documents": count, "elapsed_ms": elapsed, "physical_catalog_bytes": storage_bytes()?, "publication_bytes_written": report["publication_bytes_written"], "delta_blocks": report["delta_blocks"], "base_rewritten": report["base_rewritten"], "verified": true}));
++    }
+     Ok(json!({
+         "documents": documents,
+         "platform": std::env::consts::OS,
+-        "catalog_bytes": fs::metadata(data.join("content.idx"))?.len(),
++        "catalog_bytes": initial_catalog_bytes,
++        "incremental_updates": increments,
+         "foreground_rebuild_ms": rebuild_ms,
+         "reaped_process_tree_cpu_seconds": cpu,
+         "foreground_rebuild_one_core_cpu_percent": cpu.map(|seconds| 100_000.0 * seconds / rebuild_ms),
+--- a/rust/crates/xs-content/src/connectors.rs
++++ b/rust/crates/xs-content/src/connectors.rs
+@@ -1,8 +1,14 @@
+ //! 本地只读外部数据连接器（严格离线，仅读取用户明确授权的本地文件）。
+ use anyhow::{ensure, Context, Result};
++use fs2::FileExt;
+ use serde::{Deserialize, Serialize};
+ use serde_json::Value;
+-use std::{io::Read, path::Path};
++use sha2::{Digest, Sha256};
++use std::{
++    io::Read,
++    path::{Path, PathBuf},
++};
++use xs_platform::FileRevision;
+ 
+ const MAX_BOOKMARK_BYTES: u64 = 16 * 1024 * 1024;
+ const MAX_BOOKMARK_DEPTH: usize = 32;
+@@ -300,15 +306,20 @@
+     manifest_path: &Path,
+     data_path: &Path,
+ ) -> Result<(StaticSourceManifest, Vec<ConnectorItem>)> {
+-    let manifest: StaticSourceManifest = serde_json::from_slice(&bounded_local_read(
+-        manifest_path,
+-        MAX_PLUGIN_MANIFEST_BYTES,
+-    )?)
+-    .context("来源清单 JSON 无效")?;
++    let manifest = bounded_local_read(manifest_path, MAX_PLUGIN_MANIFEST_BYTES)?;
++    let data = bounded_local_read(data_path, MAX_PLUGIN_DATA_BYTES)?;
++    parse_static_source(&manifest, &data)
++}
++
++fn parse_static_source(
++    manifest_bytes: &[u8],
++    data_bytes: &[u8],
++) -> Result<(StaticSourceManifest, Vec<ConnectorItem>)> {
++    let manifest: StaticSourceManifest =
++        serde_json::from_slice(manifest_bytes).context("来源清单 JSON 无效")?;
+     manifest.validate()?;
+     let entries: Vec<StaticSourceRow> =
+-        serde_json::from_slice(&bounded_local_read(data_path, MAX_PLUGIN_DATA_BYTES)?)
+-            .context("来源数据 JSON 无效")?;
++        serde_json::from_slice(data_bytes).context("来源数据 JSON 无效")?;
+     ensure!(
+         entries.len() <= MAX_PLUGIN_ITEMS,
+         "声明式来源最多接受 5000 条记录"
+@@ -351,6 +362,121 @@
+     Ok((manifest, items))
+ }
+ 
++const GRANT_FILE: &str = "static-source-grant.json";
++const GRANT_LIMIT: u64 = 256 * 1024;
++
++#[derive(Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct SourceGrant {
++    manifest: PathBuf,
++    data: PathBuf,
++    manifest_sha256: String,
++    data_sha256: String,
++}
++
++/// An explicit grant is tied to exact manifest/data bytes. It never stores
++/// imported item text or URLs. No third-party code is executed on restore.
++#[derive(Debug)]
++pub struct GrantedSource {
++    pub manifest: StaticSourceManifest,
++    pub items: Vec<ConnectorItem>,
++    pub grant_revision: FileRevision,
++}
++
++fn hash(bytes: &[u8]) -> String {
++    format!("{:x}", Sha256::digest(bytes))
++}
++
++fn grant_lock(profile: &Path) -> Result<std::fs::File> {
++    xs_platform::create_local_dir_all(profile)?;
++    let lock = xs_platform::open_or_create_local_lock(&profile.join("static-source-grant.lock"))?;
++    FileExt::lock_exclusive(&lock)?;
++    Ok(lock)
++}
++
++/// Persist only after the user explicitly selects remember. Changed content
++/// requires a new grant instead of silently importing a replacement.
++pub fn remember_static_source(
++    profile: &Path,
++    manifest: &Path,
++    data: &Path,
++) -> Result<GrantedSource> {
++    let _lock = grant_lock(profile)?;
++    let manifest_bytes = bounded_local_read(manifest, MAX_PLUGIN_MANIFEST_BYTES)?;
++    let data_bytes = bounded_local_read(data, MAX_PLUGIN_DATA_BYTES)?;
++    let (parsed, items) = parse_static_source(&manifest_bytes, &data_bytes)?;
++    let grant = SourceGrant {
++        manifest: manifest.into(),
++        data: data.into(),
++        manifest_sha256: hash(&manifest_bytes),
++        data_sha256: hash(&data_bytes),
++    };
++    let bytes = serde_json::to_vec(&Some(grant))?;
++    ensure!(bytes.len() as u64 <= GRANT_LIMIT, "来源授权记录超出限制");
++    let path = profile.join(GRANT_FILE);
++    ensure!(
++        xs_platform::atomic_write_local(&path, &bytes, true)?.is_durable(),
++        "来源授权可能已提交，但持久化未确认"
++    );
++    Ok(GrantedSource {
++        manifest: parsed,
++        items,
++        grant_revision: FileRevision::at_path(&path)?,
++    })
++}
++
++/// Restore only a remembered grant. Missing or revoked grants return None;
++/// malformed, replaced or altered input is a visible error, never an import.
++pub fn restore_static_source(profile: &Path) -> Result<Option<GrantedSource>> {
++    let path = profile.join(GRANT_FILE);
++    let revision = match FileRevision::at_path(&path) {
++        Ok(revision) => revision,
++        Err(xs_platform::PlatformError::Io { source, .. })
++            if source.kind() == std::io::ErrorKind::NotFound =>
++        {
++            return Ok(None)
++        }
++        Err(error) => return Err(error.into()),
++    };
++    let _lock = grant_lock(profile)?;
++    let Some(grant) =
++        serde_json::from_slice::<Option<SourceGrant>>(&bounded_local_read(&path, GRANT_LIMIT)?)?
++    else {
++        return Ok(None);
++    };
++    let manifest_bytes = bounded_local_read(&grant.manifest, MAX_PLUGIN_MANIFEST_BYTES)?;
++    let data_bytes = bounded_local_read(&grant.data, MAX_PLUGIN_DATA_BYTES)?;
++    ensure!(
++        hash(&manifest_bytes) == grant.manifest_sha256 && hash(&data_bytes) == grant.data_sha256,
++        "来源内容已变化，请重新核对并授权"
++    );
++    let (manifest, items) = parse_static_source(&manifest_bytes, &data_bytes)?;
++    ensure!(
++        FileRevision::at_path(&path)? == revision,
++        "来源授权记录已变更，请重试"
++    );
++    Ok(Some(GrantedSource {
++        manifest,
++        items,
++        grant_revision: revision,
++    }))
++}
++
++pub fn static_grant_current(profile: &Path, revision: FileRevision) -> bool {
++    FileRevision::at_path(&profile.join(GRANT_FILE)).ok() == Some(revision)
++}
++
++/// Atomically replace with a tombstone: a successful revocation is durable,
++/// and another process can invalidate previously loaded results by revision.
++pub fn revoke_static_source(profile: &Path) -> Result<()> {
++    let _lock = grant_lock(profile)?;
++    ensure!(
++        xs_platform::atomic_write_local(&profile.join(GRANT_FILE), b"null", true)?.is_durable(),
++        "来源撤销可能已提交，但持久化未确认"
++    );
++    Ok(())
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+@@ -426,6 +552,44 @@
+     }
+ 
+     #[test]
++    fn remembered_source_is_bound_to_bytes_and_revocable_across_processes() {
++        let root = std::env::var_os("XS_CONTENT_TEST_ROOT")
++            .map(PathBuf::from)
++            .unwrap_or_else(|| std::env::current_dir().unwrap());
++        let tmp = tempfile::Builder::new().tempdir_in(root).unwrap();
++        let profile = tmp.path().join("profile");
++        let manifest = tmp.path().join("manifest.json");
++        let data = tmp.path().join("items.json");
++        std::fs::write(
++            &manifest,
++            r#"{"schema":1,"id":"notes","name":"笔记","kind":"static_json","offline_only":true}"#,
++        )
++        .unwrap();
++        let original = r#"[{"title":"安全条目","uri":"https://example.org/?token=sensitive"}]"#;
++        std::fs::write(&data, original).unwrap();
++        assert!(restore_static_source(&profile).unwrap().is_none());
++        let granted = remember_static_source(&profile, &manifest, &data).unwrap();
++        assert!(static_grant_current(&profile, granted.grant_revision));
++        assert_eq!(
++            restore_static_source(&profile).unwrap().unwrap().items,
++            granted.items
++        );
++        assert!(!std::fs::read_to_string(profile.join(GRANT_FILE))
++            .unwrap()
++            .contains("sensitive"));
++        std::fs::write(
++            &data,
++            r#"[{"title":"替换条目","uri":"https://example.org/new"}]"#,
++        )
++        .unwrap();
++        assert!(restore_static_source(&profile).is_err());
++        std::fs::write(&data, original).unwrap();
++        revoke_static_source(&profile).unwrap();
++        assert!(!static_grant_current(&profile, granted.grant_revision));
++        assert!(restore_static_source(&profile).unwrap().is_none());
++    }
++
++    #[test]
+     fn bookmark_without_name_does_not_display_url_credentials() {
+         // Credential-bearing links are now rejected at import, not merely redacted in the UI.
+         let forbidden = br#"{"roots":{"bar":{"type":"folder","children":[{"type":"url","url":"https://alice:secret@example.com/api?token=sensitive"}]}}}"#;
+--- a/rust/crates/xs-content/src/lib.rs
++++ b/rust/crates/xs-content/src/lib.rs
+@@ -5,6 +5,7 @@
+ mod ipc;
+ mod search;
+ mod semantic;
++mod snapshot;
+ mod transport;
+ mod worker;
+ 
+@@ -18,8 +19,9 @@
+ use anyhow::{bail, ensure, Context, Result};
+ use fs2::FileExt;
+ use rusqlite::{ffi, params, serialize::OwnedData, Connection, OptionalExtension, MAIN_DB};
+-use serde::Serialize;
++use serde::{Deserialize, Serialize};
+ use sha2::{Digest, Sha256};
++use std::collections::BTreeSet;
+ use std::{
+     fs::File,
+     io::{self, Read, Write},
+@@ -29,17 +31,112 @@
+ };
+ use xs_platform::{FileRevision, PlatformError, Settings, SpeedMode};
+ 
+-const MAGIC: [u8; 8] = *b"XSCONT02";
+-const MAX_DB_SIZE: usize = 512 * 1024 * 1024;
++use snapshot::{encode_header, OpenSnapshot, MAX_DB_SIZE};
+ // 增量路径直接在旧快照的私有可写副本中更新，不再同时保留新旧两个 SQLite 连接。
+ // 最大复用大小与受保护的索引容量相同，以免大型索引退化为全量重建。
+ const MAX_REUSE_SNAPSHOT_BYTES: u64 = MAX_DB_SIZE as u64;
+-const HEADER_BYTES: usize = 56;
+ const MAX_REPORTED_FAILURES: usize = 100;
+ const CONTENT_DB: &str = "content.idx";
+ const CONTENT_LOCK: &str = "content.lock";
+ // 私有候选库：只供重建器恢复，不是查询入口。
+ const CONTENT_CHECKPOINT: &str = "content.pending.idx";
++const CONTENT_REQUESTS: &str = "content.requests.json";
++const MAX_REQUESTS: usize = 4096;
++const MAX_REQUEST_BYTES: u64 = 4 * 1024 * 1024;
++
++/// Durable, coalesced file-change requests, bound to the exact content scope.
++/// An uncertain event (deletion, directory, overflow) requires full reconciliation.
++#[derive(Debug, Default, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct PendingRequests {
++    scope: String,
++    full: bool,
++    paths: BTreeSet<String>,
++}
++
++fn read_requests(dir: &Path) -> Result<Option<PendingRequests>> {
++    let file = match xs_platform::open_local_read(&dir.join(CONTENT_REQUESTS)) {
++        Ok(file) => file,
++        Err(PlatformError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
++            return Ok(None)
++        }
++        Err(error) => return Err(error.into()),
++    };
++    let mut bytes = Vec::new();
++    file.take(MAX_REQUEST_BYTES + 1).read_to_end(&mut bytes)?;
++    ensure!(
++        bytes.len() as u64 <= MAX_REQUEST_BYTES,
++        "正文变更队列超过容量限制"
++    );
++    let value: PendingRequests = serde_json::from_slice(&bytes)?;
++    ensure!(
++        value.paths.len() <= MAX_REQUESTS,
++        "正文变更队列超过条数限制"
++    );
++    Ok(Some(value))
++}
++
++/// Record notifications before processing; concurrent writers receive a retryable lock error.
++/// Empty input is an explicit request for complete reconciliation (e.g. watcher overflow).
++pub fn enqueue_changes(dir: &Path, paths: &[PathBuf]) -> Result<usize> {
++    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
++    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请稍后重试提交变更")?;
++    let policy = Policy::load(dir)?;
++    let mut queue = match read_requests(dir) {
++        Ok(Some(value)) if value.scope == policy.token => value,
++        Ok(None) => PendingRequests {
++            scope: policy.token.clone(),
++            ..Default::default()
++        },
++        // Unreadable/obsolete data is not trusted as a partial event list.
++        _ => PendingRequests {
++            scope: policy.token.clone(),
++            full: true,
++            paths: BTreeSet::new(),
++        },
++    };
++    if paths.is_empty() || paths.len() > MAX_REQUESTS {
++        queue.full = true;
++    }
++    for path in paths.iter().take(MAX_REQUESTS) {
++        ensure!(
++            policy.allows(dir, path)?
++                || policy.settings.allows_content(path, true)?
++                    && !xs_platform::local_path_within(path, dir)?,
++            "变更路径不在正文授权范围"
++        );
++        let text = path.to_str().context("变更路径不是有效 UTF-8")?;
++        if !queue.full {
++            queue.paths.insert(text.to_owned());
++        }
++    }
++    if queue.paths.len() > MAX_REQUESTS {
++        queue.full = true;
++    }
++    if queue.full {
++        queue.paths.clear();
++    }
++    let mut bytes = serde_json::to_vec(&queue)?;
++    if bytes.len() as u64 > MAX_REQUEST_BYTES {
++        queue.full = true;
++        queue.paths.clear();
++        bytes = serde_json::to_vec(&queue)?;
++    }
++    policy.verify(dir)?;
++    let result = xs_platform::atomic_write_local(&dir.join(CONTENT_REQUESTS), &bytes, true)?;
++    ensure!(result.is_durable(), "变更队列持久化未确认，请重试");
++    Ok(queue.paths.len())
++}
++
++/// Apply the durable request queue, or reconcile the whole scope when no reliable
++/// event list exists. A failed/cancelled run never acknowledges the queue.
++pub fn apply_queued_changes(
++    dir: &Path,
++    executable: &Path,
++    cancel: &AtomicBool,
++) -> Result<BuildReport> {
++    rebuild_inner(dir, executable, &WorkerOptions::default(), cancel, true)
++}
+ const CHECKPOINT_BATCH: usize = 256;
+ const CHECKPOINT_MAX_BATCH: usize = 4096;
+ const CHECKPOINT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+@@ -53,6 +150,15 @@
+ #[derive(Debug, Default, Serialize)]
+ pub struct BuildReport {
+     pub published: bool,
++    /// True only for a successful full scope traversal, not a targeted update.
++    pub scope_reconciled: bool,
++    pub targeted_update: bool,
++    pub request_warning: Option<String>,
++    /// Actual publication payload bytes written (excludes temporary checkpoints).
++    pub publication_bytes_written: u64,
++    pub delta_blocks: usize,
++    pub base_rewritten: bool,
++    pub snapshot_cleanup_warning: Option<String>,
+     pub generation: Option<u64>,
+     pub durable: bool,
+     pub durability_warning: Option<String>,
+@@ -129,6 +235,93 @@
+     }
+ }
+ 
++/// Opt-in foreground watch. Subscribe before reconciliation; notification loss
++/// and topology changes force a full scan, and every restart does the same.
++/// This is not an OS-persistent journal: an unclean stop is recovered by that scan.
++pub fn watch_changes(
++    dir: &Path,
++    executable: &Path,
++    cancel: &AtomicBool,
++    mut on_report: impl FnMut(&BuildReport),
++) -> Result<()> {
++    use std::time::{Duration, Instant};
++    use xs_platform::{ScopeWatcher, WatchEvent};
++    let policy = Policy::load(dir)?;
++    let scan_settings = Settings {
++        roots: policy.settings.content_roots.clone(),
++        mode: SpeedMode::Standard,
++        ..Settings::default()
++    };
++    let mut watcher = ScopeWatcher::new(&scan_settings, &[dir.into()])?;
++    policy.verify(dir)?;
++    enqueue_changes(dir, &[])?;
++    let mut pending = true;
++    let mut next_attempt = Instant::now();
++    let mut reconcile_at = Instant::now() + Duration::from_secs(600);
++    while !cancel.load(Ordering::Acquire) {
++        policy.verify(dir)?;
++        if Instant::now() >= reconcile_at {
++            enqueue_changes(dir, &[])?;
++            pending = true;
++            reconcile_at = Instant::now() + Duration::from_secs(600);
++        }
++        if pending && Instant::now() >= next_attempt {
++            let report = apply_queued_changes(dir, executable, cancel)?;
++            let done = report.published
++                && report.durable
++                && report.complete
++                && report.request_warning.is_none();
++            if done && report.scope_reconciled {
++                reconcile_at = Instant::now() + Duration::from_secs(600);
++            }
++            on_report(&report);
++            if report.cancelled || cancel.load(Ordering::Acquire) {
++                break;
++            }
++            pending = !done;
++            next_attempt = Instant::now()
++                + if done {
++                    Duration::from_millis(500)
++                } else {
++                    Duration::from_secs(10)
++                };
++        }
++        match watcher.poll(Duration::from_secs(1)) {
++            Ok(WatchEvent::Idle) => (),
++            Ok(WatchEvent::Changed) => {
++                policy.verify(dir)?;
++                if let Some(paths) = watcher.take_changed_paths() {
++                    // Watch notifications can include files excluded by an extension filter.
++                    let mut accepted = Vec::new();
++                    for path in paths {
++                        if policy.allows(dir, &path)?
++                            || (policy.settings.allows_content(&path, true)?
++                                && !xs_platform::local_path_within(&path, dir)?)
++                        {
++                            accepted.push(path);
++                        }
++                    }
++                    if !accepted.is_empty() {
++                        enqueue_changes(dir, &accepted)?;
++                        pending = true;
++                    }
++                } else {
++                    enqueue_changes(dir, &[])?;
++                    pending = true;
++                }
++            }
++            _ => {
++                policy.verify(dir)?;
++                // Re-subscribe before scheduling a full reconciliation.
++                watcher = ScopeWatcher::new(&scan_settings, &[dir.into()])?;
++                enqueue_changes(dir, &[])?;
++                pending = true;
++            }
++        }
++    }
++    Ok(())
++}
++
+ /// 使用相邻的受信任抽取程序重建独立正文库，默认每份文档 384 MiB／10 秒。
+ pub fn rebuild(dir: &Path, executable: &Path, cancel: &AtomicBool) -> Result<BuildReport> {
+     rebuild_with_worker_options(dir, executable, &WorkerOptions::default(), cancel)
+@@ -139,6 +332,16 @@
+     executable: &Path,
+     options: &WorkerOptions,
+     cancel: &AtomicBool,
++) -> Result<BuildReport> {
++    rebuild_inner(dir, executable, options, cancel, false)
++}
++
++fn rebuild_inner(
++    dir: &Path,
++    executable: &Path,
++    options: &WorkerOptions,
++    cancel: &AtomicBool,
++    use_queue: bool,
+ ) -> Result<BuildReport> {
+     let policy = Policy::load(dir)?;
+     options.validate()?;
+@@ -160,20 +363,16 @@
+     FileExt::try_lock_exclusive(&lock).context("另一个正文重建任务正在运行")?;
+ 
+     let mut report = BuildReport::default();
++    policy.verify(dir)?;
++    if cancel.load(Ordering::Acquire) {
++        report.cancelled = true;
++        return Ok(report);
++    }
+     let scan_settings = Settings {
+         roots: policy.settings.content_roots.clone(),
+         mode: SpeedMode::Standard,
+         ..Settings::default()
+     };
+-    let scan = xs_platform::scan_with_exclusions(&scan_settings, cancel, |_| {}, &[dir.into()])?;
+-    if !scan.complete {
+-        report.cancelled = scan.cancelled;
+-        for failure in scan.errors {
+-            report.failure(failure.path, failure.message);
+-        }
+-        return Ok(report);
+-    }
+-
+     let target = dir.join(CONTENT_DB);
+     let base_revision = optional_revision(&target)?;
+     let generation = next_generation(&target)?;
+@@ -193,6 +392,81 @@
+     // 只有授权 token 和语义模型指纹均一致、快照校验通过时允许复用。
+     // 文件身份/时间戳/长度还要在逐文件复制前后再次确认。
+     let fingerprint = model.as_ref().map(semantic::ModelClient::fingerprint);
++    let mut published_base = if use_queue {
++        reusable_snapshot(&target, &policy.token, fingerprint, cancel)
++    } else {
++        None
++    };
++    let mut entries = None;
++    if use_queue && published_base.is_some() {
++        if let Ok(Some(queue)) = read_requests(dir) {
++            if queue.scope == policy.token && !queue.full && !queue.paths.is_empty() {
++                let mut selected = Vec::new();
++                for path in &queue.paths {
++                    // Missing, renamed or directory events must reconcile the whole scope;
++                    // never infer deletion from a transient failure or a single directory event.
++                    match xs_platform::inspect_scoped_entry(
++                        &scan_settings,
++                        Path::new(path),
++                        &[dir.into()],
++                    ) {
++                        Ok(Some(entry))
++                            if !entry.is_dir
++                                && entry.path == *path
++                                && policy.allows(dir, Path::new(path))?
++                                && extract::supports(
++                                    &Path::new(path)
++                                        .extension()
++                                        .and_then(std::ffi::OsStr::to_str)
++                                        .unwrap_or_default()
++                                        .to_ascii_lowercase(),
++                                    policy.settings.ocr_enabled,
++                                ) =>
++                        {
++                            selected.push(entry)
++                        }
++                        _ => {
++                            selected.clear();
++                            break;
++                        }
++                    }
++                }
++                if selected.len() == queue.paths.len() {
++                    entries = Some(selected);
++                }
++            }
++        }
++    }
++    report.targeted_update = entries.is_some();
++    let entries = match entries {
++        Some(entries) => entries,
++        None => {
++            let scan =
++                xs_platform::scan_with_exclusions(&scan_settings, cancel, |_| {}, &[dir.into()])?;
++            if !scan.complete {
++                report.cancelled = scan.cancelled;
++                for failure in scan.errors {
++                    report.failure(failure.path, failure.message);
++                }
++                return Ok(report);
++            }
++            scan.entries
++        }
++    };
++    // Bind a candidate to the exact selected event set; partial candidates must
++    // never be mistaken for full-scope reconciliation or a different event set.
++    let checkpoint_key = if report.targeted_update {
++        serde_json::to_string(&(
++            checkpoint_key,
++            entries.iter().map(|e| &e.path).collect::<Vec<_>>(),
++        ))?
++    } else {
++        checkpoint_key
++    };
++    // Avoid holding two large snapshots in memory at once.
++    if optional_revision(&checkpoint)?.is_some() {
++        published_base = None;
++    }
+     let pending =
+         reusable_snapshot(&checkpoint, &policy.token, fingerprint, cancel).filter(|loaded| {
+             loaded.generation == generation
+@@ -210,10 +484,16 @@
+         // A stale or damaged candidate must never be resumed. Do not follow links.
+         clear_checkpoint(&checkpoint)?;
+     }
+-    let previous =
+-        pending.or_else(|| reusable_snapshot(&target, &policy.token, fingerprint, cancel));
++    let previous = pending
++        .or(published_base)
++        .or_else(|| reusable_snapshot(&target, &policy.token, fingerprint, cancel));
++    ensure!(
++        !report.targeted_update || previous.is_some(),
++        "正文局部更新的发布基线失效，请完整校准"
++    );
+     let incremental = previous.is_some();
+     let previous_generation = previous.as_ref().map(|loaded| loaded.generation);
++    let previous_stamp = previous.as_ref().map(|loaded| loaded.stamp);
+     let mut db = if let Some(previous) = previous {
+         previous.connection
+     } else {
+@@ -261,7 +541,7 @@
+     }
+     let mut dirty = 0;
+     let mut last_checkpoint = std::time::Instant::now();
+-    for entry in scan.entries.into_iter().filter(|entry| !entry.is_dir) {
++    for entry in entries.into_iter().filter(|entry| !entry.is_dir) {
+         if cancel.load(Ordering::Acquire) {
+             report.cancelled = true;
+             return Ok(report);
+@@ -422,7 +702,7 @@
+         return Ok(report);
+     }
+     let tx = db.transaction()?;
+-    if incremental {
++    if incremental && !report.targeted_update {
+         let missing = {
+             let mut stmt = tx.prepare(
+                 "SELECT path FROM documents WHERE path NOT IN (SELECT path FROM scanned)",
+@@ -450,12 +730,17 @@
+             optional_revision(&target)? == base_revision,
+             "正文发布基线已变化，请重试"
+         );
++        if let Some(stamp) = previous_stamp {
++            stamp.verify(&target)?;
++        }
+         report.published = true;
+         report.unchanged_snapshot = true;
+         report.generation = previous_generation;
+         report.complete = true;
+         report.durable = true;
+         clear_checkpoint(&checkpoint)?;
++        report.scope_reconciled = !report.targeted_update;
++        acknowledge_requests(dir, &mut report);
+         return Ok(report);
+     }
+     if cancel.load(Ordering::Acquire) {
+@@ -464,49 +749,57 @@
+     }
+     let bytes = db.serialize(MAIN_DB)?;
+     ensure!(bytes.len() <= MAX_DB_SIZE, "正文库超出容量上限");
+-    let header = encode_header(generation, &bytes);
+-    policy.verify(dir)?;
+-    if cancel.load(Ordering::Acquire) {
+-        report.cancelled = true;
+-        return Ok(report);
+-    }
+-    ensure!(
+-        optional_revision(&target)? == base_revision,
+-        "正文发布基线已变化，请重试"
++    let published = snapshot::publish(
++        &target,
++        &bytes,
++        generation,
++        incremental && !report.resumed_checkpoint && report.removed_documents == 0,
++        cancel,
++        || {
++            policy.verify(dir)?;
++            ensure!(
++                optional_revision(&target)? == base_revision,
++                "正文发布基线已变化，请重试"
++            );
++            if !report.resumed_checkpoint {
++                if let Some(stamp) = previous_stamp {
++                    stamp.verify(&target)?;
++                }
++            }
++            ensure!(!cancel.load(Ordering::Acquire), "正文重建已取消");
++            Ok(())
++        },
+     );
+-    let published = xs_platform::write_local_replace(&target, |file| {
+-        file.write_all(&header)?;
+-        for chunk in bytes.chunks(1024 * 1024) {
+-            if cancel.load(Ordering::Acquire) {
+-                return Err(io::Error::other("正文重建已取消"));
+-            }
+-            file.write_all(chunk)?;
+-        }
+-        policy.verify(dir).map_err(io::Error::other)?;
+-        if optional_revision(&target).map_err(io::Error::other)? != base_revision {
+-            return Err(io::Error::other("正文发布基线已变化"));
+-        }
+-        if cancel.load(Ordering::Acquire) {
+-            return Err(io::Error::other("正文重建已取消"));
+-        }
+-        Ok(())
+-    });
+-    let outcome = match published {
++    let (outcome, stats) = match published {
+         Err(_) if cancel.load(Ordering::Acquire) => {
+             report.cancelled = true;
+             return Ok(report);
+         }
+         other => other?,
+     };
++    report.publication_bytes_written = stats.bytes_written;
++    report.delta_blocks = stats.delta_blocks;
++    report.base_rewritten = stats.base_rewritten;
++    report.snapshot_cleanup_warning = stats.cleanup_warning;
+     report.published = true;
+     report.generation = Some(generation);
+     report.durable = outcome.is_durable();
+     report.durability_warning = outcome.warning().map(str::to_owned);
+     report.complete = report.failed == 0;
++    report.scope_reconciled = report.complete && !report.targeted_update;
++    if report.durable && report.complete {
++        acknowledge_requests(dir, &mut report);
++    }
+     if let Err(error) = clear_checkpoint(&checkpoint) {
+         report.checkpoint_warning = Some(format!("已发布，但候选检查点清理失败：{error}"));
+     }
+     Ok(report)
++}
++
++fn acknowledge_requests(dir: &Path, report: &mut BuildReport) {
++    if let Err(error) = clear_checkpoint(&dir.join(CONTENT_REQUESTS)) {
++        report.request_warning = Some(format!("已发布，但变更队列未清理（可安全重放）：{error}"));
++    }
+ }
+ 
+ /// Discard only the private candidate. Never touches the published index or user files.
+@@ -515,6 +808,14 @@
+     let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
+     FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请取消任务并等待结束后重试")?;
+     clear_checkpoint(&dir.join(CONTENT_CHECKPOINT))
++}
++
++/// Clear pending candidate and queued paths on explicit authorization change.
++pub fn discard_pending_work(dir: &Path) -> Result<()> {
++    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
++    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请取消任务并等待结束后重试")?;
++    clear_checkpoint(&dir.join(CONTENT_CHECKPOINT))?;
++    clear_checkpoint(&dir.join(CONTENT_REQUESTS))
+ }
+ 
+ fn optional_revision(path: &Path) -> Result<Option<FileRevision>> {
+@@ -585,12 +886,11 @@
+     model: Option<&str>,
+     cancel: &AtomicBool,
+ ) -> Option<LoadedDb> {
+-    let file = xs_platform::open_local_read(target).ok()?;
+-    if file.metadata().ok()?.len() > MAX_REUSE_SNAPSHOT_BYTES + HEADER_BYTES as u64 {
++    let snapshot = OpenSnapshot::open(target).ok()?;
++    if snapshot.head.size as u64 > MAX_REUSE_SNAPSHOT_BYTES {
+         return None;
+     }
+-    let revision = FileRevision::from_file(&file).ok()?;
+-    let loaded = load_db(file, revision, cancel, true).ok()?;
++    let loaded = load_db(snapshot, cancel, true).ok()?;
+     if loaded.scope == scope_token && loaded.model.as_deref() == model {
+         Some(loaded)
+     } else {
+@@ -695,35 +995,11 @@
+     Ok((revision, segments))
+ }
+ 
+-fn snapshot_header(file: &mut File) -> Result<(u64, usize, [u8; 32])> {
+-    let mut bytes = [0; HEADER_BYTES];
+-    file.read_exact(&mut bytes)?;
+-    ensure!(bytes[..8] == MAGIC, "无法识别正文库格式，请重建");
+-    let generation = u64::from_le_bytes(bytes[8..16].try_into()?);
+-    let size = usize::try_from(u64::from_le_bytes(bytes[16..24].try_into()?))?;
+-    ensure!(
+-        (1..=i64::MAX as u64).contains(&generation)
+-            && (512..=MAX_DB_SIZE).contains(&size)
+-            && file.metadata()?.len() == (HEADER_BYTES + size) as u64,
+-        "正文库头部或长度无效，请重建"
+-    );
+-    Ok((generation, size, bytes[24..].try_into()?))
+-}
+-
+-fn encode_header(generation: u64, bytes: &[u8]) -> [u8; HEADER_BYTES] {
+-    let mut result = [0; HEADER_BYTES];
+-    result[..8].copy_from_slice(&MAGIC);
+-    result[8..16].copy_from_slice(&generation.to_le_bytes());
+-    result[16..24].copy_from_slice(&(bytes.len() as u64).to_le_bytes());
+-    result[24..].copy_from_slice(&Sha256::digest(bytes));
+-    result
+-}
+-
+ fn next_generation(path: &Path) -> Result<u64> {
+     match xs_platform::open_local_read(path) {
+         Ok(mut file) => {
+             // 显式重建可以恢复受损的快照。响应仍以打开的文件对象和代次双重校验。
+-            let previous = snapshot_header(&mut file).map_or(0, |header| header.0);
++            let previous = snapshot::read_head(&mut file).map_or(0, |header| header.generation);
+             Ok(previous.checked_add(1).context("正文索引代次耗尽")?)
+         }
+         Err(PlatformError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => Ok(1),
+@@ -732,20 +1008,17 @@
+ }
+ 
+ struct LoadedDb {
++    stamp: snapshot::Stamp,
+     generation: u64,
+     scope: String,
+     model: Option<String>,
+     connection: Connection,
+ }
+ 
+-fn load_db(
+-    mut file: File,
+-    revision: FileRevision,
+-    cancel: &AtomicBool,
+-    writable: bool,
+-) -> Result<LoadedDb> {
+-    let (generation, size, digest) = snapshot_header(&mut file)?;
+-    // 使用 SQLite 官方分配器并立即建立所有权，读取失败也会释放分配。
++fn load_db(mut snapshot: OpenSnapshot, cancel: &AtomicBool, writable: bool) -> Result<LoadedDb> {
++    let generation = snapshot.head.generation;
++    let size = snapshot.head.size;
++    // SQLite owns this one reconstructed buffer; no second full DB allocation.
+     let ptr = NonNull::new(unsafe { ffi::sqlite3_malloc64(size as u64) }.cast::<u8>())
+         .context("正文库超出可用内存")?;
+     let data = unsafe { OwnedData::from_raw_nonnull(ptr, size) };
+@@ -753,16 +1026,7 @@
+         ptr.as_ptr().write_bytes(0, size);
+         std::slice::from_raw_parts_mut(ptr.as_ptr(), size)
+     };
+-    let mut sha = Sha256::new();
+-    for chunk in bytes.chunks_mut(1024 * 1024) {
+-        ensure!(!cancel.load(Ordering::Acquire), "正文库读取已取消");
+-        file.read_exact(chunk)?;
+-        sha.update(chunk);
+-    }
+-    ensure!(
+-        sha.finalize()[..] == digest && FileRevision::from_file(&file)? == revision,
+-        "正文库已损坏或读取期间已更改，请重建或重试"
+-    );
++    snapshot.read_into(bytes, cancel)?;
+     let mut db = Connection::open_in_memory()?;
+     db.deserialize(MAIN_DB, data, !writable)?;
+     if writable {
+@@ -788,6 +1052,7 @@
+         "正文库的代次不一致，请重建"
+     );
+     Ok(LoadedDb {
++        stamp: snapshot.stamp,
+         generation,
+         scope,
+         model,
+@@ -801,11 +1066,12 @@
+         response.scope_token == policy.token && response.settings_revision == policy.revision,
+         "正文授权已更改"
+     );
+-    let mut snapshot = xs_platform::open_local_read(&dir.join(CONTENT_DB))?;
+-    let revision = FileRevision::from_file(&snapshot)?;
++    let path = dir.join(CONTENT_DB);
++    let snapshot = OpenSnapshot::open(&path)?;
+     ensure!(
+-        response.catalog_revision == revision
+-            && snapshot_header(&mut snapshot)?.0 == response.generation,
++        response.catalog_revision == snapshot.stamp.publication
++            && response.catalog_base_revision == snapshot.stamp.base
++            && snapshot.head.generation == response.generation,
+         "正文索引已更新，请重新搜索"
+     );
+     for hit in &response.hits {
+@@ -815,10 +1081,7 @@
+         }
+     }
+     policy.verify(dir)?;
+-    ensure!(
+-        FileRevision::at_path(&dir.join(CONTENT_DB))? == revision,
+-        "正文索引已更新，请重新搜索"
+-    );
++    snapshot.stamp.verify(&path)?;
+     Ok(())
+ }
+ 
+--- a/rust/crates/xs-content/src/search.rs
++++ b/rust/crates/xs-content/src/search.rs
+@@ -1,6 +1,6 @@
+ //! SQLite FTS5 的有界正文查询。分页、精确索引计数和当前文件验证分开记录。
+ 
+-use crate::{load_db, semantic, Policy, WorkerOptions, CONTENT_DB};
++use crate::{load_db, semantic, snapshot::OpenSnapshot, Policy, WorkerOptions, CONTENT_DB};
+ use anyhow::{ensure, Context, Result};
+ use rusqlite::{params, Connection};
+ use serde::{Deserialize, Serialize};
+@@ -102,10 +102,13 @@
+     pub(crate) scope_token: String,
+     pub(crate) settings_revision: FileRevision,
+     pub(crate) catalog_revision: FileRevision,
++    #[serde(default)]
++    pub(crate) catalog_base_revision: Option<(u8, FileRevision)>,
+ }
+ 
+ struct Cached {
+     revision: FileRevision,
++    base_revision: Option<(u8, FileRevision)>,
+     generation: u64,
+     scope_token: String,
+     model: Option<String>,
+@@ -205,17 +208,19 @@
+     ) -> Result<SearchResponse> {
+         let policy = Policy::load(&self.dir)?;
+         let path = self.dir.join(CONTENT_DB);
+-        let file = xs_platform::open_local_read(&path)?;
+-        let revision = FileRevision::from_file(&file)?;
++        let snapshot = OpenSnapshot::open(&path)?;
++        let stamp = snapshot.stamp;
++        let revision = stamp.publication;
+         if !self
+             .cached
+             .as_ref()
+-            .is_some_and(|db| db.revision == revision)
++            .is_some_and(|db| db.revision == revision && db.base_revision == stamp.base)
+         {
+             self.release();
+-            let loaded = load_db(file, revision, cancel, false)?;
++            let loaded = load_db(snapshot, cancel, false)?;
+             self.cached = Some(Cached {
+                 revision,
++                base_revision: stamp.base,
+                 generation: loaded.generation,
+                 scope_token: loaded.scope,
+                 model: loaded.model,
+@@ -289,10 +294,7 @@
+         let response = search?;
+         reset?;
+         policy.verify(&self.dir)?;
+-        ensure!(
+-            FileRevision::at_path(&path)? == revision,
+-            "正文索引已更新，请重新搜索"
+-        );
++        stamp.verify(&path)?;
+         Ok(response)
+     }
+ }
+@@ -589,6 +591,7 @@
+         scope_token: catalog.scope_token.clone(),
+         settings_revision: policy.revision,
+         catalog_revision: catalog.revision,
++        catalog_base_revision: catalog.base_revision,
+     };
+     let mut details = catalog.db.prepare_cached(
+         "SELECT d.path, d.revision, s.location, s.body
+@@ -805,6 +808,7 @@
+                 modified: stamp,
+                 changed: stamp,
+             },
++            base_revision: None,
+             generation: 1,
+             scope_token: String::new(),
+             model: None,
+@@ -882,6 +886,7 @@
+                 modified: stamp,
+                 changed: stamp,
+             },
++            base_revision: None,
+             generation: 1,
+             scope_token: String::new(),
+             model: None,
+--- a/rust/crates/xs-content/tests/content.rs
++++ b/rust/crates/xs-content/tests/content.rs
+@@ -667,3 +667,142 @@
+     assert_eq!(response.indexed_total, 1);
+     assert!(docs.join("new.txt").is_file());
+ }
++
++#[test]
++fn durable_change_queue_targets_files_and_reconciles_uncertain_events() {
++    let tmp = sandbox();
++    let data = tmp.path().join("app");
++    let docs = tmp.path().join("docs");
++    fs::create_dir_all(&docs).unwrap();
++    settings(&data, &docs);
++    let a = docs.join("a.txt");
++    let b = docs.join("b.txt");
++    let c = docs.join("c.txt");
++    fs::write(&a, "original-alpha").unwrap();
++    fs::write(&b, "unrelated-beta").unwrap();
++    let cancel = AtomicBool::new(false);
++    assert!(rebuild(&data, worker(), &cancel).unwrap().scope_reconciled);
++    fs::write(&a, "changed-alpha").unwrap();
++    fs::write(&c, "new-gamma").unwrap();
++    assert_eq!(
++        xs_content::enqueue_changes(&data, std::slice::from_ref(&a)).unwrap(),
++        1
++    );
++    assert_eq!(
++        xs_content::enqueue_changes(&data, &[a.clone(), c.clone()]).unwrap(),
++        2
++    );
++    let queue = data.join("content.requests.json");
++    assert!(queue.is_file());
++    let stopped =
++        xs_content::apply_queued_changes(&data, worker(), &AtomicBool::new(true)).unwrap();
++    assert!(stopped.cancelled && queue.is_file());
++    let updated = xs_content::apply_queued_changes(&data, worker(), &cancel).unwrap();
++    assert!(
++        updated.published && updated.targeted_update && !updated.scope_reconciled,
++        "{updated:?}"
++    );
++    assert_eq!(updated.updated_documents, 2);
++    assert_eq!(updated.removed_documents, 0);
++    assert!(!queue.exists());
++    let mut reader = ContentReader::new(&data);
++    for text in ["changed-alpha", "unrelated-beta", "new-gamma"] {
++        assert_eq!(
++            reader
++                .search(text, &SearchOptions::default(), &cancel)
++                .unwrap()
++                .hits
++                .len(),
++            1
++        );
++    }
++    fs::remove_file(&b).unwrap();
++    xs_content::enqueue_changes(&data, &[b]).unwrap();
++    let reconciled = xs_content::apply_queued_changes(&data, worker(), &cancel).unwrap();
++    assert!(
++        reconciled.published && reconciled.scope_reconciled && !reconciled.targeted_update,
++        "{reconciled:?}"
++    );
++    assert_eq!(reconciled.removed_documents, 1);
++    assert_eq!(
++        reader
++            .search("unrelated-beta", &SearchOptions::default(), &cancel)
++            .unwrap()
++            .indexed_total,
++        0
++    );
++}
++
++#[test]
++fn change_queue_rejects_outside_scope_and_recovers_corruption() {
++    let tmp = sandbox();
++    let data = tmp.path().join("app");
++    let docs = tmp.path().join("docs");
++    fs::create_dir_all(&docs).unwrap();
++    settings(&data, &docs);
++    let a = docs.join("a.txt");
++    fs::write(&a, "alpha").unwrap();
++    let cancel = AtomicBool::new(false);
++    rebuild(&data, worker(), &cancel).unwrap();
++    assert!(xs_content::enqueue_changes(&data, &[tmp.path().join("outside.txt")]).is_err());
++    assert!(!data.join("content.requests.json").exists());
++    xs_content::enqueue_changes(&data, std::slice::from_ref(&a)).unwrap();
++    fs::write(data.join("content.requests.json"), "invalid-json").unwrap();
++    fs::write(&a, "after-corruption").unwrap();
++    let recovered = xs_content::apply_queued_changes(&data, worker(), &cancel).unwrap();
++    assert!(
++        recovered.published && recovered.scope_reconciled && !recovered.targeted_update,
++        "{recovered:?}"
++    );
++    assert!(!data.join("content.requests.json").exists());
++    xs_content::enqueue_changes(&data, &[a]).unwrap();
++    xs_content::discard_pending_work(&data).unwrap();
++    assert!(!data.join("content.requests.json").exists());
++    assert!(data.join("content.idx").exists());
++}
++
++#[cfg(target_os = "linux")]
++#[test]
++fn foreground_content_watch_reconciles_real_filesystem_notification() {
++    use std::{
++        sync::{atomic::Ordering, mpsc},
++        time::Duration,
++    };
++    let tmp = sandbox();
++    let data = tmp.path().join("app");
++    let docs = tmp.path().join("docs");
++    fs::create_dir_all(&docs).unwrap();
++    settings(&data, &docs);
++    let a = docs.join("watched.txt");
++    fs::write(&a, "original-watch").unwrap();
++    let cancel = AtomicBool::new(false);
++    let (tx, rx) = mpsc::channel();
++    std::thread::scope(|scope| {
++        let thread = scope.spawn(|| {
++            xs_content::watch_changes(&data, worker(), &cancel, |report| {
++                let _ = tx.send((
++                    report.published,
++                    report.scope_reconciled,
++                    report.updated_documents,
++                ));
++            })
++        });
++        let result = (|| -> anyhow::Result<()> {
++            let first = rx.recv_timeout(Duration::from_secs(15))?;
++            anyhow::ensure!(first == (true, true, 1));
++            fs::write(&a, "modified-watch-content")?;
++            let next = rx.recv_timeout(Duration::from_secs(15))?;
++            anyhow::ensure!(next.0 && next.2 == 1, "unexpected update {next:?}");
++            let response = ContentReader::new(&data).search(
++                "modified-watch-content",
++                &SearchOptions::default(),
++                &cancel,
++            )?;
++            anyhow::ensure!(response.hits.len() == 1);
++            Ok(())
++        })();
++        cancel.store(true, Ordering::Release);
++        thread.join().unwrap().unwrap();
++        result.unwrap();
++    });
++}
+--- a/rust/crates/xs-inference/src/bin/install.rs
++++ b/rust/crates/xs-inference/src/bin/install.rs
+@@ -228,12 +228,24 @@
+         version.directory.starts_with("release-") && safe_component(&version.directory),
+         "安装状态损坏"
+     );
++    ensure!(
++        version.manifest_sha256.len() == 64
++            && version
++                .manifest_sha256
++                .bytes()
++                .all(|byte| byte.is_ascii_hexdigit()),
++        "安装状态摘要无效"
++    );
+     Ok(root.join("versions").join(&version.directory))
+ }
+ 
+ fn read_state(root: &Path) -> Result<State> {
+     match read_limited(&root.join(POINTER), MAX_MANIFEST) {
+-        Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
++        Ok(bytes) => {
++            let state: State = serde_json::from_slice(&bytes)?;
++            validate_state(root, &state)?;
++            Ok(state)
++        },
+         Err(error) if error.downcast_ref::<xs_platform::PlatformError>().is_some_and(|e| {
+             matches!(e, xs_platform::PlatformError::Io { source, .. } if source.kind() == io::ErrorKind::NotFound)
+         }) => Ok(State::default()),
+@@ -241,11 +253,38 @@
+     }
+ }
+ 
++fn validate_state(root: &Path, state: &State) -> Result<()> {
++    let mut retained = BTreeSet::new();
++    for version in &state.retained {
++        version_root(root, version)?;
++        ensure!(retained.insert(&version.directory), "安装状态包含重复版本");
++    }
++    for version in [&state.active, &state.previous].into_iter().flatten() {
++        version_root(root, version)?;
++        if let Some(entry) = state
++            .retained
++            .iter()
++            .find(|v| v.directory == version.directory)
++        {
++            ensure!(
++                entry.manifest_sha256 == version.manifest_sha256,
++                "安装状态版本摘要冲突"
++            );
++        }
++    }
++    ensure!(
++        !matches!((&state.active, &state.previous), (Some(a), Some(b)) if a.directory == b.directory),
++        "当前和回退版本不能相同"
++    );
++    Ok(())
++}
++
+ fn save_state(root: &Path, state: &State) -> Result<()> {
++    validate_state(root, state)?;
+     let outcome =
+         xs_platform::atomic_write_local(&root.join(POINTER), &serde_json::to_vec(state)?, true)?;
+     if let Some(warning) = outcome.warning() {
+-        eprintln!("入口已切换，持久化状态需确认：{warning}");
++        anyhow::bail!("入口可能已切换，但持久化未确认；禁止继续删除旧版本：{warning}");
+     }
+     Ok(())
+ }
+@@ -324,7 +363,8 @@
+ 
+ fn prepare_probe(root: &Path, version: &Version) -> Result<PathBuf> {
+     let probe = root.join("self-test-data").join(&version.directory);
+-    xs_platform::create_local_dir_all(&probe)?;
++    xs_platform::create_local_dir_all(&root.join("self-test-data"))?;
++    xs_platform::create_local_dir_new(&probe)?;
+     xs_platform::atomic_write_local(
+         &probe.join(PROBE_OWNER),
+         version.manifest_sha256.as_bytes(),
+@@ -361,6 +401,8 @@
+ /// 在指针持久化后清理既非当前也非回退的版本。
+ /// 个别文件被占用时保留记录并报告，而不是误报清理成功或阻断已完成安装。
+ fn cleanup_old_versions(root: &Path, state: &mut State) -> Result<usize> {
++    // Ensure the current pointer is durable before any destructive operation.
++    save_state(root, state)?;
+     let mut keep = Vec::new();
+     let mut deleted = 0;
+     for version in &state.retained {
+@@ -410,7 +452,8 @@
+         manifest_sha256: digest(&raw),
+     };
+     let destination = version_root(root, &version)?;
+-    xs_platform::create_local_dir_all(&destination)?;
++    xs_platform::create_local_dir_all(&root.join("versions"))?;
++    xs_platform::create_local_dir_new(&destination)?;
+     xs_platform::atomic_write_local(
+         &destination.join(RELEASE_OWNER),
+         version.manifest_sha256.as_bytes(),
+@@ -420,6 +463,12 @@
+     let result = (|| -> Result<()> {
+         state.retained.push(version.clone());
+         save_state(root, state)?;
++        // Commit the exact manifest before copying payload files. A crash now
++        // leaves an allowlist for safe compensation, not an arbitrary tree.
++        ensure!(
++            xs_platform::atomic_write_local(&destination.join(MANIFEST), &raw, false)?.is_durable(),
++            "安装清单持久化未确认"
++        );
+         for (name, entry) in &manifest.files {
+             let source = payload.join(name);
+             let target = destination.join(name);
+@@ -434,7 +483,6 @@
+                 std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))?;
+             }
+         }
+-        xs_platform::atomic_write_local(&destination.join(MANIFEST), &raw, false)?;
+         verify(&destination, &version.manifest_sha256)?;
+         policy(&destination, "install")?;
+         let probe = prepare_probe(root, &version)?;
+@@ -543,9 +591,16 @@
+     let (manifest, _) = match manifest(&directory, &version.manifest_sha256) {
+         Ok(found) => found,
+         Err(_error) if owned && !directory.join(MANIFEST).exists() => {
+-            // 安装中断时可能尚未提交清单；目录由安装器独占创建并含归属标记。
+-            // 遵循不跟随符号链接的标准库行为，只对该已追踪版本作补偿清理。
+-            std::fs::remove_dir_all(&directory)?;
++            // With no manifest there is no proof that other files belong to us.
++            // Only an owner-marker-only interrupted directory may be removed.
++            for item in std::fs::read_dir(&directory)? {
++                ensure!(
++                    item?.file_name() == RELEASE_OWNER,
++                    "缺少清单且包含未知文件，保留待人工确认"
++                );
++            }
++            xs_platform::remove_local_file(&owner_path)?;
++            std::fs::remove_dir(&directory)?;
+             return Ok(());
+         }
+         Err(error) => return Err(error),
+@@ -611,7 +666,9 @@
+             let (manifest, _) = manifest(&directory, &version.manifest_sha256)?;
+             let ui = executable("xs-ui");
+             let program = directory.join(&ui);
+-            checked_file(&program, &manifest.files[&ui], io::sink())?;
++            for name in PROGRAMS.map(executable) {
++                checked_file(&directory.join(&name), &manifest.files[&name], io::sink())?;
++            }
+             let mut command = Command::new(program);
+             if let Some(data) = data_dir {
+                 let data = std::path::absolute(data)?;
+@@ -650,6 +707,10 @@
+                     versions.push(version.clone());
+                 }
+             }
++            state.active = None;
++            state.previous = None;
++            state.retained = versions.clone();
++            save_state(&root, &state)?;
+             for version in &versions {
+                 remove_version(&root, version)?;
+                 if let Err(error) = clean_probe(&root, version) {
+@@ -668,3 +729,67 @@
+         std::process::exit(1);
+     }
+ }
++
++#[cfg(test)]
++mod lifecycle_tests {
++    use super::*;
++
++    fn version() -> Version {
++        Version {
++            directory: "release-test-123".into(),
++            manifest_sha256: "a".repeat(64),
++        }
++    }
++
++    #[test]
++    fn state_validation_refuses_conflicting_or_duplicate_version_records() {
++        let root = Path::new("/test");
++        let v = version();
++        let mut state = State {
++            active: Some(v.clone()),
++            previous: None,
++            retained: vec![v.clone()],
++        };
++        assert!(validate_state(root, &state).is_ok());
++        state.previous = Some(v.clone());
++        assert!(validate_state(root, &state).is_err());
++        state.previous = None;
++        state.retained.push(v.clone());
++        assert!(validate_state(root, &state).is_err());
++        state.retained.pop();
++        state.retained[0].manifest_sha256 = "b".repeat(64);
++        assert!(validate_state(root, &state).is_err());
++        state.retained.clear();
++        assert!(
++            validate_state(root, &state).is_ok(),
++            "legacy retained records may be absent"
++        );
++        state.active.as_mut().unwrap().manifest_sha256 = "not-a-hash".into();
++        assert!(validate_state(root, &state).is_err());
++    }
++
++    #[cfg(target_os = "linux")]
++    #[test]
++    fn interrupted_install_without_manifest_preserves_unknown_files() {
++        let mut random = [0_u8; 8];
++        getrandom::fill(&mut random).unwrap();
++        let root = std::env::temp_dir().join(format!("xs-install-test-{}", hex(&random)));
++        xs_platform::create_local_dir_all(&root).unwrap();
++        let v = version();
++        let directory = version_root(&root, &v).unwrap();
++        xs_platform::create_local_dir_all(&directory).unwrap();
++        let marker = directory.join(RELEASE_OWNER);
++        std::fs::write(&marker, v.manifest_sha256.as_bytes()).unwrap();
++        let unknown = directory.join("keep.txt");
++        std::fs::write(&unknown, "not owned by the installer").unwrap();
++        assert!(remove_version(&root, &v).is_err());
++        assert_eq!(
++            std::fs::read_to_string(&unknown).unwrap(),
++            "not owned by the installer"
++        );
++        std::fs::remove_file(&unknown).unwrap();
++        remove_version(&root, &v).unwrap();
++        assert!(!directory.exists());
++        std::fs::remove_dir_all(&root).unwrap();
++    }
++}
+--- a/rust/crates/xs-ui/src/connectors_ui.rs
++++ b/rust/crates/xs-ui/src/connectors_ui.rs
+@@ -1,6 +1,9 @@
+ //! 本地应用启动器与只读连接器（Chrome/Edge 书签、本地 Git 仓库）统一面板。
+ use eframe::egui::{self, RichText};
+-use std::{cell::RefCell, path::Path};
++use std::{
++    cell::RefCell,
++    path::{Path, PathBuf},
++};
+ use xs_content::connectors::{self, ConnectorItem};
+ use xs_platform::apps::{self, AppEntry};
+ 
+@@ -19,6 +22,8 @@
+     source_manifest_path: String,
+     source_data_path: String,
+     static_source_name: String,
++    remember_source: bool,
++    persisted_grant: Option<(PathBuf, xs_platform::FileRevision)>,
+     static_items: Vec<ConnectorItem>,
+     notice: Option<String>,
+     error: Option<String>,
+@@ -45,6 +50,7 @@
+         static_sources: bool,
+         limit: usize,
+     ) -> Vec<ConnectorItem> {
++        let static_sources = static_sources && self.grant_current();
+         let limit = limit.min(12);
+         if let Some(cache) = self.match_cache.borrow().as_ref() {
+             if cache.query == query
+@@ -79,6 +85,11 @@
+         hits
+     }
+ 
++    pub(crate) fn grant_current(&self) -> bool {
++        self.persisted_grant
++            .as_ref()
++            .is_none_or(|(profile, revision)| connectors::static_grant_current(profile, *revision))
++    }
+     pub(crate) fn open_item(item: &ConnectorItem, ctx: &egui::Context) -> anyhow::Result<()> {
+         match item.source.as_str() {
+             "connector:chrome_bookmarks" => {
+@@ -124,7 +135,7 @@
+         }
+     }
+ 
+-    pub(crate) fn show(&mut self, ctx: &egui::Context) {
++    pub(crate) fn show(&mut self, ctx: &egui::Context, profile: &Path) {
+         if !self.open {
+             return;
+         }
+@@ -295,31 +306,79 @@
+                     );
+                 });
+                 ui.horizontal(|ui| {
++                    ui.checkbox(&mut self.remember_source, "记住授权（内容变化须重新授权）");
++                });
++                ui.horizontal(|ui| {
+                     if ui.button("授权载入来源").clicked() {
+-                        match connectors::load_static_source(
+-                            Path::new(self.source_manifest_path.trim()),
+-                            Path::new(self.source_data_path.trim()),
+-                        ) {
+-                            Ok((manifest, items)) => {
+-                                let count = items.len();
++                        let manifest = Path::new(self.source_manifest_path.trim());
++                        let data = Path::new(self.source_data_path.trim());
++                        let loaded = if self.remember_source {
++                            connectors::remember_static_source(profile, manifest, data).map(
++                                |grant| {
++                                    (
++                                        grant.manifest,
++                                        grant.items,
++                                        Some((profile.to_path_buf(), grant.grant_revision)),
++                                    )
++                                },
++                            )
++                        } else {
++                            connectors::load_static_source(manifest, data).and_then(
++                                |(manifest, items)| {
++                                    connectors::revoke_static_source(profile)?;
++                                    Ok((manifest, items, None))
++                                },
++                            )
++                        };
++                        match loaded {
++                            Ok((manifest, items, grant)) => {
+                                 self.static_source_name = manifest.name;
+                                 self.static_items = items;
++                                self.persisted_grant = grant;
+                                 self.match_cache.borrow_mut().take();
+                                 self.error = None;
+                                 self.notice = Some(format!(
+                                     "已授权载入 {} 条：{}",
+-                                    count, self.static_source_name
++                                    self.static_items.len(),
++                                    self.static_source_name
+                                 ));
+                             }
+                             Err(err) => self.error = Some(format!("来源载入失败：{err:#}")),
++                        }
++                    }
++                    if ui.button("恢复已记住来源").clicked() {
++                        match connectors::restore_static_source(profile) {
++                            Ok(Some(grant)) => {
++                                self.static_source_name = grant.manifest.name;
++                                self.static_items = grant.items;
++                                self.persisted_grant =
++                                    Some((profile.to_path_buf(), grant.grant_revision));
++                                self.match_cache.borrow_mut().take();
++                                self.error = None;
++                                self.notice = Some(format!(
++                                    "已恢复 {} 条已授权来源",
++                                    self.static_items.len()
++                                ));
++                            }
++                            Ok(None) => self.error = Some("没有已记住的来源授权".into()),
++                            Err(err) => self.error = Some(format!("恢复授权失败：{err:#}")),
+                         }
+                     }
+                     if ui.button("撤销此来源授权").clicked() {
+                         self.static_items.clear();
+                         self.static_source_name.clear();
++                        self.persisted_grant = None;
+                         self.match_cache.borrow_mut().take();
+-                        self.notice = Some("已撤销来源授权并移除本次载入数据".into());
+-                        self.error = None;
++                        match connectors::revoke_static_source(profile) {
++                            Ok(()) => {
++                                self.notice = Some("已撤销来源授权并移除本次载入数据".into());
++                                self.error = None;
++                            }
++                            Err(err) => {
++                                self.error =
++                                    Some(format!("本次数据已移除，但持久撤销未确认：{err:#}"))
++                            }
++                        }
+                     }
+                     if !self.static_source_name.is_empty() {
+                         ui.label(format!(
+--- a/rust/crates/xs-ui/src/content.rs
++++ b/rust/crates/xs-ui/src/content.rs
+@@ -31,7 +31,7 @@
+ 
+ enum Reply {
+     Ready,
+-    Search(u64, Result<SearchResponse, String>),
++    Search(u64, Result<Box<SearchResponse>, String>),
+     Failed(String),
+ }
+ 
+@@ -95,12 +95,12 @@
+                     ),
+                     _ => Reply::Search(
+                         id,
+-                        (|| -> Result<SearchResponse> {
++                        (|| -> Result<Box<SearchResponse>> {
+                             let response: SearchResponse = serde_json::from_value(
+                                 value.get("result").cloned().unwrap_or(Value::Null),
+                             )?;
+                             xs_content::validate_response(&profile, &response)?;
+-                            Ok(response)
++                            Ok(Box::new(response))
+                         })()
+                         .map_err(|error| format!("{error:#}")),
+                     ),
+@@ -229,6 +229,7 @@
+     notice: Option<String>,
+     error: Option<String>,
+     build: Option<(Arc<AtomicBool>, Receiver<BuildResult>)>,
++    watch_status: Option<Receiver<(bool, String)>>,
+     next_validation: Option<Instant>,
+     validation: Option<Receiver<(u64, bool)>>,
+     mode: SearchMode,
+@@ -341,6 +342,64 @@
+         Ok(())
+     }
+ 
++    fn watch(&mut self, profile: &Path, ctx: &egui::Context) -> Result<()> {
++        ensure!(self.build.is_none(), "正文任务已在运行");
++        let worker = sibling("xs-content-worker")?;
++        let cancel = Arc::new(AtomicBool::new(false));
++        let stop = cancel.clone();
++        let (tx, rx) = mpsc::channel();
++        let (status_tx, status_rx) = mpsc::sync_channel(4);
++        let profile = profile.to_owned();
++        let ctx = ctx.clone();
++        thread::spawn(move || {
++            let outcome = xs_content::watch_changes(&profile, &worker, &stop, |report| {
++                if report.cancelled {
++                    return;
++                }
++                let ok = report.published
++                    && report.durable
++                    && report.complete
++                    && report.request_warning.is_none();
++                let status = if ok {
++                    format!(
++                        "实时监控中 · {} · 更新 {} · 删除 {} · 代次 {}",
++                        if report.scope_reconciled {
++                            "全范围校准"
++                        } else {
++                            "局部更新"
++                        },
++                        report.updated_documents,
++                        report.removed_documents,
++                        report.generation.unwrap_or_default()
++                    )
++                } else {
++                    format!(
++                        "实时收录暂未完成（{} 项失败），将重试。{}",
++                        report.failed,
++                        report
++                            .failures
++                            .first()
++                            .map(|f| f.error.as_str())
++                            .unwrap_or("请检查持久化及访问权限")
++                    )
++                };
++                let _ = status_tx.try_send((ok, status));
++                ctx.request_repaint();
++            })
++            .map_err(|error| format!("实时收录已停止：{error:#}"));
++            let _ = tx.send(outcome.map(|()| BuildReport {
++                cancelled: true,
++                ..BuildReport::default()
++            }));
++            ctx.request_repaint();
++        });
++        self.build = Some((cancel, rx));
++        self.watch_status = Some(status_rx);
++        self.notice = Some("正在启动正文实时监控和完整校准…".into());
++        self.error = None;
++        Ok(())
++    }
++
+     pub fn update(&mut self, profile: &Path, ctx: &egui::Context) {
+         if let Some(check) = &self.model_check {
+             match check.try_recv() {
+@@ -365,7 +424,7 @@
+                         self.active = None;
+                         if id == self.id {
+                             match result {
+-                                Ok(response) => self.results = Some(Arc::new(response)),
++                                Ok(response) => self.results = Some(Arc::from(response)),
+                                 Err(error) => self.error = Some(error),
+                             }
+                         }
+@@ -380,6 +439,17 @@
+         if let Some(error) = failure {
+             self.release();
+             self.error = Some(error);
++        }
++        if let Some(status) = &self.watch_status {
++            for (ok, message) in status.try_iter() {
++                if ok {
++                    self.notice = Some(message);
++                    self.error = None;
++                } else {
++                    self.notice = None;
++                    self.error = Some(message);
++                }
++            }
+         }
+         if let Some((_, build)) = &self.build {
+             let result = match build.try_recv() {
+@@ -389,9 +459,17 @@
+             };
+             if let Some(result) = result {
+                 self.build = None;
++                let was_watching = self.watch_status.take().is_some();
+                 match result {
+                     Ok(report) if report.cancelled => {
+-                        self.notice = Some("已取消正文收录，原索引保持不变".into())
++                        self.notice = Some(
++                            if was_watching {
++                                "正文实时监控已停止，已提交的索引保留"
++                            } else {
++                                "已取消正文收录，原索引保持不变"
++                            }
++                            .into(),
++                        )
+                     }
+                     Ok(report) if report.published => {
+                         self.notice = Some(if report.unchanged_snapshot {
+@@ -495,6 +573,7 @@
+         );
+         ui.add_space(14.0);
+         let mut start_build = false;
++        let mut start_watch = false;
+         ui.horizontal(|ui| {
+             if ui
+                 .add_enabled(
+@@ -514,7 +593,14 @@
+                 });
+             }
+             if self.build.is_some() {
+-                if ui.button("取消收录").clicked() {
++                if ui
++                    .button(if self.watch_status.is_some() {
++                        "停止实时监控"
++                    } else {
++                        "取消收录"
++                    })
++                    .clicked()
++                {
+                     self.cancel_build();
+                 }
+                 ui.spinner();
+@@ -527,20 +613,35 @@
+             {
+                 start_build = true;
+             }
++            if ui
++                .add_enabled(
++                    !saving && settings.content_enabled && self.build.is_none(),
++                    egui::Button::new("启动实时收录"),
++                )
++                .on_hover_text("仅在当前应用运行时监听已授权范围；停止后下次启动先完整校准")
++                .clicked()
++            {
++                start_watch = true;
++            }
+         });
+         if !saving
+             && self.build.is_none()
+             && ui
+-                .button("清除未发布检查点")
+-                .on_hover_text("只清理未完成的正文收录进度，正式索引和用户文件不受影响")
++                .button("清除未发布任务")
++                .on_hover_text("只清理未完成的正文收录进度和变更队列，正式索引和用户文件不受影响")
+                 .clicked()
+         {
+-            match xs_content::discard_pending_checkpoint(profile) {
++            match xs_content::discard_pending_work(profile) {
+                 Ok(()) => {
+                     self.error = None;
+-                    self.notice = Some("未发布检查点已清除".into());
++                    self.notice = Some("未发布任务已清除".into());
+                 }
+                 Err(error) => self.error = Some(error.to_string()),
++            }
++        }
++        if start_watch {
++            if let Err(error) = self.watch(profile, ui.ctx()) {
++                self.error = Some(error.to_string());
+             }
+         }
+         if start_build {
+--- a/rust/crates/xs-ui/src/main.rs
++++ b/rust/crates/xs-ui/src/main.rs
+@@ -750,9 +750,9 @@
+         && expected.and_then(|old| old.content_scope_token().ok())
+             != candidate.content_scope_token().ok()
+     {
+-        if let Err(error) = xs_content::discard_pending_checkpoint(dir) {
++        if let Err(error) = xs_content::discard_pending_work(dir) {
+             warning = Some(format!(
+-                "正文授权已保存，但检查点未清理：{error:#}{}",
++                "正文授权已保存，但待处理任务未清理：{error:#}{}",
+                 warning.map(|s| format!("；{s}")).unwrap_or_default()
+             ));
+         }
+@@ -839,6 +839,11 @@
+     }
+ 
+     fn open_connector(&mut self, row: usize, ctx: &egui::Context) {
++        if !self.connectors.grant_current() {
++            self.error = Some("来源授权已变更，请重新载入来源".into());
++            self.selected_connector = None;
++            return;
++        }
+         let Some(item) = self.matching_connectors().get(row).cloned() else {
+             self.error = Some("连接器结果已更新，请重新搜索".into());
+             return;
+@@ -3171,7 +3176,7 @@
+                     self.main_panel(ctx);
+                     self.activity_panel(ctx);
+                     self.preview_dialog(ctx);
+-                    self.connectors.show(ctx);
++                    self.connectors.show(ctx, &self.data_dir);
+                 }
+                 self.wizard(ctx);
+                 self.utility.show(ctx, &self.data_dir);
+--- /dev/null
++++ b/rust/crates/xs-content/src/snapshot.rs
+@@ -0,0 +1,505 @@
++//! Integrity-checked, bounded two-slot snapshot storage. The publication
++//! file is the sole commit point. A base is immutable while referenced; changes
++//! are stored as a cumulative, bounded block overlay relative to that base.
++//! A compaction writes the inactive base durably before replacing the pointer.
++//! Digests detect corruption, not an adversary able to rewrite the entire profile.
++use anyhow::{ensure, Context, Result};
++use sha2::{Digest, Sha256};
++use std::{
++    fs::File,
++    io::{self, Read, Seek, SeekFrom, Write},
++    path::{Path, PathBuf},
++    sync::atomic::{AtomicBool, Ordering},
++};
++use xs_platform::{FileRevision, LocalWriteOutcome, PlatformError};
++
++pub(crate) const MAGIC: [u8; 8] = *b"XSCONT02";
++const PATCH_MAGIC: [u8; 8] = *b"XSCDEL03";
++pub(crate) const HEADER_BYTES: usize = 56;
++const OVERLAY_HEADER: usize = 120;
++const BLOCK: usize = 32768;
++pub(crate) const MAX_DB_SIZE: usize = 512 * 1024 * 1024;
++const MAX_DELTA_BYTES: usize = 64 * 1024 * 1024;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++struct Base {
++    slot: u8,
++    generation: u64,
++    size: usize,
++    digest: [u8; 32],
++}
++
++#[derive(Debug, Clone, Copy)]
++struct Overlay {
++    base: Base,
++    blocks: usize,
++}
++
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct Head {
++    pub generation: u64,
++    pub size: usize,
++    digest: [u8; 32],
++    overlay: Option<Overlay>,
++}
++
++fn base_path(path: &Path, slot: u8) -> PathBuf {
++    path.with_file_name(if slot == 0 {
++        "content.base-a.idx"
++    } else {
++        "content.base-b.idx"
++    })
++}
++
++pub(crate) fn encode_header(generation: u64, bytes: &[u8]) -> [u8; HEADER_BYTES] {
++    let mut header = [0; HEADER_BYTES];
++    header[..8].copy_from_slice(&MAGIC);
++    header[8..16].copy_from_slice(&generation.to_le_bytes());
++    header[16..24].copy_from_slice(&(bytes.len() as u64).to_le_bytes());
++    header[24..].copy_from_slice(&Sha256::digest(bytes));
++    header
++}
++
++pub(crate) fn read_head(file: &mut File) -> Result<Head> {
++    file.seek(SeekFrom::Start(0))?;
++    let mut bytes = [0; HEADER_BYTES];
++    file.read_exact(&mut bytes)?;
++    let generation = u64::from_le_bytes(bytes[8..16].try_into()?);
++    let size = usize::try_from(u64::from_le_bytes(bytes[16..24].try_into()?))?;
++    ensure!(
++        (1..=i64::MAX as u64).contains(&generation) && (512..=MAX_DB_SIZE).contains(&size),
++        "正文库头部或容量无效"
++    );
++    let digest = bytes[24..].try_into()?;
++    let length = file.metadata()?.len();
++    let overlay = if bytes[..8] == MAGIC {
++        ensure!(length == (HEADER_BYTES + size) as u64, "正文库长度无效");
++        None
++    } else if bytes[..8] == PATCH_MAGIC {
++        let mut extra = [0; OVERLAY_HEADER - HEADER_BYTES];
++        file.read_exact(&mut extra)?;
++        let slot = extra[0];
++        let base_generation = u64::from_le_bytes(extra[8..16].try_into()?);
++        let base_size = usize::try_from(u64::from_le_bytes(extra[16..24].try_into()?))?;
++        let base_digest = extra[24..56].try_into()?;
++        let blocks = u32::from_le_bytes(extra[56..60].try_into()?) as usize;
++        ensure!(
++            slot <= 1
++                && extra[1..8] == [0; 7]
++                && extra[60..64] == [0; 4]
++                && (1..=generation).contains(&base_generation)
++                && (512..=MAX_DB_SIZE).contains(&base_size)
++                && blocks <= size.div_ceil(BLOCK)
++                && length >= OVERLAY_HEADER as u64
++                && length <= (OVERLAY_HEADER + blocks * (BLOCK + 4)) as u64
++                && length <= (OVERLAY_HEADER + MAX_DELTA_BYTES) as u64,
++            "正文增量头部无效，请完整重建"
++        );
++        Some(Overlay {
++            base: Base {
++                slot,
++                generation: base_generation,
++                size: base_size,
++                digest: base_digest,
++            },
++            blocks,
++        })
++    } else {
++        anyhow::bail!("无法识别正文库格式，请重建");
++    };
++    Ok(Head {
++        generation,
++        size,
++        digest,
++        overlay,
++    })
++}
++
++fn open_base(path: &Path, descriptor: Base) -> Result<(File, FileRevision)> {
++    let mut file = xs_platform::open_local_read(&base_path(path, descriptor.slot))?;
++    let revision = FileRevision::from_file(&file)?;
++    let head = read_head(&mut file)?;
++    ensure!(
++        head.overlay.is_none()
++            && head.generation == descriptor.generation
++            && head.size == descriptor.size
++            && head.digest == descriptor.digest,
++        "正文增量的基准快照不匹配，请完整校准"
++    );
++    Ok((file, revision))
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub(crate) struct Stamp {
++    pub publication: FileRevision,
++    pub base: Option<(u8, FileRevision)>,
++}
++impl Stamp {
++    pub fn verify(&self, path: &Path) -> Result<()> {
++        ensure!(
++            FileRevision::at_path(path)? == self.publication,
++            "正文索引已更新，请重新搜索"
++        );
++        if let Some((slot, revision)) = self.base {
++            ensure!(
++                slot <= 1 && FileRevision::at_path(&base_path(path, slot))? == revision,
++                "正文基准索引已更新，请重新搜索"
++            );
++        }
++        Ok(())
++    }
++}
++
++pub(crate) struct OpenSnapshot {
++    file: File,
++    base_file: Option<File>,
++    pub head: Head,
++    pub stamp: Stamp,
++}
++
++impl OpenSnapshot {
++    pub fn open(path: &Path) -> Result<Self> {
++        let mut file = xs_platform::open_local_read(path)?;
++        let publication = FileRevision::from_file(&file)?;
++        let head = read_head(&mut file)?;
++        let (base_file, base) = if let Some(overlay) = head.overlay {
++            // A candidate checkpoint must always be a self-contained snapshot.
++            ensure!(
++                path.file_name().and_then(|n| n.to_str()) == Some(super::CONTENT_DB),
++                "检查点不能引用外部基准"
++            );
++            let (file, revision) = open_base(path, overlay.base)?;
++            (Some(file), Some((overlay.base.slot, revision)))
++        } else {
++            (None, None)
++        };
++        let stamp = Stamp { publication, base };
++        stamp.verify(path)?;
++        Ok(Self {
++            file,
++            base_file,
++            head,
++            stamp,
++        })
++    }
++
++    /// Reconstruct using a single output allocation, hashing all base bytes
++    /// (including a truncated tail), then validating the full reconstructed DB.
++    pub fn read_into(&mut self, output: &mut [u8], cancel: &AtomicBool) -> Result<()> {
++        ensure!(output.len() == self.head.size, "正文读取缓冲区长度错误");
++        if let Some(overlay) = self.head.overlay {
++            if output.len() > overlay.base.size {
++                output[overlay.base.size..].fill(0);
++            }
++            let base = self.base_file.as_mut().context("正文基准句柄缺失")?;
++            let mut digest = Sha256::new();
++            let mut chunk = vec![0; BLOCK];
++            for start in (0..overlay.base.size).step_by(BLOCK) {
++                ensure!(!cancel.load(Ordering::Acquire), "正文库读取已取消");
++                let n = BLOCK.min(overlay.base.size - start);
++                base.read_exact(&mut chunk[..n])?;
++                digest.update(&chunk[..n]);
++                if start < output.len() {
++                    let copy = n.min(output.len() - start);
++                    output[start..start + copy].copy_from_slice(&chunk[..copy]);
++                }
++            }
++            ensure!(
++                digest.finalize()[..] == overlay.base.digest
++                    && Some((overlay.base.slot, FileRevision::from_file(base)?)) == self.stamp.base,
++                "正文基准已损坏或读取期间已更改"
++            );
++            let mut last = None;
++            for _ in 0..overlay.blocks {
++                ensure!(!cancel.load(Ordering::Acquire), "正文库读取已取消");
++                let mut raw = [0; 4];
++                self.file.read_exact(&mut raw)?;
++                let index = u32::from_le_bytes(raw) as usize;
++                ensure!(
++                    index < output.len().div_ceil(BLOCK)
++                        && last.is_none_or(|previous| index > previous),
++                    "正文增量块顺序或范围无效"
++                );
++                let start = index * BLOCK;
++                let end = (start + BLOCK).min(output.len());
++                self.file.read_exact(&mut output[start..end])?;
++                last = Some(index);
++            }
++            ensure!(
++                self.file.stream_position()? == self.file.metadata()?.len(),
++                "正文增量存在多余字节"
++            );
++        } else {
++            for chunk in output.chunks_mut(1024 * 1024) {
++                ensure!(!cancel.load(Ordering::Acquire), "正文库读取已取消");
++                self.file.read_exact(chunk)?;
++            }
++        }
++        let mut digest = Sha256::new();
++        for chunk in output.chunks(1024 * 1024) {
++            ensure!(!cancel.load(Ordering::Acquire), "正文库读取已取消");
++            digest.update(chunk);
++        }
++        ensure!(
++            digest.finalize()[..] == self.head.digest
++                && FileRevision::from_file(&self.file)? == self.stamp.publication,
++            "正文库已损坏或读取期间已更改，请重建或重试"
++        );
++        Ok(())
++    }
++}
++
++#[derive(Debug)]
++pub(crate) struct PublishStats {
++    pub bytes_written: u64,
++    pub delta_blocks: usize,
++    pub base_rewritten: bool,
++    pub cleanup_warning: Option<String>,
++}
++
++fn write_chunks(file: &mut File, bytes: &[u8], cancel: &AtomicBool) -> io::Result<()> {
++    for chunk in bytes.chunks(1024 * 1024) {
++        if cancel.load(Ordering::Acquire) {
++            return Err(io::Error::other("正文重建已取消"));
++        }
++        file.write_all(chunk)?;
++    }
++    Ok(())
++}
++
++/// Compare against the immutable base. Keep only block numbers, not duplicated
++/// data. The cumulative overlay is compacted before it exceeds 25% of the base
++/// (at least eight blocks, capped at 64 MiB).
++fn changed_blocks(
++    path: &Path,
++    base: Base,
++    bytes: &[u8],
++    cancel: &AtomicBool,
++) -> Result<Option<(Vec<u32>, FileRevision)>> {
++    let (mut file, revision) = open_base(path, base)?;
++    let budget = (base.size / 4).clamp(8 * BLOCK, MAX_DELTA_BYTES);
++    let mut changed = Vec::new();
++    let mut patch_size = 0;
++    let mut old = vec![0; BLOCK];
++    let mut digest = Sha256::new();
++    for start in (0..base.size.max(bytes.len())).step_by(BLOCK) {
++        ensure!(!cancel.load(Ordering::Acquire), "正文增量比较已取消");
++        let n = base.size.saturating_sub(start).min(BLOCK);
++        file.read_exact(&mut old[..n])?;
++        digest.update(&old[..n]);
++        if start >= bytes.len() {
++            continue;
++        }
++        let current = &bytes[start..(start + BLOCK).min(bytes.len())];
++        if n < current.len() || old[..current.len()] != *current {
++            patch_size += current.len() + 4;
++            if patch_size > budget {
++                return Ok(None);
++            }
++            changed.push(u32::try_from(start / BLOCK)?);
++        }
++    }
++    ensure!(
++        digest.finalize()[..] == base.digest && FileRevision::from_file(&file)? == revision,
++        "正文基准在增量比较期间损坏或被替换"
++    );
++    Ok(Some((changed, revision)))
++}
++
++fn overlay_header(
++    generation: u64,
++    bytes: &[u8],
++    base: Base,
++    blocks: usize,
++) -> Result<[u8; OVERLAY_HEADER]> {
++    let mut header = [0; OVERLAY_HEADER];
++    header[..HEADER_BYTES].copy_from_slice(&encode_header(generation, bytes));
++    header[..8].copy_from_slice(&PATCH_MAGIC);
++    header[56] = base.slot;
++    header[64..72].copy_from_slice(&base.generation.to_le_bytes());
++    header[72..80].copy_from_slice(&(base.size as u64).to_le_bytes());
++    header[80..112].copy_from_slice(&base.digest);
++    header[112..116].copy_from_slice(&u32::try_from(blocks)?.to_le_bytes());
++    Ok(header)
++}
++
++pub(crate) fn publish(
++    path: &Path,
++    bytes: &[u8],
++    generation: u64,
++    allow_delta: bool,
++    cancel: &AtomicBool,
++    validate: impl Fn() -> Result<()>,
++) -> Result<(LocalWriteOutcome, PublishStats)> {
++    ensure!(
++        (512..=MAX_DB_SIZE).contains(&bytes.len()),
++        "正文库超出容量上限"
++    );
++    validate()?;
++    ensure!(!cancel.load(Ordering::Acquire), "正文重建已取消");
++    let old_base = xs_platform::open_local_read(path)
++        .ok()
++        .and_then(|mut file| read_head(&mut file).ok())
++        .and_then(|head| head.overlay.map(|overlay| overlay.base));
++    let diff = if allow_delta {
++        if let Some(base) = old_base {
++            changed_blocks(path, base, bytes, cancel)?
++                .map(|(blocks, revision)| (base, blocks, revision))
++        } else {
++            None
++        }
++    } else {
++        None
++    };
++    let (base, blocks, base_revision, base_rewritten) = if let Some((base, blocks, revision)) = diff
++    {
++        (base, blocks, revision, false)
++    } else {
++        // Never overwrite the base referenced by the current publication.
++        let slot = old_base.map_or(0, |old| 1 - old.slot);
++        let base = Base {
++            slot,
++            generation,
++            size: bytes.len(),
++            digest: Sha256::digest(bytes).into(),
++        };
++        let path_base = base_path(path, slot);
++        let outcome = xs_platform::write_local_replace(&path_base, |file| {
++            file.write_all(&encode_header(generation, bytes))?;
++            write_chunks(file, bytes, cancel)?;
++            validate().map_err(io::Error::other)
++        })?;
++        ensure!(
++            outcome.is_durable(),
++            "正文基准已写入但持久化未确认，未切换正式索引"
++        );
++        (base, Vec::new(), FileRevision::at_path(&path_base)?, true)
++    };
++    let header = overlay_header(generation, bytes, base, blocks.len())?;
++    let mut bytes_written = (if base_rewritten {
++        HEADER_BYTES + bytes.len()
++    } else {
++        0
++    }) + OVERLAY_HEADER;
++    for &index in &blocks {
++        bytes_written += 4 + (bytes.len() - index as usize * BLOCK).min(BLOCK);
++    }
++    let outcome = xs_platform::write_local_replace(path, |file| {
++        file.write_all(&header)?;
++        for &index in &blocks {
++            if cancel.load(Ordering::Acquire) {
++                return Err(io::Error::other("正文增量发布已取消"));
++            }
++            file.write_all(&index.to_le_bytes())?;
++            let start = index as usize * BLOCK;
++            file.write_all(&bytes[start..(start + BLOCK).min(bytes.len())])?;
++        }
++        validate().map_err(io::Error::other)?;
++        if FileRevision::at_path(&base_path(path, base.slot)).map_err(io::Error::other)?
++            != base_revision
++        {
++            return Err(io::Error::other("正文基准在提交前发生变化"));
++        }
++        if cancel.load(Ordering::Acquire) {
++            return Err(io::Error::other("正文重建已取消"));
++        }
++        Ok(())
++    })?;
++    let mut cleanup_warning = None;
++    if outcome.is_durable() {
++        let obsolete = base_path(path, 1 - base.slot);
++        match xs_platform::remove_local_file(&obsolete) {
++            Ok(()) => (),
++            Err(PlatformError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => (),
++            Err(error) => cleanup_warning = Some(format!("旧正文基准未清理：{error}")),
++        }
++    }
++    Ok((
++        outcome,
++        PublishStats {
++            bytes_written: bytes_written as u64,
++            delta_blocks: blocks.len(),
++            base_rewritten,
++            cleanup_warning,
++        },
++    ))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::{cell::Cell, fs};
++
++    fn read(path: &Path) -> Result<Vec<u8>> {
++        let mut snapshot = OpenSnapshot::open(path)?;
++        let mut output = vec![0xff; snapshot.head.size];
++        snapshot.read_into(&mut output, &AtomicBool::new(false))?;
++        Ok(output)
++    }
++
++    #[test]
++    fn legacy_overlay_roundtrip_and_corruption() -> Result<()> {
++        let dir = tempfile::tempdir()?;
++        let path = dir.path().join(super::super::CONTENT_DB);
++        let cancel = AtomicBool::new(false);
++        let initial = vec![42; BLOCK * 64];
++        let mut legacy = encode_header(1, &initial).to_vec();
++        legacy.extend_from_slice(&initial);
++        fs::write(&path, legacy)?;
++        assert_eq!(read(&path)?, initial);
++        let (_, first) = publish(&path, &initial, 2, true, &cancel, || Ok(()))?;
++        assert!(first.base_rewritten);
++        let old = OpenSnapshot::open(&path)?.stamp;
++        let mut updated = initial.clone();
++        updated[BLOCK * 5 + 10] = 99;
++        updated.extend_from_slice(&[17; 100]);
++        let (_, delta) = publish(&path, &updated, 3, true, &cancel, || Ok(()))?;
++        assert!(!delta.base_rewritten);
++        assert_eq!(delta.delta_blocks, 2);
++        assert!(delta.bytes_written < initial.len() as u64 / 10);
++        assert_eq!(read(&path)?, updated);
++        assert_eq!(OpenSnapshot::open(&path)?.stamp.base, old.base);
++        assert!(old.verify(&path).is_err());
++        updated.truncate(BLOCK * 63 + 15);
++        publish(&path, &updated, 4, true, &cancel, || Ok(()))?;
++        assert_eq!(read(&path)?, updated);
++        let pointer = fs::read(&path)?;
++        let mut bad = pointer.clone();
++        *bad.last_mut().unwrap() ^= 1;
++        fs::write(&path, bad)?;
++        assert!(read(&path).is_err());
++        fs::write(&path, pointer)?;
++        let stamp = OpenSnapshot::open(&path)?.stamp;
++        let base = base_path(&path, stamp.base.unwrap().0);
++        let mut bad = fs::read(&base)?;
++        *bad.last_mut().unwrap() ^= 1;
++        fs::write(base, bad)?;
++        assert!(stamp.verify(&path).is_err());
++        assert!(read(&path).is_err());
++        Ok(())
++    }
++
++    #[test]
++    fn interrupted_compaction_preserves_current_snapshot() -> Result<()> {
++        let dir = tempfile::tempdir()?;
++        let path = dir.path().join(super::super::CONTENT_DB);
++        let cancel = AtomicBool::new(false);
++        let initial = vec![12; BLOCK * 16];
++        publish(&path, &initial, 1, false, &cancel, || Ok(()))?;
++        let before = OpenSnapshot::open(&path)?.stamp;
++        let checks = Cell::new(0);
++        let updated = vec![23; BLOCK * 16];
++        let result = publish(&path, &updated, 2, false, &cancel, || {
++            checks.set(checks.get() + 1);
++            ensure!(checks.get() < 3, "injected interruption before publication");
++            Ok(())
++        });
++        assert!(result.is_err());
++        before.verify(&path)?;
++        assert_eq!(read(&path)?, initial);
++        publish(&path, &updated, 2, false, &cancel, || Ok(()))?;
++        assert_eq!(read(&path)?, updated);
++        assert!(!base_path(&path, before.base.unwrap().0).exists());
++        Ok(())
++    }
++}
+--- /dev/null
++++ b/rust/ALPHA7_DEVELOPMENT.md
+@@ -0,0 +1,14 @@
++# Alpha.7 开发检查点（不放行正式发行）
++
++基线：0.18.0-alpha.6；工具链：Rust 1.99.1，原有锁定 Vendor。未增加第三方依赖。
++
++- 正文持久变更请求：content-enqueue / content-apply / content-watch。已知文件增改采用局部更新；未知、目录、删除或异常回到完整校准，避免静默漏收。实时监控重启先全量校准，不承诺 OS 持久日志。局部 `scope_reconciled=false`。桌面提供显式启动/停止实时收录。
++- 原子发布正文数据库：`content.idx` 作为提交点，`content.base-a.idx` / `content.base-b.idx` 为两槽基准，32KiB 累计差分，达到预算则压缩；删除文件时强制重新生成基准。读取校验基准身份、基准与重构 SHA-256、发布身份及授权。兼容旧自包含格式。新格式旧程序不能直接读，降级需独立备份或重建。未完成磁盘 WAL、真正局部读取、加密与可证明擦除。提交统计不含检查点及 OS/存储硬件写放大。
++- 来源授权：显式记住、恢复和撤销，绑定来源路径与内容摘要；不存导入正文和 URL 令牌。来源变化要求重新授权。
++- 安装器：确认激活状态持久化后才清理旧版本，验证程序，保留无清单未知文件；卸载先持久提交状态。真实模型安装、断电、Windows 升级及卸载未验收。
++
++Linux 当前证据：全工作区 219 个独立测试通过（原始日志 220 次成功，跨进程子测试重复一次）；Rustfmt、Clippy `-D warnings`、全工作区类型检查、版本一致性、Debug 原生构建与 Xvfb 冒烟通过。Release CLI/正文 worker 和正文 benchmark 构建通过；桌面 Release 未重新构建。3,000,000 合成文件名每组 30 次，首屏核心 P95 最大 0.462ms（3 宽查询为部分首屏），完整查询 P95 最大 105.744ms（仍超 50ms 门槛）；20,000 合成文档初次建库 11.771s，常驻查询 P95 0.788/5.129/4.617ms；增量 1/100/1000 文件分别 59.408/171.174/1057.898ms，发布 557244/1016052/1966440 字节，命中真值验证通过。合成、tmpfs、非竞品同机跑分；不含真实模型及真实多格式文件。
++
++复现：`bash scripts/verify_offline_linux.sh`；`cargo clippy --workspace --all-targets --locked --offline -- -D warnings`；`cargo build --release --locked --offline -p xs-cli -p xs-content --bins --example benchmark`。把 CLI 和正文 worker 放在安全策略允许的本地目录，同目录有 `xs-content-worker`。用专用空数据目录运行 `xunshu --data-dir <dir> benchmark --entries 3000000 --iterations 30`；`target/release/examples/benchmark <合成父目录> <CLI绝对路径> 20000`。不禁用任何本地文件系统保护。
++
++下一阶段必须完成真实 OCR/语义资源、Windows 原生发行/升级/回滚/卸载、国产系统实机测试、长期故障注入和资源预算，且验证宽查询完整耗时。未达到 80 分门槛，禁止将本开发检查点称为最终发布包。
