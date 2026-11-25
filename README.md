@@ -53,7 +53,7 @@
 
 ## 当前版本与验证状态
 
-当前版本为 **`0.18.0-alpha.7`（Alpha8 内部测试候选，2026 年 11 月 25 日）**。本轮更新了原生搜索工作台和品牌图标，并在 Windows 11 上验证桌面快捷方式、最小化到托盘、恢复、升级及回退。统信 UOS 安装候选面向 **UOS Desktop 20 1070 amd64**，以 GLIBC 2.28 为兼容目标。目标系统的原生安装和 DDE 桌面验收待完成，Windows 10 原生验收也待完成。测试候选包未签名。
+当前版本为 **`0.18.0-alpha.7`（Alpha8 内部测试候选，2026 年 11 月 25 日）**。本轮更新了原生搜索工作台、文件类别筛选和品牌图标。Windows 11 已验证分类切换、桌面快捷方式、最小化到托盘、恢复、升级及回退。统信 UOS 兼容性测试包以 **UOS Desktop 20 1070 amd64 / GLIBC 2.28** 为目标，已通过 Debian 安装与桌面测试。当前 UOS 1070 虚拟机执行候选程序时退出码为 139，UOS 原生安装、DDE 和 Windows 10 的验收待完成。测试候选包未签名。
 
 [当前验证记录](rust/VALIDATION.md) · [双平台验收路径](rust/docs/PLATFORM_ACCEPTANCE.md) · [历史 alpha.7 验收数据](checkpoints/alpha7/QA_Evidence.json)
 
