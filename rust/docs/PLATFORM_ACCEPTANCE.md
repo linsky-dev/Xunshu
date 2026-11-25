@@ -53,4 +53,6 @@ bash scripts/accept-uos.sh /opt/xunshu/bin /opt/xunshu/acceptance \
 
 Windows 调用遵循本机当前 PowerShell 执行策略。UOS 1070 的 Python 3.7.3 可运行本脚本所用语法与标准库接口。验收脚本及复用的合同脚本只用于测试，不属于产品运行时依赖。启用 `--with-models` 的 OCR 及语义测试还需要 Python Pillow 来合成混合 PDF 样本。
 
+Linux 使用系统统计接口记录 CPU 时间和内存。Windows 已安装 `psutil` 时会采集扫描进程的 CPU 时间和工作集，未安装或未采到样本会显示跳过。资源读数仅代表该轮合成验收。
+
 请逐项完成人工清单中的桌面窗口、中文输入法、多屏与高 DPI、快捷键、托盘、文件拖拽、真实合成扫描件 OCR、变更监听、索引恢复和范围撤销检查。只有安装经核验模型的本机才执行语义搜索。人工检查结果应在验收报告副本中逐项勾选并注明目标系统版本。

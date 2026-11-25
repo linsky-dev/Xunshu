@@ -11,14 +11,65 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
 
 
-def run_json(command: list[str], timeout: int = 120) -> tuple[dict, float]:
+def windows_scan(command, timeout, usage):
+    try:
+        import psutil
+    except ImportError:
+        usage["reason"] = "Windows 的资源采样需要在验收工具的 Python 环境中安装 psutil"
+        return subprocess.run(command, capture_output=True, encoding="utf-8", timeout=timeout)
+
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8") as child:
+        finished = threading.Event()
+
+        def sample():
+            try:
+                process = psutil.Process(child.pid)
+                while not finished.is_set():
+                    rss = process.memory_info().peak_wset
+                    cpu = process.cpu_times()
+                    usage.update(peak_rss_bytes=rss, user_cpu_ms=round(cpu.user * 1000, 3),
+                                 system_cpu_ms=round(cpu.system * 1000, 3))
+                    finished.wait(0.005)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return
+
+        sampler = threading.Thread(target=sample)
+        sampler.start()
+        try:
+            stdout, stderr = child.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.communicate()
+            raise
+        finally:
+            finished.set()
+            sampler.join()
+        usage["measurement"] = "合成文件名扫描子进程的 5 ms 间隔采样"
+        return subprocess.CompletedProcess(command, child.returncode, stdout, stderr)
+
+
+def run_json(command: list[str], timeout: int = 120, usage=None) -> tuple[dict, float]:
     started = time.perf_counter()
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    if usage is not None and os.name == "nt":
+        completed = windows_scan(command, timeout, usage)
+    elif usage is not None and sys.platform == "linux":
+        import resource
+
+        before = resource.getrusage(resource.RUSAGE_CHILDREN)
+        completed = subprocess.run(command, capture_output=True, encoding="utf-8", timeout=timeout)
+        after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        usage.update(peak_rss_bytes=after.ru_maxrss * 1024,
+                     user_cpu_ms=round((after.ru_utime - before.ru_utime) * 1000, 3),
+                     system_cpu_ms=round((after.ru_stime - before.ru_stime) * 1000, 3),
+                     measurement="已回收验收子进程的峰值 RSS，CPU 时间只计合成扫描")
+    else:
+        completed = subprocess.run(command, capture_output=True, encoding="utf-8", timeout=timeout)
     elapsed_ms = (time.perf_counter() - started) * 1000
     if completed.returncode != 0:
         raise RuntimeError(
@@ -169,12 +220,13 @@ def main() -> int:
         except Exception as error:
             checks["launch"] = record("FAIL", str(error))
 
-        def invoke(*arguments: str, timeout: int = 120) -> tuple[dict, float]:
-            return run_json([str(cli), "--data-dir", str(data_dir), *arguments], timeout)
+        def invoke(*arguments: str, timeout: int = 120, usage=None) -> tuple[dict, float]:
+            return run_json([str(cli), "--data-dir", str(data_dir), *arguments], timeout, usage)
 
+        resources = {}
         try:
             init, _ = invoke("init", "--root", str(samples), "--ext", "txt,pdf")
-            scan, _ = invoke("scan")
+            scan, _ = invoke("scan", usage=resources)
             found, search_ms = invoke("search", "ext:txt")
             status, _ = invoke("status")
             if not init.get("ok") or not scan.get("published") or not scan["report"].get("complete"):
@@ -240,22 +292,13 @@ def main() -> int:
 
         recovery_helper = Path(__file__).with_name("verify-recovery.py")
         try:
-            recovery_bin_dir = bin_dir
-            if args.with_models:
-                fixtures = args.model_fixtures or (args.payload / "self-test" if args.payload else bin_dir / "self-test")
-                fixtures = fixtures.resolve(strict=True)
-                if fixtures != (bin_dir / "self-test").resolve():
-                    recovery_bin_dir = work_root / "model-test-bin"
-                    recovery_bin_dir.mkdir()
-                    suffix = ".exe" if os.name == "nt" else ""
-                    for name in ("xunshu", "xs-content-worker", "xs-model-worker"):
-                        os.link(bin_dir / f"{name}{suffix}", recovery_bin_dir / f"{name}{suffix}")
-                    shutil.copytree(bin_dir / "resources", recovery_bin_dir / "resources", copy_function=os.link)
-                    shutil.copytree(fixtures, recovery_bin_dir / "self-test")
-            recovery_args = [sys.executable, str(recovery_helper), "--bin-dir", str(recovery_bin_dir),
+            recovery_args = [sys.executable, str(recovery_helper), "--bin-dir", str(bin_dir),
                              "--temp-root", str(work_root)]
             if args.with_models:
                 recovery_args.append("--with-models")
+                fixtures = args.model_fixtures or (args.payload / "self-test" if args.payload else None)
+                if fixtures is not None:
+                    recovery_args.extend(["--model-fixtures", str(fixtures.resolve(strict=True))])
             recovery_run = subprocess.run(recovery_args, capture_output=True, text=True, timeout=1200)
             if recovery_run.returncode != 0:
                 raise RuntimeError(recovery_run.stderr.strip() or recovery_run.stdout.strip())
@@ -276,7 +319,12 @@ def main() -> int:
             checks["recovery"] = record("FAIL", str(error))
             checks["ocr"] = record("FAIL", str(error)) if args.with_models else record("SKIP", "未启用 --with-models")
             checks["semantic_search"] = record("FAIL", str(error)) if args.with_models else record("SKIP", "未启用 --with-models")
-        checks["resources"] = record("SKIP", "跨平台进程内存与 CPU 采样未由此脚本采集")
+        if resources.get("peak_rss_bytes"):
+            detail = (f"{resources['measurement']}，峰值内存 {resources['peak_rss_bytes']} 字节，"
+                      f"用户态 CPU {resources['user_cpu_ms']} ms，内核态 CPU {resources['system_cpu_ms']} ms")
+            checks["resources"] = record("PASS", detail, **resources)
+        else:
+            checks["resources"] = record("SKIP", resources.get("reason", "未采到合成扫描进程的资源数据"))
 
         if args.installer:
             installer = args.installer.resolve(strict=True)

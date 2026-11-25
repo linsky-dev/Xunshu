@@ -87,9 +87,9 @@ def write_mixed_pdf(path, image_path):
     path.write_bytes(pdf)
 
 
-def verify_model_worker(bin_dir, workspace, suffix):
+def verify_model_worker(bin_dir, workspace, suffix, model_fixtures):
     worker = bin_dir / ("xs-model-worker" + suffix)
-    image = (bin_dir / "self-test" / "image.png").read_bytes()
+    image = (model_fixtures / "image.png").read_bytes()
     self_test = subprocess.run(
         [worker, "self-test", "本地文件"], input=image, capture_output=True, timeout=45,
     )
@@ -130,7 +130,7 @@ def verify_model_worker(bin_dir, workspace, suffix):
     return result
 
 
-def run(bin_dir, workspace, with_models):
+def run(bin_dir, workspace, with_models, model_fixtures=None):
     suffix = ".exe" if os.name == "nt" else ""
     cli = str(bin_dir / ("xunshu" + suffix))
     fixtures = workspace / "files"
@@ -223,10 +223,11 @@ def run(bin_dir, workspace, with_models):
     checked = ["scope_scan", "resident_stdio_v2", "watch_update", "efu_edit_compare", "nullable_metadata", "content_worker", "agent_once_and_revocation"]
     evidence = {"ok": True, "platform": os.name, "verified": checked}
     if with_models:
+        model_fixtures = model_fixtures or bin_dir / "self-test"
         assets = command("status", "--verify-assets")
         assert assets["model_resources"]["state"] == "verified", assets["model_resources"]
         for name in ("image.png", "scanned.pdf"):
-            shutil.copyfile(bin_dir / "self-test" / name, fixtures / name)
+            shutil.copyfile(model_fixtures / name, fixtures / name)
         write_mixed_pdf(fixtures / "mixed.pdf", fixtures / "image.png")
         (fixtures / "长文.txt").write_text("春季花园开满了鲜花。" * 90 + "量子纠缠实验在两个粒子之间建立强关联。", encoding="utf-8")
         (fixtures / "对照.txt").write_text("蓝鲸以磷虾为食，生活在海洋中。", encoding="utf-8")
@@ -256,7 +257,7 @@ def run(bin_dir, workspace, with_models):
         evidence["models"] = {
             "semantic_vectors": content["semantic_vectors"], "semantic_top": Path(top["path"]).name,
             "ocr_files": ocr_files, "mixed_pdf_text_layer": "mixedtextlayer", "cancelled_search": replies[1],
-            "worker_self_test": verify_model_worker(bin_dir, workspace, suffix),
+            "worker_self_test": verify_model_worker(bin_dir, workspace, suffix, model_fixtures),
         }
         checked += ["installed_ocr", "scanned_pdf", "mixed_pdf", "semantic_tail", "semantic_cancel_resume", "model_tamper"]
     print(json.dumps(evidence, ensure_ascii=False))
@@ -267,9 +268,12 @@ def main():
     parser.add_argument("--bin-dir", type=Path, required=True)
     parser.add_argument("--temp-root", type=Path, required=True)
     parser.add_argument("--with-models", action="store_true")
+    parser.add_argument("--model-fixtures", type=Path, help="合成扫描 PDF 和 PNG 样本目录")
     args = parser.parse_args()
+    if args.model_fixtures and not args.with_models:
+        parser.error("--model-fixtures 需要 --with-models")
     with tempfile.TemporaryDirectory(prefix="xunshu-recovery-", dir=args.temp_root.resolve()) as directory:
-        run(args.bin_dir.resolve(), Path(directory), args.with_models)
+        run(args.bin_dir.resolve(), Path(directory), args.with_models, args.model_fixtures)
 
 
 if __name__ == "__main__":
