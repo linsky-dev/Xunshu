@@ -139,6 +139,7 @@ function IsOwnedInstall(const Directory, RegisteredDirectory: String): Boolean;
 var
   Uninstaller, UninstallerName: String;
   VersionMetadata: AnsiString;
+  ClosingQuote: Integer;
   Size: Int64;
 begin
   Result := False;
@@ -146,7 +147,13 @@ begin
   if (CompareText(Directory, RegisteredDirectory) <> 0) or
     (not RegQueryStringValue(HKLM64, UninstallKey, 'UninstallString', Uninstaller)) then
     Exit;
-  Uninstaller := RemoveQuotes(Uninstaller);
+  // Inno 的登记值在带引号的程序路径后还可能带有 /LOG。
+  if (Length(Uninstaller) < 3) or (Uninstaller[1] <> '"') then
+    Exit;
+  ClosingQuote := Pos('"', Copy(Uninstaller, 2, Length(Uninstaller) - 1));
+  if ClosingQuote < 2 then
+    Exit;
+  Uninstaller := Copy(Uninstaller, 2, ClosingQuote - 1);
   UninstallerName := ExtractFileName(Uninstaller);
   if (CompareText(ExtractFileDir(Uninstaller), Directory) <> 0) or
     (Length(UninstallerName) <> 12) or (CompareText(Copy(UninstallerName, 1, 5), 'unins') <> 0) or
