@@ -16,11 +16,29 @@ from pathlib import Path
 
 BGE = "https://huggingface.co/BAAI/bge-small-zh-v1.5/resolve/7999e1d3359715c523056ef9478215996d62a620"
 BGE_WEIGHTS_SHA256 = "354763b9b1357bc9c44f62c6be2276321081ed2567773608c0d0785b61d5a026"
+BGE_METADATA_SHA256 = {
+    "README.md": "c48a4eeea77f6b1d38b48ec1c5b8d4f86d5550cc43fa345a0db1b2ca1d082369",
+    "config.json": "3853a7979202c348751b753e36f579c41d8da7d36af617d3d907e1fc9b441f2a",
+    "tokenizer.json": "48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26",
+    "tokenizer_config.json": "e6f3b96db926a37d4039995fbf5ad17de158dfb8f6343d607e4dbaad18d75f5a",
+    "special_tokens_map.json": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3",
+    "vocab.txt": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+}
 DET = "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/e6f4fa85f00e168c862bc462aebca69eef9b3d3d"
 REC = "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_rec_onnx/resolve/ed152b8b495f84de93cda5709d768548a9127622"
 OCR_SHA256 = {
     "det": "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
     "rec": "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092",
+}
+OCR_METADATA_SHA256 = {
+    "det": {
+        "README.md": "951c155673ac6c15feb85857c9024a62266e5956d15319ce578a8f508f399d66",
+        "inference.yml": "98069072e1b6b37d727fd9d9f11725faa46d6ea0de012f2ed26caea011c37699",
+    },
+    "rec": {
+        "README.md": "7331c129fd5024b6a0abd1f510cfdfb2d7714fdcdbb00df21a0cb8b48e6683ee",
+        "inference.yml": "5dfeb2777f6d0db8177d8128a8acfcf6e6276dc4ac73ea3bf0dc06d6a5e85d8e",
+    },
 }
 BGE_LICENSE = "https://raw.githubusercontent.com/FlagOpen/FlagEmbedding/d04f7989eeec2c6db4ead7c77ddef656f9c9d3aa/LICENSE"
 OCR_LICENSE = "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/a00f633cef33a8192f853fdaf8decf24ce2240b0/LICENSE"
@@ -36,6 +54,17 @@ ORT_RELEASE = "https://github.com/microsoft/onnxruntime/releases/download/v1.24.
 ORT_ARCHIVES = {
     "windows": ("onnxruntime-win-x64-1.24.4.zip", "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357", "onnxruntime.dll", "onnxruntime.dll"),
     "linux": ("onnxruntime-linux-x64-1.24.4.tgz", "3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747", "libonnxruntime.so.1.24.4", "libonnxruntime.so"),
+}
+# 微软官方 PyPI 发布提供同版本的 CPU 动态库。仅提取原生库及许可证。
+ORT_WHEELS = {
+    "windows": (
+        "https://files.pythonhosted.org/packages/8b/f4/6b89e297b93704345f0f3f8c62229bee323ef25682a3f9b4f89a39324950/onnxruntime-1.24.4-cp312-cp312-win_amd64.whl",
+        "535b29475ca42b593c45fbb2152fbf1cdf3f287315bf650e6a724a0a1d065cdb",
+    ),
+    "linux": (
+        "https://files.pythonhosted.org/packages/6d/ab/5b68110e0460d73fad814d5bd11c7b1ddcce5c37b10177eb264d6a36e331/onnxruntime-1.24.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "0d640eb9f3782689b55cfa715094474cd5662f2f137be6a6f847a594b6e9705c",
+    ),
 }
 
 
@@ -97,6 +126,14 @@ def checked_copy(source, target, expected):
         raise ValueError(f"复制后摘要不匹配：{target.name}")
 
 
+def stage_inputs(upstream, cache, root, expected_hashes):
+    # 元数据摘要也经过固定提交的 Git 对象核验，未知缓存需重新下载。
+    root.mkdir()
+    for name, expected in expected_hashes.items():
+        source = fetch(f"{upstream}/{name}", cache / name, expected)
+        checked_copy(source, root / name, expected)
+
+
 def embedding_cosines(expected, actual, count):
     import numpy as np
 
@@ -119,13 +156,9 @@ def embedding_cosines(expected, actual, count):
 
 def stage_bge_inputs(cache, work):
     root = work / "bge"
-    root.mkdir()
-    weights = fetch(f"{BGE}/model.safetensors", cache / "bge" / "model.safetensors", BGE_WEIGHTS_SHA256)
-    checked_copy(weights, root / "model.safetensors", BGE_WEIGHTS_SHA256)
-    for name in ("README.md", "config.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "vocab.txt"):
-        fetch(f"{BGE}/{name}", root / name)
-    inputs_provenance = {path.name: digest(path) for path in sorted(root.iterdir())}
-    return root, inputs_provenance
+    expected = {"model.safetensors": BGE_WEIGHTS_SHA256, **BGE_METADATA_SHA256}
+    stage_inputs(BGE, cache / "bge", root, expected)
+    return root, expected
 
 
 def export_bge(cache, work):
@@ -140,7 +173,7 @@ def export_bge(cache, work):
     root, inputs_provenance = stage_bge_inputs(cache, work)
     quantized = root / "bge-quantized.onnx"
     # Never trust a derived ONNX left by an earlier build. Re-export from the
-    # verified weights and fresh metadata in this isolated workspace.
+    # verified weights and metadata in this isolated workspace.
     torch.set_num_threads(2)
     tokenizer = AutoTokenizer.from_pretrained(root, local_files_only=True, trust_remote_code=False)
     encoder = AutoModel.from_pretrained(root, local_files_only=True, trust_remote_code=False,
@@ -181,6 +214,7 @@ def export_bge(cache, work):
     minimum = float(cosine.min())
     provenance = {"upstream": BGE, "inputs_sha256": inputs_provenance,
                   "sample_count": len(samples), "minimum_quantized_cosine": minimum,
+                  "quantized_cosines": [float(value) for value in cosine],
                   "fp32_max_abs_error": float(np.max(np.abs(fp32 - expected))),
                   "versions": {"torch": str(torch.__version__), "onnx": onnx.__version__,
                                "onnxruntime": ort.__version__, "numpy": np.__version__}}
@@ -198,11 +232,10 @@ def prepare_ocr(cache, work, name, upstream):
     import yaml
 
     root = work / name
-    for file in ("README.md", "inference.yml"):
-        fetch(f"{upstream}/{file}", root / file)
+    stage_inputs(upstream, cache / name, root, {
+        "inference.onnx": OCR_SHA256[name], **OCR_METADATA_SHA256[name],
+    })
     model = root / "inference.onnx"
-    cached = fetch(f"{upstream}/inference.onnx", cache / name / "inference.onnx", OCR_SHA256[name])
-    checked_copy(cached, model, OCR_SHA256[name])
     config = yaml.safe_load((root / "inference.yml").read_text(encoding="utf-8"))
     if name == "rec":
         dictionary = root / "dictionary.txt"
@@ -217,7 +250,16 @@ def prepare_ocr(cache, work, name, upstream):
 def add_runtime(cache, work, output, platform):
     archive, expected, source_name, local_name = ORT_ARCHIVES[platform]
     url = f"{ORT_RELEASE}/{archive}"
-    cached = fetch(url, cache / archive, expected)
+    from_wheel = False
+    try:
+        cached = fetch(url, cache / archive, expected)
+    except urllib.error.HTTPError as error:
+        if error.code not in (404, 410):
+            raise
+        url, expected = ORT_WHEELS[platform]
+        archive = url.rsplit("/", 1)[1]
+        cached = fetch(url, cache / archive, expected)
+        from_wheel = True
     path = work / archive
     checked_copy(cached, path, expected)
     license_names = {"LICENSE", "ThirdPartyNotices.txt"}
@@ -229,10 +271,12 @@ def add_runtime(cache, work, output, platform):
             raise ValueError(f"ORT 压缩包中存在重复文件：{name}")
         seen.add(name)
         return output / (local_name if name == source_name else "onnxruntime-" + name)
-    if platform == "windows":
+    if from_wheel or platform == "windows":
+        wheel_members = {"onnxruntime/capi/" + source_name: source_name,
+                         **{"onnxruntime/" + name: name for name in license_names}}
         with zipfile.ZipFile(path) as package:
             for item in package.infolist():
-                name = Path(item.filename).name
+                name = wheel_members.get(item.filename) if from_wheel else Path(item.filename).name
                 if name == source_name or name in license_names:
                     target = target_for(name)
                     with package.open(item) as stream, target.open("xb") as file:
@@ -247,19 +291,21 @@ def add_runtime(cache, work, output, platform):
                         shutil.copyfileobj(stream, file)
     if seen != required:
         raise ValueError(f"ORT 压缩包缺少必需文件：{sorted(required - seen)}")
-    return local_name, url
+    return local_name, {"source": url, "archive_sha256": expected}
 
 
 def build_resources(cache, work, output, platform):
     bge, tokenizer, provenance = export_bge(cache, work)
     detection = prepare_ocr(cache, work, "det", DET)
     recognition, dictionary = prepare_ocr(cache, work, "rec", REC)
-    notices = {
-        "BGE-LICENSE.txt": fetch(BGE_LICENSE, work / "BGE-LICENSE.txt"),
-        "PP-OCRv5-LICENSE.txt": fetch(OCR_LICENSE, work / "PP-OCRv5-LICENSE.txt"),
-    }
-    for notice in notices.values():
+    license_sources = {"BGE-LICENSE.txt": BGE_LICENSE, "PP-OCRv5-LICENSE.txt": OCR_LICENSE}
+    notices = {}
+    for name, url in license_sources.items():
+        notice = work / name
+        expected = LICENSE_SHA256[name]
+        checked_copy(fetch(url, cache / name, expected), notice, expected)
         verify_license(notice)
+        notices[name] = notice
     output.mkdir()
     records = {}
 
@@ -276,8 +322,8 @@ def build_resources(cache, work, output, platform):
     ):
         shutil.copyfile(source, output / name)
         record(name, url, license_id)
-    runtime, source = add_runtime(cache, work, output, platform)
-    record(runtime, source, "MIT")
+    runtime, runtime_source = add_runtime(cache, work, output, platform)
+    record(runtime, runtime_source["source"], "MIT")
     for folder, name in [("bge", "BGE"), ("det", "PP-OCRv5-det"), ("rec", "PP-OCRv5-rec")]:
         shutil.copyfile(work / folder / "README.md", output / f"{name}-MODEL-CARD.md")
     for name, notice in notices.items():
@@ -288,7 +334,8 @@ def build_resources(cache, work, output, platform):
     provenance["ocr"] = {name: {"source": url, "config_sha256": digest(work / name / "inference.yml"),
                               "model_sha256": OCR_SHA256[name]}
                          for name, url in (("det", DET), ("rec", REC))}
-    provenance["license_sources"] = {"BGE-LICENSE.txt": BGE_LICENSE, "PP-OCRv5-LICENSE.txt": OCR_LICENSE}
+    provenance["onnxruntime"] = runtime_source
+    provenance["license_sources"] = license_sources
     provenance["license_git_objects"] = {name: {"bytes": size, "git_blob_sha1": sha, "sha256": LICENSE_SHA256[name]}
                                          for name, (size, sha) in LICENSE_OBJECTS.items()}
     provenance["outputs_sha256"] = {p.name: digest(p) for p in sorted(output.iterdir())}

@@ -138,6 +138,16 @@ class PayloadContracts(unittest.TestCase):
         payload.verify_native_header(path, "windows", library=True)
         with self.assertRaises(ValueError):
             payload.verify_native_header(path, "windows")
+        runtime = self.root / "VCRUNTIME140.dll"
+        runtime.write_bytes(header)
+        output = self.root / "payload"
+        output.mkdir()
+        payload.copy_runtime(output, "windows", [runtime])
+        self.assertEqual(payload.digest(output / "vcruntime140.dll"), payload.digest(runtime))
+        with self.assertRaises(ValueError):
+            payload.copy_runtime(output, "windows", [runtime])
+        with self.assertRaises(ValueError):
+            payload.copy_runtime(output, "linux", [runtime])
         struct.pack_into("<H", header, 68, 0xaa64)
         path.write_bytes(header)
         with self.assertRaises(ValueError):

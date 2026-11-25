@@ -48,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils build-essential pkg-config cmake clang libfontconfig1-dev fonts-noto-cjk xauth libxinerama-dev libx11-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libudev-dev xvfb
+          sudo apt-get install -y binutils build-essential pkg-config cmake clang libfontconfig1-dev fonts-noto-cjk xauth libxinerama-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libudev-dev xvfb
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'

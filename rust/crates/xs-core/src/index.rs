@@ -1208,6 +1208,12 @@ impl Index {
     }
 
     #[inline]
+    fn hot_name_bytes(&self, start: u32, len: u32) -> &[u8] {
+        let start = start as usize;
+        &self.section(&self.manifest.names)[start..start + len as usize]
+    }
+
+    #[inline]
     fn name_hot<'a>(
         &'a self,
         start: u32,
@@ -1215,9 +1221,7 @@ impl Index {
         flags: u32,
         scratch: &'a mut String,
     ) -> &'a str {
-        let s = start as usize;
-        let e = s + len as usize;
-        let stored = &self.section(&self.manifest.names)[s..e];
+        let stored = self.hot_name_bytes(start, len);
         if flags & PREFIX_FLAG == 0 {
             // Index::validate() 已在加载时逐条校验所有文件名段为合法 UTF-8。
             return std::str::from_utf8(stored).unwrap_or("");
@@ -1890,6 +1894,23 @@ impl Index {
                 .as_ref()
                 .map_or(segment.manifest.count as usize, Vec::len);
             if !COLUMN_SORT && !sample && workers > 1 && candidate_len >= 16_384 {
+                // 同一字典前缀只计算一次，复杂查询或未归一化记录走完整评估。
+                let prefix_scores: Vec<_> = if !needs_path && !needs_cold && boosts.is_none() {
+                    segment
+                        .manifest
+                        .name_prefixes
+                        .iter()
+                        .take_while(|_| !budget.expired())
+                        .map(|prefix| query.prepare_name_prefix(prefix))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let prefix_scores = if prefix_scores.iter().any(Option::is_some) {
+                    prefix_scores.as_slice()
+                } else {
+                    &[]
+                };
                 struct ChunkOutcome {
                     heap: BinaryHeap<Reverse<(i64, Reverse<u32>)>>,
                     total: usize,
@@ -1941,71 +1962,101 @@ impl Index {
                                 };
                                 local_candidates += 1;
                                 local_examined += 1;
-                                let (view, folded_name, parent_id, metadata) = if !needs_cold {
-                                    let (name_off, name_len, pid, sid, flags) =
-                                        segment.hot_fields(id);
-                                    let name = segment.name_hot(
-                                        name_off,
-                                        name_len,
-                                        flags,
-                                        &mut local_name,
-                                    );
-                                    let parent_id = pid as usize;
-                                    if needs_path {
-                                        local_path.clear();
-                                        local_path.push_str(&segment.manifest.parents[parent_id]);
-                                        local_path.push_str(name);
-                                    }
-                                    let view = EntryRef {
-                                        name,
-                                        path: &local_path,
-                                        size: 0,
-                                        modified: 0,
-                                        is_dir: flags & 1 != 0,
-                                        source: &segment.manifest.sources[sid as usize],
-                                    };
-                                    let folded_name = (flags & 2 != 0).then_some(view.name);
-                                    (view, folded_name, parent_id, QueryMetadata::default())
+                                let hot = (!needs_cold).then(|| segment.hot_fields(id));
+                                let prepared_score =
+                                    hot.and_then(|(name_off, name_len, pid, _, flags)| {
+                                        if prefix_scores.is_empty()
+                                            || flags & (PREFIX_FLAG | 2) != PREFIX_FLAG | 2
+                                        {
+                                            return None;
+                                        }
+                                        let stored = segment.hot_name_bytes(name_off, name_len);
+                                        let prefix = u16::from_le_bytes([stored[0], stored[1]]);
+                                        prefix_scores
+                                            .get(prefix as usize)
+                                            .copied()
+                                            .flatten()?
+                                            .score_suffix(
+                                                &stored[2..],
+                                                flags & 1 != 0,
+                                                segment.parent_depths[pid as usize],
+                                            )
+                                    });
+                                let score = if let Some(score) = prepared_score {
+                                    score
                                 } else {
-                                    let r = segment.raw(id);
-                                    let name_view = segment.view_raw(
-                                        &r,
-                                        segment.name(&r, &mut local_name)?,
-                                        "",
-                                    );
-                                    let parent_id = read32(&r, 8) as usize;
-                                    if needs_path {
-                                        local_path.clear();
-                                        local_path.push_str(&segment.manifest.parents[parent_id]);
-                                        local_path.push_str(name_view.name);
-                                    }
-                                    let view = EntryRef {
-                                        path: &local_path,
-                                        ..name_view
-                                    };
-                                    let folded_name =
-                                        (read32(&r, 32) & 2 != 0).then_some(view.name);
-                                    let metadata = segment.query_metadata(id)?;
-                                    (view, folded_name, parent_id, metadata)
-                                };
-                                if let Some(mut score) = query_ref.matched_score_with_metadata(
-                                    &view,
-                                    folded_name,
-                                    segment.parent_depths[parent_id],
-                                    metadata,
-                                ) {
-                                    if let Some(boosts) = boosts {
-                                        let full_path = if needs_path {
-                                            local_path.as_str()
+                                    let (view, folded_name, parent_id, metadata) =
+                                        if let Some((name_off, name_len, pid, sid, flags)) = hot {
+                                            let name = segment.name_hot(
+                                                name_off,
+                                                name_len,
+                                                flags,
+                                                &mut local_name,
+                                            );
+                                            let parent_id = pid as usize;
+                                            if needs_path {
+                                                local_path.clear();
+                                                local_path
+                                                    .push_str(&segment.manifest.parents[parent_id]);
+                                                local_path.push_str(name);
+                                            }
+                                            let view = EntryRef {
+                                                name,
+                                                path: &local_path,
+                                                size: 0,
+                                                modified: 0,
+                                                is_dir: flags & 1 != 0,
+                                                source: &segment.manifest.sources[sid as usize],
+                                            };
+                                            let folded_name = (flags & 2 != 0).then_some(view.name);
+                                            (view, folded_name, parent_id, QueryMetadata::default())
                                         } else {
-                                            boost_path.clear();
-                                            boost_path
-                                                .push_str(&segment.manifest.parents[parent_id]);
-                                            boost_path.push_str(view.name);
-                                            boost_path.as_str()
+                                            let r = segment.raw(id);
+                                            let name_view = segment.view_raw(
+                                                &r,
+                                                segment.name(&r, &mut local_name)?,
+                                                "",
+                                            );
+                                            let parent_id = read32(&r, 8) as usize;
+                                            if needs_path {
+                                                local_path.clear();
+                                                local_path
+                                                    .push_str(&segment.manifest.parents[parent_id]);
+                                                local_path.push_str(name_view.name);
+                                            }
+                                            let view = EntryRef {
+                                                path: &local_path,
+                                                ..name_view
+                                            };
+                                            let folded_name =
+                                                (read32(&r, 32) & 2 != 0).then_some(view.name);
+                                            let metadata = segment.query_metadata(id)?;
+                                            (view, folded_name, parent_id, metadata)
                                         };
-                                        score = score.saturating_add(path_boost(boosts, full_path));
-                                    }
+                                    query_ref
+                                        .matched_score_with_metadata(
+                                            &view,
+                                            folded_name,
+                                            segment.parent_depths[parent_id],
+                                            metadata,
+                                        )
+                                        .map(|score| {
+                                            let Some(boosts) = boosts else {
+                                                return score;
+                                            };
+                                            let full_path = if needs_path {
+                                                local_path.as_str()
+                                            } else {
+                                                boost_path.clear();
+                                                boost_path
+                                                    .push_str(&segment.manifest.parents[parent_id]);
+                                                boost_path.push_str(view.name);
+                                                boost_path.as_str()
+                                            };
+                                            score.saturating_add(path_boost(boosts, full_path))
+                                        })
+                                };
+                                if let Some(score) = score {
                                     local_total += 1;
                                     let rank = (score, Reverse(id_in_catalog));
                                     if local_heap.len() < capacity {
@@ -2434,6 +2485,72 @@ mod tests {
             .search("path:project !readme", &SearchOptions::default(), None)
             .unwrap();
         assert_eq!(r.total, 1);
+    }
+    #[test]
+    fn compacted_broad_queries_keep_exact_totals_and_ranked_pages() {
+        let mut builder = IndexBuilder::default();
+        for id in 0..50_000 {
+            let template = match id % 5 {
+                0 => format!("project_budget_final_{id:07}.pdf"),
+                1 => format!("meeting_notes_{id:07}.txt"),
+                2 => format!("project_budget_final_{id:07}meeting.技术"),
+                3 => format!("readme_source_{id:07}.rs"),
+                _ => format!("readme_source_{id:07}.RS"),
+            };
+            let parent = if id % 3 == 0 { "/root/" } else { "/root/sub/" };
+            builder
+                .add(FileRecord {
+                    path: format!("{parent}{template}"),
+                    size: 1,
+                    modified: 0,
+                    is_dir: id % 29 == 0,
+                    source: "offline:test".into(),
+                })
+                .unwrap();
+        }
+        let idx = builder.finish(1).unwrap();
+        assert_eq!(idx.manifest.name_prefixes.len(), 3);
+        let options = SearchOptions {
+            limit: 100,
+            offset: 45,
+            time_budget_ms: 60_000,
+        };
+        for text in ["budget | meeting", "readme ext:rs"] {
+            let query = Query::parse(text).unwrap();
+            let mut truth: Vec<_> = idx
+                .records()
+                .enumerate()
+                .filter_map(|(id, record)| {
+                    let name = split_path(&record.path).unwrap().1;
+                    let entry = EntryRef {
+                        name,
+                        path: &record.path,
+                        size: record.size,
+                        modified: record.modified,
+                        is_dir: record.is_dir,
+                        source: &record.source,
+                    };
+                    query
+                        .matched_score(&entry)
+                        .map(|score| (Reverse(score), id as u32))
+                })
+                .collect();
+            truth.sort_unstable();
+            let actual = idx.search(text, &options, None).unwrap();
+            assert!(actual.complete);
+            assert!(actual.candidate_count_exact);
+            assert_eq!(actual.total, truth.len(), "{text}");
+            let ranked: Vec<_> = actual
+                .results
+                .iter()
+                .map(|hit| (Reverse(hit.score), hit.id))
+                .collect();
+            assert_eq!(
+                ranked,
+                truth[options.offset..options.offset + options.limit],
+                "{text}"
+            );
+        }
     }
     #[test]
     fn cancellation_is_honest() {

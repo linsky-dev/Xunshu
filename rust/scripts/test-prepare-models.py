@@ -64,7 +64,10 @@ class BuildContracts(unittest.TestCase):
         (cache / "bge" / "bge-quantized.onnx").write_bytes(b"stale")
         (cache / "bge" / "config.json").write_bytes(b"stale")
         (cache / "bge" / "model.safetensors").write_bytes(b"pinned-test-weights")
-        with patch.object(models, "BGE_WEIGHTS_SHA256", sha(b"pinned-test-weights")), patch.object(models.urllib.request, "urlopen", side_effect=lambda *a, **kw: io.BytesIO(b"fresh-metadata")) as request:
+        pinned_metadata = dict.fromkeys(models.BGE_METADATA_SHA256, sha(b"fresh-metadata"))
+        with patch.object(models, "BGE_WEIGHTS_SHA256", sha(b"pinned-test-weights")), patch.object(
+            models, "BGE_METADATA_SHA256", pinned_metadata,
+        ), patch.object(models.urllib.request, "urlopen", side_effect=lambda *a, **kw: io.BytesIO(b"fresh-metadata")) as request:
             staged, records = models.stage_bge_inputs(cache, work)
         self.assertEqual(request.call_count, 6)
         self.assertEqual((staged / "config.json").read_bytes(), b"fresh-metadata")
@@ -96,6 +99,35 @@ class BuildContracts(unittest.TestCase):
                 else:
                     with self.assertRaises(ValueError):
                         models.add_runtime(cache, work, output, "windows")
+            for path in output.iterdir():
+                path.unlink()
+
+    def test_runtime_fallback_extracts_only_pinned_native_wheel_members(self):
+        cache, work, output = (self.root / name for name in ("cache", "work", "output"))
+        for directory in (cache, work, output):
+            directory.mkdir()
+        for platform, library in (("windows", "onnxruntime.dll"), ("linux", "libonnxruntime.so.1.24.4")):
+            archive = cache / f"{platform}.whl"
+            with zipfile.ZipFile(archive, "w") as wheel:
+                wheel.writestr(f"onnxruntime/capi/{library}", b"native test fixture")
+                wheel.writestr("onnxruntime/LICENSE", b"MIT")
+                wheel.writestr("onnxruntime/ThirdPartyNotices.txt", b"third party")
+                wheel.writestr("onnxruntime/__init__.py", b"excluded")
+                wheel.writestr(f"outside/{library}", b"excluded")
+            fallback = "https://example.invalid/" + archive.name
+            sha256 = models.digest(archive)
+            with patch.dict(models.ORT_WHEELS, {platform: (fallback, sha256)}), patch.object(
+                models.urllib.request, "urlopen",
+                side_effect=urllib.error.HTTPError("https://example.invalid", 404, "unavailable", {}, None),
+            ) as request:
+                name, source = models.add_runtime(cache, work, output, platform)
+            request.assert_called_once()
+            self.assertEqual(source, {"source": fallback, "archive_sha256": sha256})
+            self.assertEqual(name, models.ORT_ARCHIVES[platform][3])
+            self.assertEqual((output / name).read_bytes(), b"native test fixture")
+            self.assertEqual(set(p.name for p in output.iterdir()), {
+                name, "onnxruntime-LICENSE", "onnxruntime-ThirdPartyNotices.txt",
+            })
             for path in output.iterdir():
                 path.unlink()
 

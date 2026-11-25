@@ -115,6 +115,38 @@ struct PreparedNameLiteral {
     finder: memchr::memmem::Finder<'static>,
 }
 
+/// 已归一化的文件名前缀足以确定字面量评分时，可省去完整文件名的重建。
+#[derive(Clone, Copy)]
+pub struct PreparedNamePrefix<'a> {
+    score: i64,
+    extensions: Option<&'a [String]>,
+}
+
+impl PreparedNamePrefix<'_> {
+    /// 文件名必须由已归一化的前缀及此后缀拼成。外层 None 表示须完整评估，
+    /// 内层 None 表示确定不匹配。
+    pub fn score_suffix(self, suffix: &[u8], is_dir: bool, depth: usize) -> Option<Option<i64>> {
+        if let Some(extensions) = self.extensions {
+            if is_dir {
+                return Some(None);
+            }
+            // 后缀内最后一个点的前方必有非空前缀，与 extension() 的规则相同。
+            let dot = memchr::memrchr(b'.', suffix)?;
+            let ext = &suffix[dot + 1..];
+            if !ext.is_ascii() {
+                return None;
+            }
+            if !extensions
+                .iter()
+                .any(|candidate| candidate.as_bytes() == ext)
+            {
+                return Some(None);
+            }
+        }
+        Some(Some(score_with_depth(self.score, depth)))
+    }
+}
+
 impl Query {
     fn from_expr(expr: Expr) -> Self {
         let literal_name_or = if let Expr::Or(parts) = &expr {
@@ -244,10 +276,50 @@ impl Query {
                 .evaluate(&Evaluation::new(entry, folded_name, metadata))
                 .score()
         };
-        score.map(|score| {
-            score
-                .saturating_add(50)
-                .saturating_sub(depth.min(50) as i64)
+        score.map(|score| score_with_depth(score, depth))
+    }
+
+    /// 为非空的已归一化文件名前缀准备字面量评分，保留扩展名过滤。
+    /// 调用方须确认完整文件名等于自身归一化结果。
+    pub fn prepare_name_prefix(&self, prefix: &str) -> Option<PreparedNamePrefix<'_>> {
+        let (name, extensions) = match &self.expr {
+            Expr::And(parts) => match parts.as_slice() {
+                [Expr::Leaf(Leaf::Extension(extensions)), name]
+                | [name, Expr::Leaf(Leaf::Extension(extensions))] => (name, Some(&extensions[..])),
+                _ => return None,
+            },
+            name => (name, None),
+        };
+        if prefix.is_empty() {
+            return None;
+        }
+        let leaves: &[Expr] = match name {
+            Expr::Or(parts) => parts,
+            leaf => std::slice::from_ref(leaf),
+        };
+        let mut known = None;
+        let mut unknown_max = 0;
+        for leaf in leaves {
+            let Expr::Leaf(Leaf::Text {
+                field: Field::Name,
+                pattern:
+                    Pattern::Literal {
+                        needle,
+                        finder,
+                        case_sensitive: false,
+                    },
+            }) = leaf
+            else {
+                return None;
+            };
+            match literal_prefix_score(prefix, needle, finder) {
+                Ok(score) => known = known.max(Some(score)),
+                Err(max) => unknown_max = unknown_max.max(max),
+            }
+        }
+        Some(PreparedNamePrefix {
+            score: known.filter(|&score| score >= unknown_max)?,
+            extensions,
         })
     }
 
@@ -714,17 +786,58 @@ fn literal_score(text: &str, needle: &str, finder: &memchr::memmem::Finder<'_>) 
     // Both inputs are valid UTF-8; a nonempty UTF-8 needle cannot start inside
     // a continuation byte. Empty needles also match at byte zero.
     let at = finder.find(text.as_bytes())?;
+    Some(literal_score_at(text, needle, at))
+}
+
+fn score_with_depth(score: i64, depth: usize) -> i64 {
+    score
+        .saturating_add(50)
+        .saturating_sub(depth.min(50) as i64)
+}
+
+/// Ok 为确定评分，Err 为后缀未知时的评分上界。
+fn literal_prefix_score(
+    prefix: &str,
+    needle: &str,
+    finder: &memchr::memmem::Finder<'_>,
+) -> Result<i64, i64> {
+    match finder.find(prefix.as_bytes()) {
+        Some(0) => match prefix.as_bytes().get(needle.len()) {
+            None => Err(2000),
+            Some(b'.')
+                if !needle.is_empty() && !prefix.as_bytes()[needle.len() + 1..].contains(&b'.') =>
+            {
+                Err(1800)
+            }
+            Some(_) => Ok(1500),
+        },
+        // 任何跨越前缀尾部的新匹配只能出现在已知匹配之后。
+        Some(at) => Ok(literal_score_at(prefix, needle, at)),
+        None if needle.len() > prefix.len() => Err(2000),
+        None => {
+            // 最早可能的新匹配须跨过分界，且不能从 UTF-8 续字节开始。
+            let first_possible = prefix.len() - needle.len() + 1;
+            let position = prefix
+                .char_indices()
+                .take_while(|&(at, _)| at < first_possible)
+                .count();
+            Err(1100 - position.min(200) as i64)
+        }
+    }
+}
+
+fn literal_score_at(text: &str, needle: &str, at: usize) -> i64 {
     if at == 0 {
         if text == needle {
-            return Some(2000);
+            return 2000;
         }
         if !needle.is_empty()
             && text.as_bytes().get(needle.len()) == Some(&b'.')
             && !text.as_bytes()[needle.len() + 1..].contains(&b'.')
         {
-            return Some(1800);
+            return 1800;
         }
-        return Some(1500);
+        return 1500;
     }
     let prefix = &text[..at];
     // Count bytes only for ASCII prefixes; preserve Unicode character
@@ -744,9 +857,9 @@ fn literal_score(text: &str, needle: &str, finder: &memchr::memmem::Finder<'_>) 
         )
     };
     if boundary {
-        return Some(1100 - position);
+        return 1100 - position;
     }
-    Some(800 - position)
+    800 - position
 }
 
 pub(crate) fn extension(name: &str) -> &str {
@@ -844,6 +957,67 @@ mod smart_query_tests {
 #[cfg(test)]
 mod literal_finder_tests {
     use super::*;
+
+    #[test]
+    fn compacted_prefix_scores_match_full_filename_evaluation() {
+        for (query, prefix) in [
+            ("budget | meeting", "project_budget_final_"),
+            ("budget | meeting", "meeting_notes_"),
+            ("干部", "干部任免报告_"),
+            ("readme ext:rs", "readme_source_"),
+            ("ext:rs readme", "readme_source_"),
+        ] {
+            let query = Query::parse(query).unwrap();
+            let prepared = query.prepare_name_prefix(prefix).unwrap();
+            for suffix in [
+                "007.rs",
+                "007.txt",
+                "meeting.rs",
+                "budget.rs",
+                "豆瓣.rs",
+                "007.技术",
+                "",
+            ] {
+                for is_dir in [true, false] {
+                    let name = format!("{prefix}{suffix}");
+                    let entry = EntryRef {
+                        name: &name,
+                        path: "/dir/",
+                        size: 0,
+                        modified: 0,
+                        is_dir,
+                        source: "",
+                    };
+                    let score = prepared.score_suffix(suffix.as_bytes(), is_dir, 2);
+                    if let Some(score) = score {
+                        assert_eq!(score, query.matched_score(&entry), "{query:?}: {name}");
+                    } else {
+                        assert!(!is_dir && (suffix.is_empty() || suffix.ends_with("技术")));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn compacted_prefix_defers_stem_and_possible_higher_score() {
+        for (query, prefix) in [
+            ("abcdefghi", "abcdefghi"),
+            ("abcdefghi", "abcdefghi.part"),
+            ("budget | project_budget_final", "project_budget_"),
+            ("budget | _budget_final_7", "project_budget_final_"),
+            ("budget size:1", "project_budget_final_"),
+            ("case:budget", "project_budget_final_"),
+        ] {
+            assert!(
+                Query::parse(query)
+                    .unwrap()
+                    .prepare_name_prefix(prefix)
+                    .is_none(),
+                "{query} {prefix}"
+            );
+        }
+    }
 
     fn reference(text: &str, needle: &str) -> Option<i64> {
         let at = text.find(needle)?;

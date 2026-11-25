@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import struct
 import tempfile
@@ -136,7 +137,24 @@ def validate_resources(resources, platform):
     hashes["build-provenance.json"] = digest(paths["build-provenance.json"])
     return hashes
 
-def assemble(binaries, resources, font, font_license, output, platform, version, expected_hashes):
+def copy_runtime(output, platform, libraries):
+    """将明确列出的应用本地 DLL 纳入原生安装器的完整性清单。"""
+    used = {path.name.lower() for path in output.iterdir()}
+    for source in libraries:
+        name = source.name.lower()
+        if (platform != "windows" or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*\.dll", name)
+                or name in used or source.is_symlink() or not source.is_file()):
+            raise ValueError(f"无效的应用本地运行库：{source.name}")
+        verify_native_header(source, platform, library=True)
+        expected = digest(source)
+        destination = output / name
+        shutil.copyfile(source, destination)
+        if digest(destination) != expected:
+            raise ValueError(f"运行库在复制期间发生变化：{source.name}")
+        used.add(name)
+
+
+def assemble(binaries, resources, font, font_license, output, platform, version, expected_hashes, libraries=()):
     suffix = ".exe" if platform == "windows" else ""
     names = [name + suffix for name in ("xunshu", "xs-ui", "xs-content-worker", "xs-model-worker")]
     expected = [binaries / name for name in names] + [resources / "inference.json", font, font_license]
@@ -153,6 +171,7 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
         if digest(output / name) != before:
             raise ValueError(f"程序在复制期间发生变化：{name}")
         verify_native_header(output / name, platform)
+    copy_runtime(output, platform, libraries)
     resource_copy = output / "resources"
     resource_copy.mkdir()
     for path in resources.iterdir():
@@ -192,14 +211,14 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
 
 
 
-def prepare(binaries, resources, font, font_license, output, platform, version):
+def prepare(binaries, resources, font, font_license, output, platform, version, libraries=()):
     if output.exists() or output.is_symlink():
         raise FileExistsError("载荷输出目录必须是新的")
     expected_hashes = validate_resources(resources, platform)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".xunshu-payload-", dir=output.parent) as tmp:
         staged = Path(tmp) / "payload"
-        sha, count = assemble(binaries, resources, font, font_license, staged, platform, version, expected_hashes)
+        sha, count = assemble(binaries, resources, font, font_license, staged, platform, version, expected_hashes, libraries)
         if output.exists() or output.is_symlink():
             raise FileExistsError("载荷输出目录已存在")
         staged.rename(output)
@@ -211,8 +230,9 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--platform", choices=("windows", "linux"), required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--runtime-dll", type=Path, action="append", default=[])
     args = parser.parse_args()
-    prepare(args.binaries, args.resources, args.font, args.font_license, args.output, args.platform, args.version)
+    prepare(args.binaries, args.resources, args.font, args.font_license, args.output, args.platform, args.version, args.runtime_dll)
 
 
 if __name__ == "__main__":

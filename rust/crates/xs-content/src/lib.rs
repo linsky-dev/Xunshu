@@ -45,6 +45,24 @@ const CONTENT_REQUESTS: &str = "content.requests.json";
 const MAX_REQUESTS: usize = 4096;
 const MAX_REQUEST_BYTES: u64 = 4 * 1024 * 1024;
 
+struct ContentLock(File);
+
+impl ContentLock {
+    fn acquire(dir: &Path, busy_message: &'static str) -> Result<Self> {
+        let file = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
+        FileExt::try_lock_exclusive(&file).context(busy_message)?;
+        Ok(Self(file))
+    }
+}
+
+impl Drop for ContentLock {
+    fn drop(&mut self) {
+        // Linux 的 flock 附着在打开文件描述上。并发 fork 的子进程可能在
+        // exec 之前短暂持有同一个描述；显式解锁让下一次操作立即可接手。
+        let _ = FileExt::unlock(&self.0);
+    }
+}
+
 /// Durable, coalesced file-change requests, bound to the exact content scope.
 /// An uncertain event (deletion, directory, overflow) requires full reconciliation.
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -80,8 +98,7 @@ fn read_requests(dir: &Path) -> Result<Option<PendingRequests>> {
 /// Record notifications before processing; concurrent writers receive a retryable lock error.
 /// Empty input is an explicit request for complete reconciliation (e.g. watcher overflow).
 pub fn enqueue_changes(dir: &Path, paths: &[PathBuf]) -> Result<usize> {
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请稍后重试提交变更")?;
+    let _lock = ContentLock::acquire(dir, "正文任务正在运行，请稍后重试提交变更")?;
     let policy = Policy::load(dir)?;
     let mut queue = match read_requests(dir) {
         Ok(Some(value)) if value.scope == policy.token => value,
@@ -373,8 +390,7 @@ fn rebuild_inner(
             .join("resources");
         xs_inference::Assets::verify(&resources)?;
     }
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("另一个正文重建任务正在运行")?;
+    let _lock = ContentLock::acquire(dir, "另一个正文重建任务正在运行")?;
 
     let mut report = BuildReport::default();
     policy.verify(dir)?;
@@ -819,15 +835,13 @@ fn acknowledge_requests(dir: &Path, report: &mut BuildReport) {
 /// Discard only the private candidate. Never touches the published index or user files.
 /// Acquires the same writer lock as rebuild; an active writer cannot be interrupted.
 pub fn discard_pending_checkpoint(dir: &Path) -> Result<()> {
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请取消任务并等待结束后重试")?;
+    let _lock = ContentLock::acquire(dir, "正文任务正在运行，请取消任务并等待结束后重试")?;
     clear_checkpoint(&dir.join(CONTENT_CHECKPOINT))
 }
 
 /// Clear pending candidate and queued paths on explicit authorization change.
 pub fn discard_pending_work(dir: &Path) -> Result<()> {
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请取消任务并等待结束后重试")?;
+    let _lock = ContentLock::acquire(dir, "正文任务正在运行，请取消任务并等待结束后重试")?;
     clear_checkpoint(&dir.join(CONTENT_CHECKPOINT))?;
     clear_checkpoint(&dir.join(CONTENT_REQUESTS))
 }
@@ -1134,6 +1148,19 @@ fn is_cloud_placeholder(_file: &File) -> bool {
 mod readability_tests {
     use super::*;
     use std::os::unix::{fs::PermissionsExt, process::CommandExt};
+
+    #[test]
+    fn content_lock_releases_even_if_an_inherited_descriptor_is_still_open() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let lock = ContentLock::acquire(dir.path(), "正文锁已被占用")?;
+        // clone 和 fork 的子进程一样，持有同一个打开文件描述。
+        let inherited = lock.0.try_clone()?;
+        assert!(ContentLock::acquire(dir.path(), "正文锁已被占用").is_err());
+        drop(lock);
+        let _next = ContentLock::acquire(dir.path(), "正文锁已被占用")?;
+        drop(inherited);
+        Ok(())
+    }
 
     #[test]
     fn metadata_access_is_not_content_read_permission() -> Result<()> {
