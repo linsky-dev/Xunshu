@@ -107,7 +107,15 @@ function Test-Wizard([string]$Fixture) {
             $handle = [XunshuNativeFixture]::Find($process.Id, '寻枢 · 本地文件搜索', $null)
             if ($handle -ne [IntPtr]::Zero) { $handle }
         } '新配置向导窗口'
-        Invoke-WizardButton $window '使用推荐范围'
+        Invoke-WizardButton $window '一键使用常用目录直达确认'
+        # 首次展示向导可保存提醒次数。试扫不可修改配置或发布索引。
+        $beforeEstimate = if (Test-Path -LiteralPath $settings) {
+            $initial = Get-Content -LiteralPath $settings -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($initial.setup_state -ne 'not_started' -or @($initial.roots).Count -ne 0) {
+                throw '确认前已授权搜索范围。'
+            }
+            (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
+        }
         Invoke-WizardButton $window '试扫并估算'
         $estimate = Wait-Fixture {
             try {
@@ -119,7 +127,10 @@ function Test-Wizard([string]$Fixture) {
                 }
             } catch [System.Windows.Automation.ElementNotAvailableException] { }
         } '明确显示已估算条目与时间'
-        if ((Test-Path -LiteralPath $settings) -or
+        $afterEstimate = if (Test-Path -LiteralPath $settings) {
+            (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
+        }
+        if ($beforeEstimate -ne $afterEstimate -or
             (Test-Path -LiteralPath (Join-Path $data 'index/CURRENT.json'))) {
             throw '试扫提前保存了设置或发布了索引。'
         }
