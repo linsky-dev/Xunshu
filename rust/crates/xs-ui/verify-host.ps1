@@ -7,6 +7,7 @@ param(
     [switch]$CheckAccessibility,
     [switch]$CheckDiagnostics,
     [switch]$CheckWizard,
+    [switch]$CheckCategoryFilters,
     [string]$FixtureRoot = ''
 )
 
@@ -19,7 +20,7 @@ $cliPath = (Resolve-Path -LiteralPath $Cli).Path
 if ([IO.Path]::GetDirectoryName($uiPath) -ne [IO.Path]::GetDirectoryName($cliPath)) {
     throw 'xs-ui.exe 和 xunshu.exe 必须位于同一构建目录。'
 }
-if ($CheckAccessibility -or $CheckDiagnostics -or $CheckWizard) {
+if ($CheckAccessibility -or $CheckDiagnostics -or $CheckWizard -or $CheckCategoryFilters) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 }
 
@@ -228,6 +229,12 @@ $documents = Join-Path $fixture 'documents'
 $profile = Join-Path $fixture 'profile'
 $null = New-Item -ItemType Directory -Path $documents, $profile
 [IO.File]::WriteAllText((Join-Path $documents '合成报告.txt'), '只用于 Windows 原生界面回归。原生正文验收。')
+if ($CheckCategoryFilters) {
+    foreach ($file in @('合成报告.md','合成报告.PNG','合成报告.mp3','合成报告.mp4','合成报告.tar.gz','合成报告-无扩展')) {
+        [IO.File]::WriteAllText((Join-Path $documents $file), '仅用于文件名筛选验收。')
+    }
+    [void][IO.Directory]::CreateDirectory((Join-Path $documents '合成报告-目录.pdf'))
+}
 $null = & $cliPath --data-dir $profile init --root $documents
 if ($LASTEXITCODE -ne 0) { throw '无法建立合成设置。' }
 $null = & $cliPath --data-dir $profile scan
@@ -251,6 +258,34 @@ try {
             $null = Wait-Fixture { Find-AccessibleItem $main.Window $name } "可访问性节点 $name"
         }
         $accessibility = $true
+    }
+    $categoryFilters = $null
+    if ($CheckCategoryFilters) {
+        $categoryFilters = [ordered]@{}
+        $report = '合成报告.txt'
+        $image = '合成报告.PNG'
+        foreach ($case in @(
+            @{ Label='文档'; Expected=$report; Excluded=$image },
+            @{ Label='图片'; Expected=$image; Excluded=$report },
+            @{ Label='音频'; Expected='合成报告.mp3'; Excluded=$image },
+            @{ Label='视频'; Expected='合成报告.mp4'; Excluded=$image },
+            @{ Label='压缩包'; Expected='合成报告.tar.gz'; Excluded=$image },
+            @{ Label='其他'; Expected='合成报告-无扩展'; Excluded=$image },
+            @{ Label='文件夹'; Expected='合成报告-目录.pdf'; Excluded=$report },
+            @{ Label='全部'; Expected=$image; Excluded=$null }
+        )) {
+            $button = Wait-Fixture { Find-AccessibleItem $main.Window $case.Label } "文件类型筛选 $($case.Label)"
+            $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            $expectedName = $case.Expected + '，' + (Join-Path $documents $case.Expected)
+            $null = Wait-Fixture { Find-AccessibleItem $main.Window $expectedName } "筛选命中 $expectedName"
+            if ($case.Excluded) {
+                $excludedName = $case.Excluded + '，' + (Join-Path $documents $case.Excluded)
+                if (Find-AccessibleItem $main.Window $excludedName) {
+                    throw "筛选 $($case.Label) 显示了应排除的结果 $excludedName"
+                }
+            }
+            $categoryFilters[$case.Label] = $true
+        }
     }
     $diagnosticsPanel = $null
     $diagnosticsCliExport = $null
@@ -324,7 +359,7 @@ try {
         $cjkFont = $true
     }
     $wizard = if ($CheckWizard) { Test-Wizard $fixture } else { $null }
-    [pscustomobject]@{ result = '通过'; fixture = $fixture; hidden_private_bytes = $privateBytes; native_window = $true; single_instance = $true; tray_registered = $true; minimize_to_tray = $true; tray_activation_dispatch = $true; hotkey_dispatch = $true; physical_ctrl = $false; hidden_watch = $true; exit_cleanup = $true; content_preview = $contentPreview; cjk_font = $cjkFont; windows_uia = $accessibility; diagnostics_panel_uia = $diagnosticsPanel; diagnostics_cli_export = $diagnosticsCliExport; synthetic_wizard = $wizard } | ConvertTo-Json
+    [pscustomobject]@{ result = '通过'; fixture = $fixture; hidden_private_bytes = $privateBytes; native_window = $true; single_instance = $true; tray_registered = $true; minimize_to_tray = $true; tray_activation_dispatch = $true; hotkey_dispatch = $true; physical_ctrl = $false; hidden_watch = $true; exit_cleanup = $true; content_preview = $contentPreview; cjk_font = $cjkFont; windows_uia = $accessibility; filename_category_filters = $categoryFilters; diagnostics_panel_uia = $diagnosticsPanel; diagnostics_cli_export = $diagnosticsCliExport; synthetic_wizard = $wizard } | ConvertTo-Json
 } finally {
     if (!$hostProcess.HasExited) { $hostProcess.Kill(); $hostProcess.WaitForExit() }
     $hostProcess.Dispose()

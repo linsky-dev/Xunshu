@@ -121,25 +121,56 @@ impl Args {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Filter {
     All,
     Files,
     Folders,
+    Documents,
+    Pictures,
+    Audio,
+    Video,
+    Archives,
+    Other,
 }
 impl Filter {
+    const OPTIONS: [Self; 9] = [
+        Self::All,
+        Self::Files,
+        Self::Folders,
+        Self::Documents,
+        Self::Pictures,
+        Self::Audio,
+        Self::Video,
+        Self::Archives,
+        Self::Other,
+    ];
+
     fn label(self) -> &'static str {
         match self {
             Self::All => "全部",
             Self::Files => "文件",
             Self::Folders => "文件夹",
+            Self::Documents => "文档",
+            Self::Pictures => "图片",
+            Self::Audio => "音频",
+            Self::Video => "视频",
+            Self::Archives => "压缩包",
+            Self::Other => "其他",
         }
     }
     fn query(self, query: &str) -> String {
+        // 复用索引查询的分类规则，在计数和分页之前执行筛选。
         let prefix = match self {
             Self::All => return query.to_owned(),
             Self::Files => "file:",
             Self::Folders => "folder:",
+            Self::Documents => "doc:",
+            Self::Pictures => "pic:",
+            Self::Audio => "audio:",
+            Self::Video => "video:",
+            Self::Archives => "archive:",
+            Self::Other => "file: !<doc: | pic: | audio: | video: | archive:>",
         };
         if query.trim().is_empty() {
             prefix.to_owned()
@@ -825,8 +856,12 @@ impl App {
         routed_query(&self.query).0 != SearchSource::All
     }
 
+    fn allows_external_suggestions(&self) -> bool {
+        self.filter == Filter::All || self.external_only()
+    }
+
     fn matching_connectors(&self) -> Vec<xs_content::connectors::ConnectorItem> {
-        if !source_suggestions_allowed(&self.query) {
+        if !self.allows_external_suggestions() || !source_suggestions_allowed(&self.query) {
             return Vec::new();
         }
         let (source, query) = routed_query(&self.query);
@@ -863,7 +898,7 @@ impl App {
     }
 
     fn matching_apps(&self) -> Vec<xs_platform::apps::AppEntry> {
-        if !app_matches_allowed(&self.query) {
+        if !self.allows_external_suggestions() || !app_matches_allowed(&self.query) {
             return Vec::new();
         }
         let (_, query) = app_query(&self.query);
@@ -2383,17 +2418,24 @@ impl App {
 
     fn main_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(egui::Margin::symmetric(18, 14))).show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("类型").small().color(MUTED));
-                for filter in [Filter::All, Filter::Files, Filter::Folders] {
-                    if ui.selectable_value(&mut self.filter, filter, filter.label()).changed() { self.schedule_search(true); }
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if self.searching { ui.spinner(); ui.label(RichText::new("搜索中").small().color(MUTED)); }
-                    else if let Some(r) = &self.results { ui.label(RichText::new(format!("{}{} 项 · {:.1} ms", if r.complete { "" } else { "至少 " }, r.total, r.elapsed_ms)).small().color(MUTED)); }
-                });
-            });
             ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new("类型").small().color(MUTED));
+                let enabled = !self.external_only();
+                for filter in Filter::OPTIONS {
+                    let mut button = ui.add_enabled(
+                        enabled,
+                        egui::Button::selectable(self.filter == filter, filter.label()),
+                    );
+                    if filter == Filter::Other {
+                        button = button.on_hover_text("其他扩展名与无扩展名的文件");
+                    }
+                    if button.clicked() && self.filter != filter {
+                        self.filter = filter;
+                        self.schedule_search(true);
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
                 ui.label(RichText::new("全局排序").small().color(MUTED));
                 let previous = self.sort;
                 if ui.selectable_label(self.sort.is_none(), "相关度").clicked() { self.sort = None; }
@@ -2409,6 +2451,10 @@ impl App {
                     }
                 }
                 if self.sort != previous { self.schedule_search(true); }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if self.searching { ui.spinner(); ui.label(RichText::new("搜索中").small().color(MUTED)); }
+                    else if let Some(r) = &self.results { ui.label(RichText::new(format!("{}{} 项 · {:.1} ms", if r.complete { "" } else { "至少 " }, r.total, r.elapsed_ms)).small().color(MUTED)); }
+                });
             });
             if self.show_help {
                 ui.add_space(12.0);
@@ -4221,6 +4267,96 @@ mod tests {
         assert_eq!(Filter::Files.query("cat | dog"), "file: <cat | dog>");
         assert_eq!(Filter::Folders.query(""), "folder:");
         assert_eq!(Filter::All.query("ext:pdf"), "ext:pdf");
+    }
+
+    #[test]
+    fn filename_categories_cover_unknown_extensions_and_preserve_user_queries() {
+        use xs_query::{EntryRef, Query};
+
+        for (name, is_dir, expected) in [
+            ("林地项目.PDF", false, Filter::Documents),
+            ("施工项目.webp", false, Filter::Pictures),
+            ("河岸项目.FLAC", false, Filter::Audio),
+            ("展览项目.mp4", false, Filter::Video),
+            ("项目备份.tar.gz", false, Filter::Archives),
+            ("项目草稿.blend", false, Filter::Other),
+            ("招标备忘", false, Filter::Other),
+            ("项目资料.pdf", true, Filter::Folders),
+        ] {
+            let entry = EntryRef {
+                name,
+                path: name,
+                size: 0,
+                modified: 0,
+                is_dir,
+                source: "local",
+            };
+            for filter in Filter::OPTIONS {
+                let matches = filter == Filter::All
+                    || filter == expected
+                    || (filter == Filter::Files && !is_dir);
+                assert_eq!(
+                    Query::parse(&filter.query("项目 | 招标"))
+                        .unwrap()
+                        .matches(&entry),
+                    matches,
+                    "{filter:?}: {name}",
+                );
+            }
+            assert!(Query::parse(&expected.query(" ")).unwrap().matches(&entry));
+        }
+        let query = Filter::Pictures.query("项目 ext:pdf");
+        assert!(!Query::parse(&query).unwrap().matches(&EntryRef {
+            name: "项目.pdf",
+            path: "项目.pdf",
+            size: 0,
+            modified: 0,
+            is_dir: false,
+            source: "local",
+        }));
+    }
+
+    #[test]
+    fn file_category_filters_the_whole_index_before_counting_and_paging() {
+        use xs_core::index::{FileRecord, IndexBuilder};
+
+        let mut builder = IndexBuilder::default();
+        for row in 0..215 {
+            for extension in ["pdf", "png", "bin"] {
+                builder
+                    .add(FileRecord {
+                        path: format!("/synthetic/项目{row:03}.{extension}"),
+                        size: 0,
+                        modified: 0,
+                        is_dir: false,
+                        source: "local".into(),
+                    })
+                    .unwrap();
+            }
+        }
+        let index = builder.finish(1).unwrap();
+        for (offset, length) in [(0, 200), (200, 15)] {
+            let result = index
+                .search_sorted(
+                    &Filter::Pictures.query("项目"),
+                    &SearchOptions {
+                        limit: 200,
+                        offset,
+                        time_budget_ms: 5000,
+                    },
+                    None,
+                    ColumnSort {
+                        column: SortColumn::Name,
+                        descending: false,
+                    },
+                )
+                .unwrap();
+            assert!(result.complete && result.coverage_complete);
+            assert_eq!(result.total, 215);
+            assert_eq!(result.results.len(), length);
+            assert_eq!(result.results[0].name, format!("项目{offset:03}.png"));
+            assert!(result.results.iter().all(|hit| hit.name.ends_with(".png")));
+        }
     }
     #[test]
     fn archives_policy_and_global_wizard_controls_apply_cleanly() {
