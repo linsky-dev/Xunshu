@@ -175,43 +175,158 @@ impl ModelClient {
         if !reply.ok {
             bail!("{}", reply.error.unwrap_or_else(|| "语义推理失败".into()));
         }
-        for window in &reply.windows {
-            ensure!(
-                window.start < window.end
-                    && text.is_char_boundary(window.start)
-                    && text.is_char_boundary(window.end)
-                    && window.vector.len() == DIMENSION
-                    && window
-                        .vector
-                        .iter()
-                        .all(|value| value.is_finite() && value.abs() <= 1.01),
-                "语义进程返回了无效的分窗向量"
-            );
-        }
+        validate_windows(text, &reply.windows)?;
         Ok(reply.windows)
     }
 }
 
-pub(crate) fn cosine(embedding: &[u8], queries: &[Window]) -> Result<f64> {
-    ensure!(embedding.len() == DIMENSION * 4, "正文库向量长度无效");
-    let mut best = f32::NEG_INFINITY;
-    for query in queries {
-        let score: f32 = embedding
+// The model worker promises unit-normalized, nonempty embeddings for tokenized
+// text. Reject a broken worker before publishing an incomplete semantic index.
+fn validate_windows(text: &str, windows: &[Window]) -> Result<()> {
+    ensure!(
+        text.trim().is_empty() || !windows.is_empty(),
+        "语义进程未返回有效分窗，无法确认正文语义收录完整"
+    );
+    let mut starts = std::collections::HashSet::with_capacity(windows.len());
+    for window in windows {
+        ensure!(
+            window.start < window.end
+                && text.is_char_boundary(window.start)
+                && text.is_char_boundary(window.end)
+                && starts.insert(window.start)
+                && window.vector.len() == DIMENSION
+                && window
+                    .vector
+                    .iter()
+                    .all(|value| value.is_finite() && value.abs() <= 1.01),
+            "语义进程返回了无效或重复的分窗向量"
+        );
+        let squared_norm: f64 = window
+            .vector
+            .iter()
+            .map(|&value| f64::from(value).powi(2))
+            .sum();
+        ensure!(
+            (0.99..=1.01).contains(&squared_norm),
+            "语义进程返回了未归一化的向量"
+        );
+    }
+    Ok(())
+}
+
+/// Validate model output once per exact scan, not once per indexed vector.
+/// Decode each persisted vector once even for multi-window queries. Keep the
+/// existing sequential f32 accumulation (including tie behavior).
+pub(crate) struct PreparedQueries<'a> {
+    vectors: Vec<&'a [f32; DIMENSION]>,
+}
+
+impl<'a> PreparedQueries<'a> {
+    pub(crate) fn new(queries: &'a [Window]) -> Result<Self> {
+        ensure!(!queries.is_empty(), "语义查询没有有效向量");
+        let vectors = queries
+            .iter()
+            .map(|q| {
+                let v: &[f32; DIMENSION] = q
+                    .vector
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| anyhow::anyhow!("查询向量长度无效"))?;
+                ensure!(
+                    v.iter().all(|v| v.is_finite() && v.abs() <= 1.01),
+                    "查询向量无效"
+                );
+                Ok(v)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Self { vectors })
+    }
+
+    pub(crate) fn cosine(&self, embedding: &[u8]) -> Result<f64> {
+        ensure!(embedding.len() == DIMENSION * 4, "正文库向量长度无效");
+        let chunks: &[[u8; 4]; DIMENSION] = embedding
             .as_chunks::<4>()
             .0
-            .iter()
-            .zip(&query.vector)
-            .map(|(bytes, q)| f32::from_le_bytes(*bytes) * q)
-            .sum();
-        ensure!(score.is_finite(), "正文库向量包含无效数据");
-        best = best.max(score);
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("正文库向量长度无效"))?;
+        let decoded = chunks.map(f32::from_le_bytes);
+        ensure!(
+            decoded.iter().all(|v| v.is_finite() && v.abs() <= 1.01),
+            "正文库向量包含无效数据"
+        );
+        let mut best = f32::NEG_INFINITY;
+        for query in &self.vectors {
+            let score: f32 = decoded.iter().zip(query.iter()).map(|(v, q)| v * q).sum();
+            ensure!(score.is_finite(), "正文库向量包含无效数据");
+            best = best.max(score);
+        }
+        Ok(f64::from(best))
     }
-    Ok(f64::from(best))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prepared_queries_match_legacy_exact_scores_and_reject_invalid_vectors() {
+        let make = |seed: usize| Window {
+            start: 0,
+            end: 1,
+            vector: (0..DIMENSION)
+                .map(|i| (((i * 17 + seed * 11) % 101) as f32 - 50.0) / 50.0)
+                .collect(),
+        };
+        let queries: Vec<_> = (0..7).map(make).collect();
+        let prepared = PreparedQueries::new(&queries).unwrap();
+        for seed in 0..128 {
+            let data = make(seed).bytes();
+            let old = queries
+                .iter()
+                .map(|q| {
+                    data.as_chunks::<4>()
+                        .0
+                        .iter()
+                        .zip(&q.vector)
+                        .map(|(bytes, q)| f32::from_le_bytes(*bytes) * q)
+                        .sum::<f32>()
+                })
+                .fold(f32::NEG_INFINITY, f32::max);
+            assert_eq!(prepared.cosine(&data).unwrap(), f64::from(old));
+        }
+        assert!(prepared.cosine(&[0; 4]).is_err());
+        let mut data = make(0);
+        data.vector[0] = f32::NAN;
+        assert!(prepared.cosine(&data.bytes()).is_err());
+        assert!(PreparedQueries::new(&[data]).is_err());
+        let mut data = make(1);
+        data.vector[0] = 2.0;
+        assert!(prepared.cosine(&data.bytes()).is_err());
+        assert!(PreparedQueries::new(&[data]).is_err());
+        let mut data = make(2);
+        data.vector.pop();
+        assert!(PreparedQueries::new(&[data]).is_err());
+        assert!(PreparedQueries::new(&[]).is_err());
+    }
+
+    #[test]
+    fn model_protocol_rejects_empty_duplicate_and_non_normalized_windows() {
+        let text = "中文文本";
+        let make = |start, end, value| {
+            let mut vector = vec![0.0; DIMENSION];
+            vector[0] = value;
+            Window { start, end, vector }
+        };
+        assert!(validate_windows(text, &[]).is_err());
+        assert!(validate_windows("  ", &[]).is_ok());
+        assert!(validate_windows(text, &[make(0, 6, 1.0), make(3, 12, 1.0)]).is_ok());
+        assert!(validate_windows(text, &[make(0, 6, 1.0), make(0, 12, 1.0)]).is_err());
+        assert!(validate_windows(text, &[make(1, 6, 1.0)]).is_err());
+        assert!(validate_windows(text, &[make(0, 13, 1.0)]).is_err());
+        assert!(validate_windows(text, &[make(0, 6, 0.0)]).is_err());
+        assert!(validate_windows(text, &[make(0, 6, 0.5)]).is_err());
+        assert!(validate_windows(text, &[make(0, 6, f32::NAN)]).is_err());
+    }
 
     #[test]
     fn passages_keep_long_utf8_tail_at_its_original_offset() {

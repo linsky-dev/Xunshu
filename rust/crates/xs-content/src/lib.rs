@@ -1,6 +1,7 @@
 //! 独立的正文收录与查询。内容范围和文件对象版本是发布与展示的共同约束。
 
 pub mod connectors;
+pub mod experimental_ann;
 mod extract;
 mod ipc;
 mod search;
@@ -44,6 +45,24 @@ const CONTENT_REQUESTS: &str = "content.requests.json";
 const MAX_REQUESTS: usize = 4096;
 const MAX_REQUEST_BYTES: u64 = 4 * 1024 * 1024;
 
+struct ContentLock(File);
+
+impl ContentLock {
+    fn acquire(dir: &Path, busy_message: &'static str) -> Result<Self> {
+        let file = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
+        FileExt::try_lock_exclusive(&file).context(busy_message)?;
+        Ok(Self(file))
+    }
+}
+
+impl Drop for ContentLock {
+    fn drop(&mut self) {
+        // Linux 的 flock 附着在打开文件描述上。并发 fork 的子进程可能在
+        // exec 之前短暂持有同一个描述；显式解锁让下一次操作立即可接手。
+        let _ = FileExt::unlock(&self.0);
+    }
+}
+
 /// Durable, coalesced file-change requests, bound to the exact content scope.
 /// An uncertain event (deletion, directory, overflow) requires full reconciliation.
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -79,8 +98,7 @@ fn read_requests(dir: &Path) -> Result<Option<PendingRequests>> {
 /// Record notifications before processing; concurrent writers receive a retryable lock error.
 /// Empty input is an explicit request for complete reconciliation (e.g. watcher overflow).
 pub fn enqueue_changes(dir: &Path, paths: &[PathBuf]) -> Result<usize> {
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请稍后重试提交变更")?;
+    let _lock = ContentLock::acquire(dir, "正文任务正在运行，请稍后重试提交变更")?;
     let policy = Policy::load(dir)?;
     let mut queue = match read_requests(dir) {
         Ok(Some(value)) if value.scope == policy.token => value,
@@ -200,6 +218,22 @@ struct Policy {
     token: String,
 }
 
+fn content_index_token(settings: &Settings) -> Result<String> {
+    let scope = settings.content_scope_token()?;
+    let mut hash = Sha256::new();
+    hash.update(scope.as_bytes());
+    // The previous XLSX extractor could omit out-of-order shared formulas.
+    hash.update(b"\0xlsx-sparse-v2");
+    // Previous ODS snapshots may have accepted silently capped repeat counts.
+    hash.update(b"\0ods-budget-v1");
+    // Older OCR snapshots may have silently missed inherited/form images.
+    // Retain the OCR-specific semantic version in addition to the common one.
+    if settings.ocr_enabled {
+        hash.update(b"\0pdf-drawn-images-v2");
+    }
+    Ok(format!("{:x}", hash.finalize()))
+}
+
 impl Policy {
     fn load(dir: &Path) -> Result<Self> {
         let path = dir.join("settings.json");
@@ -210,10 +244,7 @@ impl Policy {
             revision == FileRevision::at_path(&path)?,
             "正文授权设置正在更改，请重试"
         );
-        let token = format!(
-            "{:x}",
-            Sha256::digest(settings.content_scope_token()?.as_bytes())
-        );
+        let token = content_index_token(&settings)?;
         Ok(Self {
             settings,
             revision,
@@ -359,8 +390,7 @@ fn rebuild_inner(
             .join("resources");
         xs_inference::Assets::verify(&resources)?;
     }
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("另一个正文重建任务正在运行")?;
+    let _lock = ContentLock::acquire(dir, "另一个正文重建任务正在运行")?;
 
     let mut report = BuildReport::default();
     policy.verify(dir)?;
@@ -565,8 +595,8 @@ fn rebuild_inner(
                         unchanged_document(&db, &entry.path, &current)?
                     {
                         ensure!(
-                            FileRevision::at_path(&path)? == current,
-                            "复用正文索引期间文件已变更，请重试"
+                            content_revision_readable(&path, current),
+                            "复用正文索引期间文件已变更或不可读取，请重试"
                         );
                         db.execute(
                             "INSERT OR IGNORE INTO scanned(path) VALUES (?1)",
@@ -805,15 +835,13 @@ fn acknowledge_requests(dir: &Path, report: &mut BuildReport) {
 /// Discard only the private candidate. Never touches the published index or user files.
 /// Acquires the same writer lock as rebuild; an active writer cannot be interrupted.
 pub fn discard_pending_checkpoint(dir: &Path) -> Result<()> {
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请取消任务并等待结束后重试")?;
+    let _lock = ContentLock::acquire(dir, "正文任务正在运行，请取消任务并等待结束后重试")?;
     clear_checkpoint(&dir.join(CONTENT_CHECKPOINT))
 }
 
 /// Clear pending candidate and queued paths on explicit authorization change.
 pub fn discard_pending_work(dir: &Path) -> Result<()> {
-    let lock = xs_platform::open_or_create_local_lock(&dir.join(CONTENT_LOCK))?;
-    FileExt::try_lock_exclusive(&lock).context("正文任务正在运行，请取消任务并等待结束后重试")?;
+    let _lock = ContentLock::acquire(dir, "正文任务正在运行，请取消任务并等待结束后重试")?;
     clear_checkpoint(&dir.join(CONTENT_CHECKPOINT))?;
     clear_checkpoint(&dir.join(CONTENT_REQUESTS))
 }
@@ -1060,6 +1088,18 @@ fn load_db(mut snapshot: OpenSnapshot, cancel: &AtomicBool, writable: bool) -> R
     })
 }
 
+/// Metadata-only access is not a proof of current content-read permission.
+/// Never expose a cached snippet without reopening the guarded local object;
+/// check both the opened handle and its current pathname without reading bytes.
+fn content_revision_readable(path: &Path, expected: FileRevision) -> bool {
+    let Ok(file) = xs_platform::open_local_read(path) else {
+        return false;
+    };
+    !is_cloud_placeholder(&file)
+        && FileRevision::from_file(&file).ok() == Some(expected)
+        && FileRevision::at_path(path).ok() == Some(expected)
+}
+
 pub fn validate_response(dir: &Path, response: &SearchResponse) -> Result<()> {
     let policy = Policy::load(dir)?;
     ensure!(
@@ -1076,7 +1116,7 @@ pub fn validate_response(dir: &Path, response: &SearchResponse) -> Result<()> {
     );
     for hit in &response.hits {
         let path = Path::new(&hit.path);
-        if !policy.allows(dir, path)? || FileRevision::at_path(path).ok() != Some(hit.revision) {
+        if !policy.allows(dir, path)? || !content_revision_readable(path, hit.revision) {
             bail!("正文结果中的文件已移动、更改或撤权，请重新搜索");
         }
     }
@@ -1102,4 +1142,116 @@ fn is_cloud_placeholder(file: &File) -> bool {
 #[cfg(not(windows))]
 fn is_cloud_placeholder(_file: &File) -> bool {
     false
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod readability_tests {
+    use super::*;
+    use std::os::unix::{fs::PermissionsExt, process::CommandExt};
+
+    #[test]
+    fn content_lock_releases_even_if_an_inherited_descriptor_is_still_open() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let lock = ContentLock::acquire(dir.path(), "正文锁已被占用")?;
+        // clone 和 fork 的子进程一样，持有同一个打开文件描述。
+        let inherited = lock.0.try_clone()?;
+        assert!(ContentLock::acquire(dir.path(), "正文锁已被占用").is_err());
+        drop(lock);
+        let _next = ContentLock::acquire(dir.path(), "正文锁已被占用")?;
+        drop(inherited);
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_access_is_not_content_read_permission() -> Result<()> {
+        const CHILD_PATH: &str = "XS_TEST_READABILITY_PATH";
+        if let Some(path) = std::env::var_os(CHILD_PATH) {
+            let path = PathBuf::from(path);
+            let revision = FileRevision::at_path(&path)?;
+            assert!(matches!(
+                File::open(&path),
+                Err(error) if error.kind() == io::ErrorKind::PermissionDenied
+            ));
+            assert!(!content_revision_readable(&path, revision));
+            return Ok(());
+        }
+        // Root can read mode-000 files. For that case run the same assertion
+        // under an unprivileged UID in a separate process, with a synthetic file.
+        if unsafe { libc::geteuid() } == 0 {
+            let temp = tempfile::Builder::new()
+                .prefix("xs-readability-")
+                .tempdir_in("/dev/shm")?;
+            std::fs::set_permissions(temp.path(), std::fs::Permissions::from_mode(0o755))?;
+            let path = temp.path().join("private.txt");
+            std::fs::write(&path, "synthetic content")?;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+            let revision = FileRevision::at_path(&path)?;
+            assert!(content_revision_readable(&path, revision));
+            let child = std::process::Command::new(std::env::current_exe()?)
+                .args([
+                    "--exact",
+                    "readability_tests::metadata_access_is_not_content_read_permission",
+                    "--nocapture",
+                ])
+                .env(CHILD_PATH, &path)
+                .uid(65534)
+                .gid(65534)
+                .output()?;
+            assert!(
+                child.status.success()
+                    && String::from_utf8_lossy(&child.stdout).contains("1 passed"),
+                "{}\n{}",
+                String::from_utf8_lossy(&child.stdout),
+                String::from_utf8_lossy(&child.stderr)
+            );
+            assert_eq!(FileRevision::at_path(&path)?, revision);
+        } else {
+            let temp = tempfile::tempdir()?;
+            let path = temp.path().join("private.txt");
+            std::fs::write(&path, "synthetic content")?;
+            let before = FileRevision::at_path(&path)?;
+            assert!(content_revision_readable(&path, before));
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000))?;
+            let denied = FileRevision::at_path(&path)?;
+            assert!(!content_revision_readable(&path, denied));
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+            assert!(content_revision_readable(
+                &path,
+                FileRevision::at_path(&path)?
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod index_token_tests {
+    use super::*;
+
+    #[test]
+    fn upgrade_requires_old_content_rebuild_without_changing_scope() {
+        for ocr_enabled in [false, true] {
+            let settings = Settings {
+                content_enabled: true,
+                ocr_enabled,
+                ..Settings::default()
+            };
+            let mut old = Sha256::new();
+            old.update(settings.content_scope_token().unwrap().as_bytes());
+            if ocr_enabled {
+                old.update(b"\0pdf-drawn-images-v2");
+            }
+            let old = format!("{:x}", old.finalize());
+            let mut round14 = Sha256::new();
+            round14.update(settings.content_scope_token().unwrap().as_bytes());
+            round14.update(b"\0xlsx-sparse-v2");
+            if ocr_enabled {
+                round14.update(b"\0pdf-drawn-images-v2");
+            }
+            let new = content_index_token(&settings).unwrap();
+            assert_ne!(format!("{:x}", round14.finalize()), new);
+            assert_ne!(old, new);
+            assert_eq!(new, content_index_token(&settings).unwrap());
+        }
+    }
 }

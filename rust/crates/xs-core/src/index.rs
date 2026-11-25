@@ -325,15 +325,22 @@ fn visit_postings(
             previous = last as u32;
             continue;
         }
-        for _ in 0..run {
-            if found.is_multiple_of(1024) {
-                if let Some(budget) = budget {
-                    budget.check()?;
-                }
+        // Check at the same 1024-ID boundaries, but keep the inner run
+        // expansion free of per-ID budget branches (including long RLE runs).
+        let budget = budget.expect("budget checked above");
+        let mut remaining = run;
+        while remaining != 0 {
+            let offset = found % 1024;
+            if offset == 0 {
+                budget.check()?;
             }
-            previous += gap;
-            visit(previous);
-            found += 1;
+            let chunk = remaining.min(1024 - offset);
+            for _ in 0..chunk {
+                previous += gap;
+                visit(previous);
+            }
+            found += chunk;
+            remaining -= chunk;
         }
     }
     ensure!(found == count, "truncated posting list");
@@ -1201,6 +1208,12 @@ impl Index {
     }
 
     #[inline]
+    fn hot_name_bytes(&self, start: u32, len: u32) -> &[u8] {
+        let start = start as usize;
+        &self.section(&self.manifest.names)[start..start + len as usize]
+    }
+
+    #[inline]
     fn name_hot<'a>(
         &'a self,
         start: u32,
@@ -1208,9 +1221,7 @@ impl Index {
         flags: u32,
         scratch: &'a mut String,
     ) -> &'a str {
-        let s = start as usize;
-        let e = s + len as usize;
-        let stored = &self.section(&self.manifest.names)[s..e];
+        let stored = self.hot_name_bytes(start, len);
         if flags & PREFIX_FLAG == 0 {
             // Index::validate() 已在加载时逐条校验所有文件名段为合法 UTF-8。
             return std::str::from_utf8(stored).unwrap_or("");
@@ -1451,11 +1462,15 @@ impl Index {
         let Some(first) = lists.first() else {
             return Ok(None);
         };
-        let decode = |g: &[u8]| {
+        let postings = self.section(&self.manifest.postings);
+        let posting_bytes = |g: &[u8]| {
             let start = read64(g, 8) as usize;
             let len = read32(g, 16) as usize;
+            &postings[start..start + len]
+        };
+        let decode = |g: &[u8]| {
             decode_postings(
-                &self.section(&self.manifest.postings)[start..start + len],
+                posting_bytes(g),
                 read32(g, 20),
                 self.manifest.count,
                 self.manifest.rle_postings,
@@ -1471,6 +1486,16 @@ impl Index {
             }
             if selected.len() <= 32 || read32(g, 20) as usize > selected.len().saturating_mul(8) {
                 break;
+            }
+            // Identical encoded postings with equal counts describe the same IDs.
+            // The selected set is already a subset of the first posting.
+            // Bound the byte comparison so it cannot monopolize cancellation.
+            budget.check()?;
+            if read32(g, 20) == read32(first, 20)
+                && read32(g, 16) <= 4096
+                && posting_bytes(g) == posting_bytes(first)
+            {
+                continue;
             }
             let right = decode(g)?;
             selected = intersect_sorted(&selected, &right, budget)?;
@@ -1653,7 +1678,9 @@ impl Index {
                         continue;
                     }
                     match self.candidates(p, budget)? {
-                        Some(v) => all = union_sorted(&all, &v, budget)?,
+                        Some(v) if all.is_empty() => all = v,
+                        Some(v) if !v.is_empty() => all = union_sorted(&all, &v, budget)?,
+                        Some(_) => {}
                         None => return Ok(None),
                     }
                     if all.len() == self.len() {
@@ -1839,6 +1866,7 @@ impl Index {
         let mut candidate_count_exact = true;
         let mut name_scratch = String::new();
         let mut path = String::new();
+        let mut boost_path = String::new();
         'parts: for part in 0..segment_count {
             let (start, segment) = catalog.map_or((0, self), |catalog| catalog.part(part));
             let sample = preview && segment.candidate_upper_bound(&plan) > 32_768;
@@ -1866,6 +1894,23 @@ impl Index {
                 .as_ref()
                 .map_or(segment.manifest.count as usize, Vec::len);
             if !COLUMN_SORT && !sample && workers > 1 && candidate_len >= 16_384 {
+                // 同一字典前缀只计算一次，复杂查询或未归一化记录走完整评估。
+                let prefix_scores: Vec<_> = if !needs_path && !needs_cold && boosts.is_none() {
+                    segment
+                        .manifest
+                        .name_prefixes
+                        .iter()
+                        .take_while(|_| !budget.expired())
+                        .map(|prefix| query.prepare_name_prefix(prefix))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let prefix_scores = if prefix_scores.iter().any(Option::is_some) {
+                    prefix_scores.as_slice()
+                } else {
+                    &[]
+                };
                 struct ChunkOutcome {
                     heap: BinaryHeap<Reverse<(i64, Reverse<u32>)>>,
                     total: usize,
@@ -1895,8 +1940,9 @@ impl Index {
                             let mut local_complete = true;
                             let mut local_name = String::new();
                             let mut local_path = String::new();
+                            let mut boost_path = String::new();
                             for offset in range_start..range_end {
-                                if (offset - range_start).is_multiple_of(4096)
+                                if (offset - range_start).is_multiple_of(128)
                                     && budget_ref.expired()
                                 {
                                     local_complete = false;
@@ -1916,71 +1962,101 @@ impl Index {
                                 };
                                 local_candidates += 1;
                                 local_examined += 1;
-                                let (view, folded_name, parent_id, metadata) = if !needs_cold {
-                                    let (name_off, name_len, pid, sid, flags) =
-                                        segment.hot_fields(id);
-                                    let name = segment.name_hot(
-                                        name_off,
-                                        name_len,
-                                        flags,
-                                        &mut local_name,
-                                    );
-                                    let parent_id = pid as usize;
-                                    if needs_path {
-                                        local_path.clear();
-                                        local_path.push_str(&segment.manifest.parents[parent_id]);
-                                        local_path.push_str(name);
-                                    }
-                                    let view = EntryRef {
-                                        name,
-                                        path: &local_path,
-                                        size: 0,
-                                        modified: 0,
-                                        is_dir: flags & 1 != 0,
-                                        source: &segment.manifest.sources[sid as usize],
-                                    };
-                                    let folded_name = (flags & 2 != 0).then_some(view.name);
-                                    (view, folded_name, parent_id, QueryMetadata::default())
-                                } else {
-                                    let r = segment.raw(id);
-                                    let name_view = segment.view_raw(
-                                        &r,
-                                        segment.name(&r, &mut local_name)?,
-                                        "",
-                                    );
-                                    let parent_id = read32(&r, 8) as usize;
-                                    if needs_path {
-                                        local_path.clear();
-                                        local_path.push_str(&segment.manifest.parents[parent_id]);
-                                        local_path.push_str(name_view.name);
-                                    }
-                                    let view = EntryRef {
-                                        path: &local_path,
-                                        ..name_view
-                                    };
-                                    let folded_name =
-                                        (read32(&r, 32) & 2 != 0).then_some(view.name);
-                                    let metadata = segment.query_metadata(id)?;
-                                    (view, folded_name, parent_id, metadata)
-                                };
-                                if let Some(mut score) = query_ref.matched_score_with_metadata(
-                                    &view,
-                                    folded_name,
-                                    segment.parent_depths[parent_id],
-                                    metadata,
-                                ) {
-                                    if let Some(boosts) = boosts {
-                                        let full_path = if needs_path {
-                                            local_path.clone()
-                                        } else {
-                                            format!(
-                                                "{}{}",
-                                                segment.manifest.parents[parent_id], view.name
+                                let hot = (!needs_cold).then(|| segment.hot_fields(id));
+                                let prepared_score =
+                                    hot.and_then(|(name_off, name_len, pid, _, flags)| {
+                                        if prefix_scores.is_empty()
+                                            || flags & (PREFIX_FLAG | 2) != PREFIX_FLAG | 2
+                                        {
+                                            return None;
+                                        }
+                                        let stored = segment.hot_name_bytes(name_off, name_len);
+                                        let prefix = u16::from_le_bytes([stored[0], stored[1]]);
+                                        prefix_scores
+                                            .get(prefix as usize)
+                                            .copied()
+                                            .flatten()?
+                                            .score_suffix(
+                                                &stored[2..],
+                                                flags & 1 != 0,
+                                                segment.parent_depths[pid as usize],
                                             )
+                                    });
+                                let score = if let Some(score) = prepared_score {
+                                    score
+                                } else {
+                                    let (view, folded_name, parent_id, metadata) =
+                                        if let Some((name_off, name_len, pid, sid, flags)) = hot {
+                                            let name = segment.name_hot(
+                                                name_off,
+                                                name_len,
+                                                flags,
+                                                &mut local_name,
+                                            );
+                                            let parent_id = pid as usize;
+                                            if needs_path {
+                                                local_path.clear();
+                                                local_path
+                                                    .push_str(&segment.manifest.parents[parent_id]);
+                                                local_path.push_str(name);
+                                            }
+                                            let view = EntryRef {
+                                                name,
+                                                path: &local_path,
+                                                size: 0,
+                                                modified: 0,
+                                                is_dir: flags & 1 != 0,
+                                                source: &segment.manifest.sources[sid as usize],
+                                            };
+                                            let folded_name = (flags & 2 != 0).then_some(view.name);
+                                            (view, folded_name, parent_id, QueryMetadata::default())
+                                        } else {
+                                            let r = segment.raw(id);
+                                            let name_view = segment.view_raw(
+                                                &r,
+                                                segment.name(&r, &mut local_name)?,
+                                                "",
+                                            );
+                                            let parent_id = read32(&r, 8) as usize;
+                                            if needs_path {
+                                                local_path.clear();
+                                                local_path
+                                                    .push_str(&segment.manifest.parents[parent_id]);
+                                                local_path.push_str(name_view.name);
+                                            }
+                                            let view = EntryRef {
+                                                path: &local_path,
+                                                ..name_view
+                                            };
+                                            let folded_name =
+                                                (read32(&r, 32) & 2 != 0).then_some(view.name);
+                                            let metadata = segment.query_metadata(id)?;
+                                            (view, folded_name, parent_id, metadata)
                                         };
-                                        score =
-                                            score.saturating_add(path_boost(boosts, &full_path));
-                                    }
+                                    query_ref
+                                        .matched_score_with_metadata(
+                                            &view,
+                                            folded_name,
+                                            segment.parent_depths[parent_id],
+                                            metadata,
+                                        )
+                                        .map(|score| {
+                                            let Some(boosts) = boosts else {
+                                                return score;
+                                            };
+                                            let full_path = if needs_path {
+                                                local_path.as_str()
+                                            } else {
+                                                boost_path.clear();
+                                                boost_path
+                                                    .push_str(&segment.manifest.parents[parent_id]);
+                                                boost_path.push_str(view.name);
+                                                boost_path.as_str()
+                                            };
+                                            score.saturating_add(path_boost(boosts, full_path))
+                                        })
+                                };
+                                if let Some(score) = score {
                                     local_total += 1;
                                     let rank = (score, Reverse(id_in_catalog));
                                     if local_heap.len() < capacity {
@@ -2081,11 +2157,14 @@ impl Index {
                 ) {
                     if let Some(boosts) = boosts {
                         let full_path = if needs_path {
-                            path.clone()
+                            path.as_str()
                         } else {
-                            format!("{}{}", segment.manifest.parents[parent_id], view.name)
+                            boost_path.clear();
+                            boost_path.push_str(&segment.manifest.parents[parent_id]);
+                            boost_path.push_str(view.name);
+                            boost_path.as_str()
                         };
-                        score = score.saturating_add(path_boost(boosts, &full_path));
+                        score = score.saturating_add(path_boost(boosts, full_path));
                     }
                     total += 1;
                     if COLUMN_SORT {
@@ -2265,24 +2344,26 @@ fn intersect_sorted(left: &[u32], right: &[u32], budget: &SearchBudget<'_>) -> R
     Ok(result)
 }
 fn union_sorted(left: &[u32], right: &[u32], budget: &SearchBudget<'_>) -> Result<Vec<u32>> {
-    let mut a = 0;
-    let mut b = 0;
+    // Both inputs are sorted and unique. Avoid over-reserving heavily
+    // overlapping postings; the remaining tails can be copied in bulk.
     let mut result = Vec::with_capacity(left.len().max(right.len()));
-    while a < left.len() || b < right.len() {
-        if result.len().is_multiple_of(1024) {
-            budget.check()?;
+    let (mut a, mut b) = (0, 0);
+    while a < left.len() && b < right.len() {
+        budget.check()?;
+        // Bound cancellation latency without a modulo/length test on each ID.
+        for _ in 0..1024 {
+            if a == left.len() || b == right.len() {
+                break;
+            }
+            let (x, y) = (left[a], right[b]);
+            result.push(x.min(y));
+            a += usize::from(x <= y);
+            b += usize::from(y <= x);
         }
-        if b == right.len() || (a < left.len() && left[a] < right[b]) {
-            result.push(left[a]);
-            a += 1;
-        } else if a == left.len() || right[b] < left[a] {
-            result.push(right[b]);
-            b += 1;
-        } else {
-            result.push(left[a]);
-            a += 1;
-            b += 1;
-        }
+    }
+    for chunk in left[a..].chunks(1024).chain(right[b..].chunks(1024)) {
+        budget.check()?;
+        result.extend_from_slice(chunk);
     }
     Ok(result)
 }
@@ -2345,11 +2426,131 @@ mod tests {
         assert_eq!(r.total, 2);
     }
     #[test]
+    fn personalized_search_preserves_path_filter_and_global_rank() {
+        let idx = fixture();
+        let boosts = HashMap::from([("/tmp/project/readme.md".to_owned(), 100_000)]);
+        let options = SearchOptions {
+            limit: 1,
+            ..Default::default()
+        };
+        for query in ["budget | readme", "path:project (budget | readme)"] {
+            let r = idx
+                .search_personalized(query, &options, None, &boosts)
+                .unwrap();
+            assert!(r.complete);
+            assert_eq!(r.total, 2);
+            assert_eq!(r.results[0].path, "/tmp/project/readme.md");
+        }
+    }
+    #[test]
+    fn repeated_grams_and_or_union_keep_exact_matches() {
+        let mut builder = IndexBuilder::default();
+        for i in 0..1000 {
+            let name = match i % 4 {
+                0 => "budget",
+                1 => "meeting",
+                2 => "budget_meeting",
+                _ => "archive",
+            };
+            builder
+                .add(FileRecord {
+                    path: format!("/synthetic/{name}_{i}.txt"),
+                    size: 1,
+                    modified: 0,
+                    is_dir: false,
+                    source: "offline:test".into(),
+                })
+                .unwrap();
+        }
+        let idx = builder.finish(1).unwrap();
+        for query in [
+            "budget | meeting",
+            "absent | budget | meeting | budget",
+            "meeting | budget | absent",
+        ] {
+            let r = idx.search(query, &SearchOptions::default(), None).unwrap();
+            assert!(r.complete);
+            assert_eq!(r.total, 750);
+            assert_eq!(r.candidate_count, 750);
+        }
+        let r = idx
+            .search("budget", &SearchOptions::default(), None)
+            .unwrap();
+        assert!(r.complete);
+        assert_eq!(r.total, 500);
+    }
+    #[test]
     fn mixed_not_path_is_conservative() {
         let r = fixture()
             .search("path:project !readme", &SearchOptions::default(), None)
             .unwrap();
         assert_eq!(r.total, 1);
+    }
+    #[test]
+    fn compacted_broad_queries_keep_exact_totals_and_ranked_pages() {
+        let mut builder = IndexBuilder::default();
+        for id in 0..50_000 {
+            let template = match id % 5 {
+                0 => format!("project_budget_final_{id:07}.pdf"),
+                1 => format!("meeting_notes_{id:07}.txt"),
+                2 => format!("project_budget_final_{id:07}meeting.技术"),
+                3 => format!("readme_source_{id:07}.rs"),
+                _ => format!("readme_source_{id:07}.RS"),
+            };
+            let parent = if id % 3 == 0 { "/root/" } else { "/root/sub/" };
+            builder
+                .add(FileRecord {
+                    path: format!("{parent}{template}"),
+                    size: 1,
+                    modified: 0,
+                    is_dir: id % 29 == 0,
+                    source: "offline:test".into(),
+                })
+                .unwrap();
+        }
+        let idx = builder.finish(1).unwrap();
+        assert_eq!(idx.manifest.name_prefixes.len(), 3);
+        let options = SearchOptions {
+            limit: 100,
+            offset: 45,
+            time_budget_ms: 60_000,
+        };
+        for text in ["budget | meeting", "readme ext:rs"] {
+            let query = Query::parse(text).unwrap();
+            let mut truth: Vec<_> = idx
+                .records()
+                .enumerate()
+                .filter_map(|(id, record)| {
+                    let name = split_path(&record.path).unwrap().1;
+                    let entry = EntryRef {
+                        name,
+                        path: &record.path,
+                        size: record.size,
+                        modified: record.modified,
+                        is_dir: record.is_dir,
+                        source: &record.source,
+                    };
+                    query
+                        .matched_score(&entry)
+                        .map(|score| (Reverse(score), id as u32))
+                })
+                .collect();
+            truth.sort_unstable();
+            let actual = idx.search(text, &options, None).unwrap();
+            assert!(actual.complete);
+            assert!(actual.candidate_count_exact);
+            assert_eq!(actual.total, truth.len(), "{text}");
+            let ranked: Vec<_> = actual
+                .results
+                .iter()
+                .map(|hit| (Reverse(hit.score), hit.id))
+                .collect();
+            assert_eq!(
+                ranked,
+                truth[options.offset..options.offset + options.limit],
+                "{text}"
+            );
+        }
     }
     #[test]
     fn cancellation_is_honest() {
@@ -2428,6 +2629,65 @@ mod tests {
 #[cfg(test)]
 mod intersect_tests {
     use super::*;
+
+    #[test]
+    fn chunked_union_matches_ordered_set_for_overlap_and_long_tails() {
+        let budget = SearchBudget {
+            start: Instant::now(),
+            milliseconds: 5000,
+            cancel: None,
+        };
+        for (left, right) in [
+            (vec![], (0..5000).collect::<Vec<_>>()),
+            (
+                (0..5000).step_by(2).collect(),
+                (1..6000).step_by(2).collect(),
+            ),
+            ((0..5000).collect(), (2500..8000).collect()),
+            ((0..5000).collect(), (0..5000).collect()),
+        ] {
+            let expected = left
+                .iter()
+                .chain(&right)
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            assert_eq!(union_sorted(&left, &right, &budget).unwrap(), expected);
+            assert_eq!(union_sorted(&right, &left, &budget).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn long_posting_and_union_keep_cancellation_bounded() {
+        let cancelled = AtomicBool::new(false);
+        let budget = SearchBudget {
+            start: Instant::now(),
+            milliseconds: 5000,
+            cancel: Some(&cancelled),
+        };
+        let mut encoded = Vec::new();
+        for value in [0, 0, 8191, 1] {
+            put_varint(value, &mut encoded);
+        }
+        let mut seen = 0;
+        let error = visit_postings(&encoded, 8192, 8192, true, Some(&budget), |_| {
+            seen += 1;
+            if seen == 1025 {
+                cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        })
+        .unwrap_err();
+        assert!(error.is::<SearchInterrupted>());
+        assert_eq!(seen, 2048);
+        let long = (0..5000).collect::<Vec<_>>();
+        assert!(union_sorted(&[], &long, &budget)
+            .unwrap_err()
+            .is::<SearchInterrupted>());
+        assert!(union_sorted(&long, &long, &budget)
+            .unwrap_err()
+            .is::<SearchInterrupted>());
+    }
 
     #[test]
     fn galloping_and_linear_intersection_match_exactly() {

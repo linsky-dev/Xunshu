@@ -5121,6 +5121,7 @@ version = "0.18.0-alpha.7"
 dependencies = [
  "chrono",
  "chrono-tz",
+ "memchr",
  "pinyin",
  "regex",
  "serde",

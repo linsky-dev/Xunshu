@@ -770,14 +770,19 @@ impl Parser {
                     required_literal,
                 }
             }
-            Mode::Text => Pattern::Literal {
-                needle: if context.case_sensitive {
+            Mode::Text => {
+                let needle = if context.case_sensitive {
                     value.into_owned()
                 } else {
                     fold(&value)
-                },
-                case_sensitive: context.case_sensitive,
-            },
+                };
+                let finder = Box::new(memchr::memmem::Finder::new(needle.as_bytes()).into_owned());
+                Pattern::Literal {
+                    needle,
+                    finder,
+                    case_sensitive: context.case_sensitive,
+                }
+            }
         };
         Ok(Expr::Leaf(Leaf::Text {
             field: context.field,

@@ -1,5 +1,5 @@
 use crate::{session, Assets};
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use ort::{session::Session, value::Tensor};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,11 +40,13 @@ impl Embedder {
 
     /// tokenizer 负责保留每窗的起止偏移以及特殊 token，覆盖长文尾部。
     pub fn embed(&mut self, text: &str, cancel: &AtomicBool) -> Result<Vec<EmbeddingWindow>> {
+        ensure!(!cancel.load(Ordering::Relaxed), "语义推理已取消");
         ensure!(text.len() <= 1024 * 1024, "语义片段超出长度限制");
         let encoded = self
             .tokenizer
             .encode(text, true)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        ensure!(!cancel.load(Ordering::Relaxed), "语义推理已取消");
         let mut result = Vec::with_capacity(1 + encoded.get_overflowing().len());
         for window in std::iter::once(&encoded).chain(encoded.get_overflowing()) {
             ensure!(!cancel.load(Ordering::Relaxed), "语义推理已取消");
@@ -61,6 +63,13 @@ impl Embedder {
             let Some((start, end)) = range else {
                 continue;
             };
+            ensure!(
+                start < end
+                    && end <= text.len()
+                    && text.is_char_boundary(start)
+                    && text.is_char_boundary(end),
+                "模型分窗偏移无效"
+            );
             let length = window.len();
             ensure!((1..=MAX_TOKENS).contains(&length), "模型分窗长度无效");
             let tensor = |values: &[u32]| {
@@ -77,19 +86,58 @@ impl Embedder {
                 "attention_mask" => tensor(window.get_attention_mask())?,
                 "token_type_ids" => tensor(window.get_type_ids())?,
             })?;
-            let (shape, vector) = outputs[0].try_extract_tensor::<f32>()?;
-            ensure!(
-                shape.as_ref() == [1, 512] && vector.iter().all(|value| value.is_finite()),
-                "语义模型输出形状或数值无效"
-            );
-            let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
-            ensure!(norm.is_finite() && norm > 0.0, "语义模型输出空向量");
+            ensure!(!cancel.load(Ordering::Relaxed), "语义推理已取消");
+            let (shape, vector) = outputs
+                .get("embedding")
+                .context("语义模型缺少 embedding 输出")?
+                .try_extract_tensor::<f32>()?;
+            ensure!(shape.as_ref() == [1, 512], "语义模型输出形状无效");
             result.push(EmbeddingWindow {
                 start,
                 end,
-                vector: vector.iter().map(|value| value / norm).collect(),
+                vector: normalize(vector)?,
             });
         }
+        ensure!(!cancel.load(Ordering::Relaxed), "语义推理已取消");
         Ok(result)
+    }
+}
+
+fn normalize(vector: &[f32]) -> Result<Vec<f32>> {
+    ensure!(
+        vector.len() == 512 && vector.iter().all(|v| v.is_finite()),
+        "语义模型输出长度或数值无效"
+    );
+    let norm = vector
+        .iter()
+        .map(|&v| f64::from(v).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    ensure!(norm.is_finite() && norm > 1e-12, "语义模型输出空向量");
+    Ok(vector
+        .iter()
+        .map(|&v| (f64::from(v) / norm) as f32)
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize;
+
+    #[test]
+    fn normalization_rejects_invalid_outputs() {
+        for value in [0.0, f32::NAN, f32::INFINITY, 1e-30] {
+            assert!(normalize(&[value; 512]).is_err());
+        }
+        assert!(normalize(&[1.0; 511]).is_err());
+    }
+
+    #[test]
+    fn normalization_handles_large_finite_values() {
+        for value in [1.0, f32::MAX] {
+            let vector = normalize(&[value; 512]).unwrap();
+            let length_squared: f64 = vector.iter().map(|&v| f64::from(v).powi(2)).sum();
+            assert!((length_squared - 1.0).abs() < 1e-6);
+        }
     }
 }

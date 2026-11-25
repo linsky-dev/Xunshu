@@ -85,7 +85,7 @@ fn real_worker_indexes_safe_formats_and_locations() {
             ("_rels/.rels", r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#),
             ("xl/workbook.xml", r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="表格" sheetId="1" r:id="rId1"/></sheets></workbook>"#),
             ("xl/_rels/workbook.xml.rels", r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#),
-            ("xl/worksheets/sheet1.xml", r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="3"><c r="AB3" t="inlineStr"><is><t>单元格位置</t></is></c><c r="AC3"><f>SUM(1,2)</f><v>3</v></c></row></sheetData></worksheet>"#),
+            ("xl/worksheets/sheet1.xml", r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>年初台账</t></is></c></row><row r="2"><c r="B2"><f t="shared" si="4000000000" ref="B2:B3">D2+$E$1</f><v>7</v></c></row><row r="3"><c r="B3"><f t="shared" si="4000000000"/><v>8</v></c><c r="AB3" t="inlineStr"><is><t>单元格位置</t></is></c><c r="AC3"><f>SUM(1,2)</f><v>3</v></c></row><row r="1048576"><c r="XFD1048576" t="inlineStr"><is><t>年末台账</t></is></c></row></sheetData></worksheet>"#),
         ]),
     )
     .unwrap();
@@ -126,6 +126,30 @@ fn real_worker_indexes_safe_formats_and_locations() {
             address: "AC3".into(),
         }
     );
+    assert_eq!(
+        query("年初台账").hits[0].location,
+        Location::Cell {
+            sheet: "表格".into(),
+            address: "A1".into()
+        }
+    );
+    assert_eq!(
+        query("年末台账").hits[0].location,
+        Location::Cell {
+            sheet: "表格".into(),
+            address: "XFD1048576".into()
+        }
+    );
+    let derived = query("D3");
+    assert_eq!(derived.indexed_total, 1);
+    assert_eq!(
+        derived.hits[0].location,
+        Location::Cell {
+            sheet: "表格".into(),
+            address: "B3".into()
+        }
+    );
+    assert!(derived.hits[0].snippet.contains("=D3+$E$1"));
     let hit = &query("会议").hits[0];
     let span = &hit.highlights[0];
     assert_eq!(&hit.snippet[span.start..span.end], "会议");
@@ -190,6 +214,92 @@ fn failed_extraction_never_replaces_complete_index() {
         .unwrap();
     assert_eq!(existing.generation, first.generation.unwrap());
     assert_eq!(existing.indexed_total, 1);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn unreadable_file_cannot_expose_previously_indexed_content() {
+    use std::os::unix::{fs::PermissionsExt, process::CommandExt};
+    use xs_platform::FileRevision;
+    const CHILD_DATA: &str = "XS_TEST_CONTENT_PERMISSION_DATA";
+    const CHILD_RESPONSE: &str = "XS_TEST_CONTENT_PERMISSION_RESPONSE";
+    let query = "permission synthetic";
+    let cancel = AtomicBool::new(false);
+    let options = SearchOptions::default();
+    let verify_denied = |data: &Path, original: &xs_content::SearchResponse| {
+        let mut reader = ContentReader::new(data);
+        let result = reader.search(query, &options, &cancel).unwrap();
+        assert_eq!(result.indexed_total, 1);
+        assert_eq!(result.omitted_stale, 1);
+        assert!(result.hits.is_empty());
+        assert!(validate_response(data, original).is_err());
+    };
+    if let Some(data) = std::env::var_os(CHILD_DATA) {
+        let data = PathBuf::from(data);
+        let original: xs_content::SearchResponse =
+            serde_json::from_str(&std::env::var(CHILD_RESPONSE).unwrap()).unwrap();
+        verify_denied(&data, &original);
+        return;
+    }
+    let root = unsafe { libc::geteuid() } == 0;
+    let temp = if root {
+        tempfile::Builder::new()
+            .prefix("xs-permission-")
+            .tempdir_in("/dev/shm")
+            .unwrap()
+    } else {
+        sandbox()
+    };
+    let data = temp.path().join("data");
+    let docs = temp.path().join("docs");
+    fs::create_dir_all(&docs).unwrap();
+    settings(&data, &docs);
+    let file = docs.join("private.txt");
+    fs::write(&file, query).unwrap();
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(rebuild(&data, worker(), &cancel).unwrap().published);
+    if root {
+        // Only this synthetic fixture is shared with the child. The source file
+        // remains root-owned and unreadable, with its original revision intact.
+        for dir in [temp.path(), &data, &docs] {
+            fs::set_permissions(dir, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        for entry in fs::read_dir(&data).unwrap() {
+            let entry = entry.unwrap();
+            assert!(entry.file_type().unwrap().is_file());
+            fs::set_permissions(entry.path(), fs::Permissions::from_mode(0o644)).unwrap();
+        }
+    }
+    let mut reader = ContentReader::new(&data);
+    let original = reader.search(query, &options, &cancel).unwrap();
+    assert_eq!(original.hits.len(), 1);
+    validate_response(&data, &original).unwrap();
+    if root {
+        let revision = FileRevision::at_path(&file).unwrap();
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "unreadable_file_cannot_expose_previously_indexed_content",
+                "--nocapture",
+            ])
+            .env(CHILD_DATA, &data)
+            .env(CHILD_RESPONSE, serde_json::to_string(&original).unwrap())
+            .uid(65534)
+            .gid(65534)
+            .output()
+            .unwrap();
+        assert!(
+            child.status.success() && String::from_utf8_lossy(&child.stdout).contains("1 passed"),
+            "{}\n{}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr)
+        );
+        assert_eq!(FileRevision::at_path(&file).unwrap(), revision);
+    } else {
+        fs::set_permissions(&file, fs::Permissions::from_mode(0o000)).unwrap();
+        verify_denied(&data, &original);
+        fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
+    }
 }
 
 #[test]

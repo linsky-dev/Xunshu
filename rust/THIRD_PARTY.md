@@ -10,7 +10,7 @@ Windows 当前 Cargo 解析范围的通知保存在 [恢复版库存](licenses/r
 | --- | --- |
 | 中文 BGE 模型 | [BAAI 官方 BGE-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5)，MIT。对锁定的官方权重完成 ONNX 转换及数值对照 |
 | PP-OCRv5 ONNX 检测和识别 | [检测发行](https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx) 与 [识别发行](https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_rec_onnx)，Apache-2.0 |
-| ONNX Runtime | [Microsoft 1.24.4 CPU 发行](https://github.com/microsoft/onnxruntime/releases/tag/v1.24.4)，MIT 及随附第三方通知 |
+| ONNX Runtime | MIT 及随附第三方通知。官方 GitHub 资产缺失时，使用固定 SHA-256 从同版本的 Microsoft PyPI wheel 提取原生库。 [GitHub 发行](https://github.com/microsoft/onnxruntime/releases/tag/v1.24.4) · [PyPI 1.24.4](https://pypi.org/project/onnxruntime/1.24.4/) |
 | 中文界面字体 | [Noto Sans SC](https://github.com/notofonts/noto-cjk/tree/Sans2.004)，SIL OFL 1.1 |
 
 ## M1 历史通知

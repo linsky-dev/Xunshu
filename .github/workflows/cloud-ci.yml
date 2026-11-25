@@ -10,6 +10,14 @@ on:
         description: 'Also prepare real model assets and test isolated installation (not a release)'
         type: boolean
         default: false
+      performance_validation:
+        description: 'Run independent 3M synthetic filename benchmark and strict 50ms gate'
+        type: boolean
+        default: false
+      fault_validation:
+        description: 'Run Linux ENOSPC on a private, disposable mount (requires user mount namespaces)'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -40,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config cmake clang libfontconfig1-dev fonts-noto-cjk xauth libxinerama-dev libx11-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libudev-dev xvfb
+          sudo apt-get install -y binutils build-essential pkg-config cmake clang libfontconfig1-dev fonts-noto-cjk xauth libxinerama-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev libegl1-mesa-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libudev-dev xvfb
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
@@ -52,6 +60,12 @@ jobs:
           cargo fetch --locked
       - name: Source preflight
         run: python scripts/check_release_consistency.py
+      - name: Independent benchmark and ELF audit contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/test-benchmark-gate.py
+          python scripts/test-audit-linux-abi.py
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Type check
@@ -86,33 +100,85 @@ jobs:
           cargo test --workspace --locked --offline --no-fail-fast 2>&1 | Tee-Object -FilePath (Join-Path $ev 'tests.log')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native release build
+        id: release_build
         run: cargo build --workspace --release --locked --offline
+      - name: Linux direct ELF ABI inventory
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/xunshu-evidence"
+          python scripts/audit-linux-abi.py target/release/xunshu target/release/xs-ui target/release/xs-install target/release/xs-content-worker target/release/xs-model-worker | tee "$RUNNER_TEMP/xunshu-evidence/linux-abi.json"
+      - name: Native installer negative contracts (Linux)
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/xunshu-evidence"
+          python scripts/verify-install-negative.py --installer target/release/xs-install --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
+      - name: Native installer negative contracts (Windows)
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Windows'"
+        shell: pwsh
+        run: |
+          python scripts/verify-install-negative.py --installer target/release/xs-install.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/installer-negative.jsonl"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Linux isolated ENOSPC installer fault (opt-in)
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && inputs.fault_validation"
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$(mktemp -d /dev/shm/xs-ci-mount.XXXXXXXX)"
+          trap 'rmdir "$d"' EXIT
+          unshare -Ur -m bash -c 'set -eu; mount --make-rprivate /; mount -t tmpfs -o size=1m,mode=0700 tmpfs "$1"; python scripts/verify-install-enospc.py --installer target/release/xs-install --empty-mount "$1" --payload-temp-root "$RUNNER_TEMP"' _ "$d" | tee "$RUNNER_TEMP/xunshu-evidence/installer-enospc.json"
       - name: Linux recovery contracts
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           python scripts/verify-recovery.py --bin-dir target/release --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/recovery.json"
       - name: Windows recovery contracts
-        if: runner.os == 'Windows'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Windows'"
         shell: pwsh
         run: |
           python scripts/verify-recovery.py --bin-dir target/release --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/recovery.json"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native filename watcher restart and revocation (Linux)
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify-watch-restart.py --cli target/release/xunshu --temp-root "$RUNNER_TEMP" | tee "$RUNNER_TEMP/xunshu-evidence/watch-restart.json"
+      - name: Native filename watcher restart and revocation (Windows)
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Windows'"
+        shell: pwsh
+        run: |
+          python scripts/verify-watch-restart.py --cli target/release/xunshu.exe --temp-root "$env:RUNNER_TEMP" | Tee-Object -FilePath "$env:RUNNER_TEMP/xunshu-evidence/watch-restart.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Linux native window smoke
-        if: runner.os == 'Linux'
+        if: "!cancelled() && steps.release_build.outcome == 'success' && runner.os == 'Linux'"
         shell: bash
         run: |
           set -euo pipefail
           xvfb-run -a timeout 60s target/release/xs-ui --smoke-test --data-dir "$RUNNER_TEMP/xunshu-ui-smoke" 2>&1 | tee "$RUNNER_TEMP/xunshu-evidence/ui-smoke.log"
           grep -F 'XS_UI_SMOKE_OK' "$RUNNER_TEMP/xunshu-evidence/ui-smoke.log"
       - name: Real model conversion dependencies (opt-in)
-        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        id: model_dependencies
+        if: "!cancelled() && steps.release_build.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.model_validation"
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
           python -m pip install transformers==4.51.3 onnx==1.17.0 onnxruntime==1.20.1 PyYAML==6.0.2 Pillow==11.3.0
+      - name: Offline model and packaging integrity contracts (opt-in)
+        id: model_integrity
+        if: "!cancelled() && steps.model_dependencies.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.model_validation"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/test-prepare-models.py
+          python scripts/test-make-install-payload.py
       - name: Model, OCR and installation acceptance (opt-in)
-        if: github.event_name == 'workflow_dispatch' && inputs.model_validation
+        if: "!cancelled() && steps.model_integrity.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.model_validation"
         shell: bash
         run: |
           set -euo pipefail
@@ -122,18 +188,79 @@ jobs:
           base="$RUNNER_TEMP/xunshu-model-validation"
           mkdir -p "$base"
           python scripts/prepare-models.py --cache "$base/cache" --output "$base/resources" --platform "$platform"
+          cp "$base/resources/inference.json" "$RUNNER_TEMP/xunshu-evidence/inference.json"
+          cp "$base/resources/build-provenance.json" "$RUNNER_TEMP/xunshu-evidence/build-provenance.json"
+          if [[ "$platform" == linux ]]; then
+            python scripts/audit-linux-abi.py "$base/resources/libonnxruntime.so" | tee "$RUNNER_TEMP/xunshu-evidence/model-runtime-abi.json"
+          fi
           # Static OTF and license from the immutable Noto CJK Sans2.004 commit.
-          python -c "import urllib.request, pathlib, sys; root=pathlib.Path(sys.argv[1]); base='https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/'; urllib.request.urlretrieve(base+'Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf', root/'font.otf'); urllib.request.urlretrieve(base+'Sans/LICENSE', root/'font-license.txt')" "$base"
+          python -c "import urllib.request, pathlib, sys; root=pathlib.Path(sys.argv[1]); base='https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/'; urllib.request.urlretrieve(base+'Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf', root/'font.otf'); urllib.request.urlretrieve(base+'LICENSE', root/'font-license.txt')" "$base"
           version=$(python -c "import tomllib; print(tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version'])")
           python scripts/make-install-payload.py --binaries target/release --resources "$base/resources" --font "$base/font.otf" --font-license "$base/font-license.txt" --output "$base/payload" --platform "$platform" --version "$version" | tee "$RUNNER_TEMP/xunshu-evidence/model-payload.json"
           python scripts/verify-recovery.py --bin-dir "$base/payload" --temp-root "$base" --with-models | tee "$RUNNER_TEMP/xunshu-evidence/model-recovery.json"
           python scripts/verify-install.py --installer "target/release/xs-install$suffix" --payload "$base/payload" --temp-root "$base" | tee "$RUNNER_TEMP/xunshu-evidence/install.jsonl"
-          cp "$base/resources/inference.json" "$RUNNER_TEMP/xunshu-evidence/inference.json"
       - name: Preserve validation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: engineering-evidence-${{ matrix.os }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/xunshu-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  performance:
+    name: Synthetic 3M filename latency gate (Linux)
+    if: github.event_name == 'workflow_dispatch' && inputs.performance_validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TERM_COLOR: never
+      PYTHONUTF8: '1'
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Build locked Release CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.99.1 --profile minimal
+          cargo fetch --locked
+          cargo build --locked --offline --release -p xs-cli
+      - name: Measure and check independent filename benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          ev="$RUNNER_TEMP/xunshu-perf-evidence"
+          mkdir -p "$ev"
+          root="$(mktemp -d "$RUNNER_TEMP/xunshu-perf.XXXXXXXX")"
+          # Require three independent datasets; never hide a failed round
+          # behind a subsequent pass. Preserve every result for review.
+          failed=0
+          for round in 1 2 3; do
+            if target/release/xunshu --data-dir "$root/data-$round" benchmark --entries 3000000 --iterations 30 > "$ev/benchmark-$round.json" 2> "$ev/benchmark-$round.stderr"; then
+              if ! python scripts/check-benchmark-gate.py "$ev/benchmark-$round.json" --strict-latency | tee "$ev/gate-$round.json"; then
+                failed=1
+              fi
+            else
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - name: Keep benchmark evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: filename-benchmark-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/xunshu-perf-evidence/
           if-no-files-found: warn
           retention-days: 14

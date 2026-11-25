@@ -84,6 +84,9 @@ struct State {
     active: Option<Version>,
     previous: Option<Version>,
     retained: Vec<Version>,
+    // Separate from releases: rollback probes must never authorize version deletion.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rollback_probes: Vec<Version>,
 }
 
 fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>> {
@@ -159,6 +162,7 @@ fn manifest(root: &Path, expected: &str) -> Result<(Manifest, Vec<u8>)> {
         "安装清单版本、平台或文件数量无效"
     );
     let mut names = BTreeSet::new();
+    let mut directories = BTreeMap::<String, String>::new();
     for (name, entry) in &manifest.files {
         let folded = name.to_ascii_lowercase();
         ensure!(
@@ -171,7 +175,30 @@ fn manifest(root: &Path, expected: &str) -> Result<(Manifest, Vec<u8>)> {
                 && entry.bytes <= 512 * 1024 * 1024,
             "安装载荷路径或摘要无效：{name}"
         );
+        let mut parent = Path::new(name).parent();
+        while let Some(relative) = parent {
+            if relative.as_os_str().is_empty() {
+                break;
+            }
+            let spelling = relative
+                .to_str()
+                .context("无效的载荷目录")?
+                .replace('\\', "/");
+            let key = spelling.to_ascii_lowercase();
+            if let Some(existing) = directories.get(&key) {
+                ensure!(existing == &spelling, "安装目录大小写冲突：{name}");
+            } else {
+                directories.insert(key, spelling);
+            }
+            parent = relative.parent();
+        }
     }
+    ensure!(
+        directories
+            .keys()
+            .all(|key| !names.contains(key) && key != MANIFEST),
+        "安装清单文件与目录路径冲突"
+    );
     for name in PROGRAMS.map(executable).into_iter().chain([
         "resources/inference.json".to_owned(),
         "resources/fonts/NotoSansSC-Regular.otf".to_owned(),
@@ -214,8 +241,54 @@ fn checked_file(path: &Path, entry: &Entry, mut output: impl Write) -> Result<()
     Ok(())
 }
 
+// Do not allow an unlisted DLL, executable, or other file in an installed
+// release. The release owner marker is metadata, not an executable asset.
+fn verify_release_tree(root: &Path, manifest: &Manifest) -> Result<()> {
+    let mut directories = BTreeSet::new();
+    for name in manifest.files.keys() {
+        let mut parent = Path::new(name).parent();
+        while let Some(relative) = parent {
+            if relative.as_os_str().is_empty() {
+                break;
+            }
+            directories.insert(root.join(relative));
+            parent = relative.parent();
+        }
+    }
+    let files: BTreeSet<_> = manifest.files.keys().map(|name| root.join(name)).collect();
+    let mut pending = vec![root.to_owned()];
+    while let Some(directory) = pending.pop() {
+        xs_platform::validate_local_path(&directory, false)?;
+        for entry in std::fs::read_dir(&directory)? {
+            let entry = entry?;
+            let path = entry.path();
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                ensure!(
+                    directories.contains(&path),
+                    "安装目录包含未登记目录：{}",
+                    path.display()
+                );
+                pending.push(path);
+            } else {
+                ensure!(
+                    kind.is_file()
+                        && (files.contains(&path)
+                            || path == root.join(MANIFEST)
+                            || path == root.join(RELEASE_OWNER)),
+                    "安装目录包含未登记文件或链接：{}",
+                    path.display()
+                );
+                xs_platform::validate_local_path(&path, false)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify(root: &Path, expected: &str) -> Result<()> {
     let (manifest, _) = manifest(root, expected)?;
+    verify_release_tree(root, &manifest)?;
     for (name, entry) in manifest.files {
         checked_file(&root.join(name), &entry, io::sink())?;
     }
@@ -257,32 +330,79 @@ fn validate_state(root: &Path, state: &State) -> Result<()> {
     let mut retained = BTreeSet::new();
     for version in &state.retained {
         version_root(root, version)?;
-        ensure!(retained.insert(&version.directory), "安装状态包含重复版本");
+        ensure!(
+            retained.insert(version.directory.to_ascii_lowercase()),
+            "安装状态包含重复版本"
+        );
+    }
+    for probe in &state.rollback_probes {
+        version_root(root, probe)?;
+        ensure!(
+            probe
+                .directory
+                .strip_prefix("release-rollback-")
+                .is_some_and(|nonce| nonce.len() == 32
+                    && nonce
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
+            "回退自检目录名称无效"
+        );
+        ensure!(
+            retained.insert(probe.directory.to_ascii_lowercase()),
+            "自检目录归属冲突"
+        );
     }
     for version in [&state.active, &state.previous].into_iter().flatten() {
+        ensure!(
+            !state
+                .rollback_probes
+                .iter()
+                .any(|p| p.directory.eq_ignore_ascii_case(&version.directory)),
+            "自检目录不能作为安装版本"
+        );
         version_root(root, version)?;
         if let Some(entry) = state
             .retained
             .iter()
-            .find(|v| v.directory == version.directory)
+            .find(|v| v.directory.eq_ignore_ascii_case(&version.directory))
         {
             ensure!(
-                entry.manifest_sha256 == version.manifest_sha256,
+                entry.directory == version.directory
+                    && entry.manifest_sha256 == version.manifest_sha256,
                 "安装状态版本摘要冲突"
             );
         }
     }
     ensure!(
-        !matches!((&state.active, &state.previous), (Some(a), Some(b)) if a.directory == b.directory),
+        !matches!((&state.active, &state.previous), (Some(a), Some(b)) if a.directory.eq_ignore_ascii_case(&b.directory)),
         "当前和回退版本不能相同"
     );
     Ok(())
 }
 
+// Older state files may not list the active and previous versions in retained.
+// Preserve those identities before changing a pointer so later cleanup can
+// account for every version, including the displaced previous release.
+fn retain_pointer_versions(state: &mut State) {
+    for version in [&state.active, &state.previous].into_iter().flatten() {
+        if !state
+            .retained
+            .iter()
+            .any(|v| v.directory == version.directory)
+        {
+            state.retained.push(version.clone());
+        }
+    }
+}
+
 fn save_state(root: &Path, state: &State) -> Result<()> {
     validate_state(root, state)?;
-    let outcome =
-        xs_platform::atomic_write_local(&root.join(POINTER), &serde_json::to_vec(state)?, true)?;
+    let bytes = serde_json::to_vec(state)?;
+    ensure!(
+        bytes.len() as u64 <= MAX_MANIFEST,
+        "安装状态超过大小限制，请先清理历史记录"
+    );
+    let outcome = xs_platform::atomic_write_local(&root.join(POINTER), &bytes, true)?;
     if let Some(warning) = outcome.warning() {
         anyhow::bail!("入口可能已切换，但持久化未确认；禁止继续删除旧版本：{warning}");
     }
@@ -343,13 +463,34 @@ fn self_test(directory: &Path, data: &Path) -> Result<()> {
 /// 仅清理安装器创建且与发布 SHA 一致的自检目录，绝不清理用户数据目录。
 fn clean_probe(root: &Path, version: &Version) -> Result<()> {
     let probe = root.join("self-test-data").join(&version.directory);
-    if !probe.exists() {
-        return Ok(());
+    // `exists` also returns false on dangling links and access failures.
+    xs_platform::validate_local_path(&probe, true)?;
+    match std::fs::symlink_metadata(&probe) {
+        Ok(_) => (),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
     }
     xs_platform::validate_local_path(&probe, false)?;
     let owner = probe.join(PROBE_OWNER);
     match read_limited(&owner, 128) {
         Ok(bytes) if bytes == version.manifest_sha256.as_bytes() => {
+            // Refuse links/reparse points and unsupported mounts throughout the
+            // tree. Keep ownership on a failed preflight; never traverse them.
+            let mut pending = vec![probe.clone()];
+            while let Some(dir) = pending.pop() {
+                xs_platform::validate_local_path(&dir, false)?;
+                for entry in std::fs::read_dir(dir)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    xs_platform::validate_local_path(&path, false)?;
+                    let kind = entry.file_type()?;
+                    if kind.is_dir() {
+                        pending.push(path);
+                    } else {
+                        ensure!(kind.is_file(), "自检目录包含非普通文件，拒绝清理");
+                    }
+                }
+            }
             std::fs::remove_dir_all(&probe)?;
             Ok(())
         }
@@ -365,12 +506,60 @@ fn prepare_probe(root: &Path, version: &Version) -> Result<PathBuf> {
     let probe = root.join("self-test-data").join(&version.directory);
     xs_platform::create_local_dir_all(&root.join("self-test-data"))?;
     xs_platform::create_local_dir_new(&probe)?;
-    xs_platform::atomic_write_local(
-        &probe.join(PROBE_OWNER),
-        version.manifest_sha256.as_bytes(),
-        false,
-    )?;
+    ensure!(
+        xs_platform::atomic_write_local(
+            &probe.join(PROBE_OWNER),
+            version.manifest_sha256.as_bytes(),
+            false,
+        )?
+        .is_durable(),
+        "自检目录归属持久化未确认"
+    );
     Ok(probe)
+}
+
+// Rollback must exercise a clean profile, not an old settings/index directory.
+// A separate random sibling also avoids touching legacy unowned probe data.
+fn prepare_rollback_probe(
+    root: &Path,
+    version: &Version,
+    state: &mut State,
+) -> Result<(Version, PathBuf)> {
+    let mut nonce = [0_u8; 16];
+    getrandom::fill(&mut nonce).map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let probe_version = Version {
+        directory: format!("release-rollback-{}", hex(&nonce)),
+        manifest_sha256: version.manifest_sha256.clone(),
+    };
+    // Journal the identity before creating or using the probe. A crash after
+    // this write is recoverable; an unmarked directory is never removed.
+    state.rollback_probes.push(probe_version.clone());
+    save_state(root, state)?;
+    let path = prepare_probe(root, &probe_version)?;
+    Ok((probe_version, path))
+}
+
+fn rollback_self_test(
+    root: &Path,
+    directory: &Path,
+    version: &Version,
+    state: &mut State,
+) -> Result<()> {
+    let (probe_version, probe) = prepare_rollback_probe(root, version, state)?;
+    let result = self_test(directory, &probe);
+    if let Err(error) = clean_probe(root, &probe_version) {
+        eprintln!(
+            "回退自检目录保留待 cleanup 重试 {}：{error:#}",
+            probe.display()
+        );
+    } else {
+        state
+            .rollback_probes
+            .retain(|p| p.directory != probe_version.directory);
+        // Also persist on a failed self-test, without switching any pointer.
+        save_state(root, state)?;
+    }
+    result
 }
 
 /// 版本目录只能删除清单拥有的文件，目录必须确认为空后才移除。
@@ -400,11 +589,22 @@ fn remove_empty_release_dirs(directory: &Path, names: impl Iterator<Item = Strin
 
 /// 在指针持久化后清理既非当前也非回退的版本。
 /// 个别文件被占用时保留记录并报告，而不是误报清理成功或阻断已完成安装。
-fn cleanup_old_versions(root: &Path, state: &mut State) -> Result<usize> {
-    // Ensure the current pointer is durable before any destructive operation.
+#[derive(Debug, Default)]
+struct CleanupReport {
+    completed: usize,
+    pending: usize,
+}
+
+fn remove_release_and_probe(root: &Path, version: &Version) -> Result<()> {
+    remove_version(root, version)?;
+    clean_probe(root, version)
+}
+
+fn cleanup_old_versions(root: &Path, state: &mut State) -> Result<CleanupReport> {
+    retain_pointer_versions(state);
     save_state(root, state)?;
     let mut keep = Vec::new();
-    let mut deleted = 0;
+    let mut report = CleanupReport::default();
     for version in &state.retained {
         if state
             .active
@@ -418,29 +618,59 @@ fn cleanup_old_versions(root: &Path, state: &mut State) -> Result<usize> {
             keep.push(version.clone());
             continue;
         }
-        match remove_version(root, version) {
-            Ok(()) => {
-                deleted += 1;
-                if let Err(error) = clean_probe(root, version) {
-                    // 旧版自检数据没有归属标识，不能自动删除，但不应阻塞继续升级。
-                    eprintln!(
-                        "历史自检数据未清理，请人工核验 {}：{error:#}",
-                        version.directory
-                    );
-                }
-            }
+        match remove_release_and_probe(root, version) {
+            Ok(()) => report.completed += 1,
             Err(error) => {
                 eprintln!(
-                    "历史安装目录保留待下次重试 {}：{error:#}",
+                    "历史安装或自检目录保留待下次重试 {}：{error:#}",
                     version.directory
                 );
                 keep.push(version.clone());
+                report.pending += 1;
             }
         }
     }
     state.retained = keep;
+    state
+        .rollback_probes
+        .retain(|probe| match clean_probe(root, probe) {
+            Ok(()) => {
+                report.completed += 1;
+                false
+            }
+            Err(error) => {
+                eprintln!("回退自检目录保留待下次重试 {}：{error:#}", probe.directory);
+                report.pending += 1;
+                true
+            }
+        });
     save_state(root, state)?;
-    Ok(deleted)
+    Ok(report)
+}
+
+// Compensate only after verifying the durable pointer and preserving the
+// identity. Both release and probe must be gone before dropping the record.
+fn compensate_failed_install(root: &Path, persisted: &mut State, version: &Version) -> Result<()> {
+    if [&persisted.active, &persisted.previous]
+        .into_iter()
+        .flatten()
+        .any(|v| v.directory.eq_ignore_ascii_case(&version.directory))
+    {
+        return Ok(());
+    }
+    if !persisted
+        .retained
+        .iter()
+        .any(|v| v.directory == version.directory)
+    {
+        persisted.retained.push(version.clone());
+    }
+    save_state(root, persisted)?;
+    remove_release_and_probe(root, version)?;
+    persisted
+        .retained
+        .retain(|v| v.directory != version.directory);
+    save_state(root, persisted)
 }
 
 fn install(root: &Path, payload: &Path, expected: &str, state: &mut State) -> Result<()> {
@@ -453,16 +683,22 @@ fn install(root: &Path, payload: &Path, expected: &str, state: &mut State) -> Re
     };
     let destination = version_root(root, &version)?;
     xs_platform::create_local_dir_all(&root.join("versions"))?;
+    // Journal before creating any version directory. If the write fails, no
+    // release or probe directory is created. Never take over an existing name.
+    retain_pointer_versions(state);
+    state.retained.push(version.clone());
+    save_state(root, state)?;
     xs_platform::create_local_dir_new(&destination)?;
-    xs_platform::atomic_write_local(
-        &destination.join(RELEASE_OWNER),
-        version.manifest_sha256.as_bytes(),
-        false,
-    )?;
-    // 先持久化新版本归属，支持安装中断后的 Cleanup 补偿回收。
     let result = (|| -> Result<()> {
-        state.retained.push(version.clone());
-        save_state(root, state)?;
+        ensure!(
+            xs_platform::atomic_write_local(
+                &destination.join(RELEASE_OWNER),
+                version.manifest_sha256.as_bytes(),
+                false,
+            )?
+            .is_durable(),
+            "安装归属持久化未确认"
+        );
         // Commit the exact manifest before copying payload files. A crash now
         // leaves an allowlist for safe compensation, not an arbitrary tree.
         ensure!(
@@ -490,34 +726,24 @@ fn install(root: &Path, payload: &Path, expected: &str, state: &mut State) -> Re
         state.previous = state.active.replace(version.clone());
         // 激活指针持久化完成后才能清理旧版本。
         save_state(root, state)?;
-        cleanup_old_versions(root, state)?;
+        // A committed upgrade remains successful even if historical cleanup
+        // cannot finish. Report the issue separately from activation.
+        match cleanup_old_versions(root, state) {
+            Ok(report) if report.pending > 0 => eprintln!(
+                "安装已激活；仍有 {} 项历史记录待 cleanup 重试",
+                report.pending
+            ),
+            Err(error) => eprintln!("安装已激活；历史清理未完成：{error:#}"),
+            _ => (),
+        }
         Ok(())
     })();
     if let Err(error) = result {
         // 只按磁盘持久化状态判断是否可回收，绝不能误删刚刚成功激活的版本。
         match read_state(root) {
             Ok(mut persisted) => {
-                if !persisted
-                    .active
-                    .as_ref()
-                    .is_some_and(|v| v.directory == version.directory)
-                {
-                    match remove_version(root, &version) {
-                        Ok(()) => {
-                            if let Err(problem) = clean_probe(root, &version) {
-                                eprintln!("失败安装的自检数据无法自动清理：{problem:#}");
-                            }
-                            persisted
-                                .retained
-                                .retain(|v| v.directory != version.directory);
-                            if let Err(problem) = save_state(root, &persisted) {
-                                eprintln!("失败安装清理后写回状态失败：{problem:#}");
-                            }
-                        }
-                        Err(problem) => {
-                            eprintln!("失败安装暂存目录未清理，可重试 cleanup：{problem:#}")
-                        }
-                    }
+                if let Err(problem) = compensate_failed_install(root, &mut persisted, &version) {
+                    eprintln!("失败安装暂存目录未完全清理，可重试 cleanup：{problem:#}");
                 }
                 *state = persisted;
             }
@@ -581,8 +807,11 @@ if (Get-NetFirewallProfile -PolicyStore ActiveStore | Where-Object Enabled -ne '
 
 fn remove_version(root: &Path, version: &Version) -> Result<()> {
     let directory = version_root(root, version)?;
-    if !directory.exists() {
-        return Ok(());
+    xs_platform::validate_local_path(&directory, true)?;
+    match std::fs::symlink_metadata(&directory) {
+        Ok(_) => (),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
     }
     xs_platform::validate_local_path(&directory, false)?;
     let owner_path = directory.join(RELEASE_OWNER);
@@ -648,27 +877,20 @@ fn run() -> Result<()> {
             install(&root, &std::path::absolute(payload)?, &sha256, &mut state)
         }
         Action::Rollback => {
-            let previous = state.previous.as_ref().context("没有可回退的安装版本")?;
-            let directory = version_root(&root, previous)?;
+            let previous = state.previous.clone().context("没有可回退的安装版本")?;
+            let directory = version_root(&root, &previous)?;
             verify(&directory, &previous.manifest_sha256)?;
             policy(&directory, "verify")?;
-            self_test(
-                &directory,
-                &root.join("self-test-data").join(&previous.directory),
-            )?;
+            rollback_self_test(&root, &directory, &previous, &mut state)?;
             std::mem::swap(&mut state.active, &mut state.previous);
             save_state(&root, &state)
         }
         Action::Launch { data_dir, folder } => {
             let version = state.active.as_ref().context("寻枢尚未安装")?;
             let directory = version_root(&root, version)?;
+            verify(&directory, &version.manifest_sha256)?;
             policy(&directory, "verify")?;
-            let (manifest, _) = manifest(&directory, &version.manifest_sha256)?;
-            let ui = executable("xs-ui");
-            let program = directory.join(&ui);
-            for name in PROGRAMS.map(executable) {
-                checked_file(&directory.join(&name), &manifest.files[&name], io::sink())?;
-            }
+            let program = directory.join(executable("xs-ui"));
             let mut command = Command::new(program);
             if let Some(data) = data_dir {
                 let data = std::path::absolute(data)?;
@@ -695,8 +917,17 @@ fn run() -> Result<()> {
             Ok(())
         }
         Action::Cleanup => {
-            let cleaned = cleanup_old_versions(&root, &mut state)?;
-            eprintln!("历史版本清理完成：{cleaned} 个；当前版及回退版均已保留");
+            let report = cleanup_old_versions(&root, &mut state)?;
+            ensure!(
+                report.pending == 0,
+                "历史清理部分完成：{} 项完成，{} 项保留待重试 cleanup；当前版及回退版均已保留",
+                report.completed,
+                report.pending
+            );
+            eprintln!(
+                "历史清理完成：{} 项；当前版及回退版均已保留",
+                report.completed
+            );
             Ok(())
         }
         Action::Uninstall => {
@@ -711,14 +942,12 @@ fn run() -> Result<()> {
             state.previous = None;
             state.retained = versions.clone();
             save_state(&root, &state)?;
-            for version in &versions {
-                remove_version(&root, version)?;
-                if let Err(error) = clean_probe(&root, version) {
-                    // 旧安装目录缺标记时不可误删；卸载继续，并明确残留。
-                    eprintln!("用户数据已保留，自检目录需手动确认：{error:#}");
-                }
-            }
-            save_state(&root, &State::default())
+            let report = cleanup_old_versions(&root, &mut state)?;
+            ensure!(
+                report.pending == 0,
+                "已停用寻枢并保留用户数据，但仍有未清理的历史目录；可重试 cleanup"
+            );
+            Ok(())
         }
     }
 }
@@ -749,6 +978,7 @@ mod lifecycle_tests {
             active: Some(v.clone()),
             previous: None,
             retained: vec![v.clone()],
+            rollback_probes: vec![],
         };
         assert!(validate_state(root, &state).is_ok());
         state.previous = Some(v.clone());
@@ -766,6 +996,290 @@ mod lifecycle_tests {
         );
         state.active.as_mut().unwrap().manifest_sha256 = "not-a-hash".into();
         assert!(validate_state(root, &state).is_err());
+    }
+
+    #[test]
+    fn legacy_pointer_versions_are_retained_before_upgrade() {
+        let a = version();
+        let mut b = a.clone();
+        b.directory = "release-test-456".into();
+        let mut state = State {
+            active: Some(a.clone()),
+            previous: Some(b.clone()),
+            retained: vec![],
+            rollback_probes: vec![],
+        };
+        retain_pointer_versions(&mut state);
+        retain_pointer_versions(&mut state);
+        assert_eq!(state.retained.len(), 2);
+        assert_eq!(state.retained[0].directory, a.directory);
+        assert_eq!(state.retained[1].directory, b.directory);
+        assert!(validate_state(Path::new("/test"), &state).is_ok());
+        state.previous.as_mut().unwrap().directory = a
+            .directory
+            .to_ascii_uppercase()
+            .replace("RELEASE-", "release-");
+        assert!(validate_state(Path::new("/test"), &state).is_err());
+    }
+
+    #[test]
+    fn release_tree_rejects_unlisted_files_and_manifest_path_conflicts() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-tree-test-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let result = (|| -> Result<()> {
+            let mut files = serde_json::Map::new();
+            let entry = serde_json::json!({"bytes": 0, "sha256": digest(b"")});
+            for name in PROGRAMS.map(executable).into_iter().chain([
+                "resources/inference.json".to_owned(),
+                "resources/fonts/NotoSansSC-Regular.otf".to_owned(),
+                "self-test/image.png".to_owned(),
+                "self-test/scanned.pdf".to_owned(),
+            ]) {
+                let path = root.join(&name);
+                xs_platform::create_local_dir_all(path.parent().unwrap())?;
+                std::fs::write(path, [])?;
+                files.insert(name, entry.clone());
+            }
+            let write_manifest =
+                |files: &serde_json::Map<String, serde_json::Value>| -> Result<String> {
+                    let bytes = serde_json::to_vec(&serde_json::json!({
+                        "schema":1, "version":"test", "platform":std::env::consts::OS, "files":files
+                    }))?;
+                    std::fs::write(root.join(MANIFEST), &bytes)?;
+                    Ok(digest(&bytes))
+                };
+            let sha = write_manifest(&files)?;
+            let (valid, _) = manifest(&root, &sha)?;
+            verify_release_tree(&root, &valid)?;
+            let unknown = root.join("resources/unlisted.dll");
+            std::fs::write(&unknown, b"synthetic unknown")?;
+            assert!(verify_release_tree(&root, &valid).is_err());
+            assert_eq!(std::fs::read(&unknown)?, b"synthetic unknown");
+            std::fs::remove_file(unknown)?;
+            std::fs::create_dir(root.join("unlisted"))?;
+            assert!(verify_release_tree(&root, &valid).is_err());
+            std::fs::remove_dir(root.join("unlisted"))?;
+            #[cfg(unix)]
+            {
+                let path = root.join("unlisted-link");
+                std::os::unix::fs::symlink(root.join(MANIFEST), &path)?;
+                assert!(verify_release_tree(&root, &valid).is_err());
+                std::fs::remove_file(path)?;
+            }
+            verify_release_tree(&root, &valid)?;
+            let model = root.join("resources/inference.json");
+            std::fs::write(&model, b"tampered")?;
+            assert!(
+                checked_file(&model, &valid.files["resources/inference.json"], io::sink()).is_err()
+            );
+            std::fs::write(&model, [])?;
+            for conflict in [
+                "Resources/other.bin",
+                "resources",
+                "release.json/child",
+                "resources/inference.json/child",
+            ] {
+                let mut invalid = files.clone();
+                invalid.insert(conflict.to_owned(), entry.clone());
+                let sha = write_manifest(&invalid)?;
+                assert!(manifest(&root, &sha).is_err(), "accepted {conflict}");
+            }
+            Ok(())
+        })();
+        std::fs::remove_dir_all(&root)?;
+        result
+    }
+
+    #[test]
+    fn rollback_probe_is_fresh_and_does_not_touch_legacy_data() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-rollback-test-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let v = version();
+        let old = root.join("self-test-data").join(&v.directory);
+        xs_platform::create_local_dir_all(&old)?;
+        std::fs::write(old.join("settings.json"), b"legacy user data")?;
+        let mut state = State::default();
+        let (a, first) = prepare_rollback_probe(&root, &v, &mut state)?;
+        let (b, second) = prepare_rollback_probe(&root, &v, &mut state)?;
+        assert_eq!(read_state(&root)?.rollback_probes.len(), 2);
+        assert_ne!(first, second);
+        assert_ne!(first, old);
+        assert_eq!(std::fs::read_dir(&first)?.count(), 1);
+        assert_eq!(std::fs::read_dir(&second)?.count(), 1);
+        assert_eq!(
+            std::fs::read(first.join(PROBE_OWNER))?,
+            v.manifest_sha256.as_bytes()
+        );
+        clean_probe(&root, &a)?;
+        clean_probe(&root, &b)?;
+        assert!(!first.exists() && !second.exists());
+        assert_eq!(
+            std::fs::read(old.join("settings.json"))?,
+            b"legacy user data"
+        );
+        std::fs::remove_dir_all(&root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn cleanup_preserves_retryable_probe_identity_and_legacy_pointers() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-cleanup-test-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let active = version();
+        let mut obsolete = active.clone();
+        obsolete.directory = "release-old-obsolete".into();
+        let mut state = State {
+            active: Some(active.clone()),
+            previous: None,
+            retained: vec![obsolete.clone()],
+            rollback_probes: vec![],
+        };
+        let old = root.join("self-test-data").join(&obsolete.directory);
+        xs_platform::create_local_dir_all(&old)?;
+        let unknown = old.join("keep.txt");
+        std::fs::write(&unknown, b"unowned data")?;
+        let report = cleanup_old_versions(&root, &mut state)?;
+        assert_eq!((report.completed, report.pending), (0, 1));
+        let persisted = read_state(&root)?;
+        assert_eq!(persisted.retained.len(), 2);
+        assert!(persisted
+            .retained
+            .iter()
+            .any(|v| v.directory == active.directory));
+        assert!(persisted
+            .retained
+            .iter()
+            .any(|v| v.directory == obsolete.directory));
+        assert_eq!(std::fs::read(&unknown)?, b"unowned data");
+        // The user resolves the unowned directory themselves; cleanup may then
+        // clear the pending record without touching the live version.
+        std::fs::remove_file(unknown)?;
+        std::fs::remove_dir(old)?;
+        let report = cleanup_old_versions(&root, &mut state)?;
+        assert_eq!((report.completed, report.pending), (1, 0));
+        assert_eq!(read_state(&root)?.retained.len(), 1);
+        assert_eq!(state.retained[0].directory, active.directory);
+        std::fs::remove_dir_all(&root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn failed_install_compensation_keeps_unknown_probe_and_live_pointers() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-compensate-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let active = version();
+        let mut failed = active.clone();
+        failed.directory = "release-failed".into();
+        let release = version_root(&root, &failed)?;
+        xs_platform::create_local_dir_all(&release)?;
+        std::fs::write(
+            release.join(RELEASE_OWNER),
+            failed.manifest_sha256.as_bytes(),
+        )?;
+        let probe = root.join("self-test-data").join(&failed.directory);
+        xs_platform::create_local_dir_all(&probe)?;
+        std::fs::write(probe.join("unknown"), b"keep")?;
+        let mut state = State {
+            active: Some(active.clone()),
+            ..State::default()
+        };
+        assert!(compensate_failed_install(&root, &mut state, &failed).is_err());
+        assert!(!release.exists());
+        assert_eq!(std::fs::read(probe.join("unknown"))?, b"keep");
+        let mut persisted = read_state(&root)?;
+        assert_eq!(
+            persisted.active.as_ref().unwrap().directory,
+            active.directory
+        );
+        assert_eq!(persisted.retained.len(), 1);
+        assert_eq!(persisted.retained[0].directory, failed.directory);
+        std::fs::remove_file(probe.join("unknown"))?;
+        std::fs::remove_dir(probe)?;
+        let report = cleanup_old_versions(&root, &mut persisted)?;
+        assert_eq!((report.completed, report.pending), (1, 0));
+        assert_eq!(read_state(&root)?.retained.len(), 1);
+        std::fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn rollback_journal_survives_restart_and_refuses_unowned_probe() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-rollback-journal-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let mut state = State {
+            active: Some(version()),
+            ..State::default()
+        };
+        let (owned, path) = prepare_rollback_probe(&root, &version(), &mut state)?;
+        std::fs::write(path.join("synthetic"), b"probe")?;
+        let mut unknown = owned.clone();
+        unknown.directory = format!("release-rollback-{}", "1".repeat(32));
+        let unknown_path = root.join("self-test-data").join(&unknown.directory);
+        xs_platform::create_local_dir_new(&unknown_path)?;
+        std::fs::write(unknown_path.join("keep"), b"unknown")?;
+        state.rollback_probes.push(unknown.clone());
+        save_state(&root, &state)?;
+        let mut restarted = read_state(&root)?;
+        let report = cleanup_old_versions(&root, &mut restarted)?;
+        assert_eq!((report.completed, report.pending), (1, 1));
+        assert!(!path.exists());
+        assert_eq!(std::fs::read(unknown_path.join("keep"))?, b"unknown");
+        assert_eq!(
+            read_state(&root)?.rollback_probes[0].directory,
+            unknown.directory
+        );
+        restarted.active = Some(unknown);
+        assert!(validate_state(&root, &restarted).is_err());
+        std::fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn rollback_does_not_create_probe_when_journal_cannot_be_saved() -> Result<()> {
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-rollback-write-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        xs_platform::create_local_dir_new(&root.join(POINTER))?;
+        assert!(prepare_rollback_probe(&root, &version(), &mut State::default()).is_err());
+        assert!(!root.join("self-test-data").exists());
+        std::fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn probe_cleanup_refuses_nested_and_dangling_links() -> Result<()> {
+        use std::os::unix::fs::symlink;
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let root = std::env::temp_dir().join(format!("xs-probe-link-{}", hex(&random)));
+        xs_platform::create_local_dir_new(&root)?;
+        let v = version();
+        let user = root.join("user-data");
+        std::fs::write(&user, b"keep")?;
+        let probe = prepare_probe(&root, &v)?;
+        symlink(&user, probe.join("link"))?;
+        assert!(clean_probe(&root, &v).is_err());
+        assert_eq!(std::fs::read(&user)?, b"keep");
+        assert!(probe.join(PROBE_OWNER).is_file());
+        std::fs::remove_file(probe.join("link"))?;
+        clean_probe(&root, &v)?;
+        symlink(root.join("missing"), &probe)?;
+        assert!(clean_probe(&root, &v).is_err());
+        assert!(std::fs::symlink_metadata(&probe)?.file_type().is_symlink());
+        std::fs::remove_dir_all(root)?;
+        Ok(())
     }
 
     #[cfg(target_os = "linux")]
