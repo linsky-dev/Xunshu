@@ -3335,6 +3335,11 @@ impl eframe::App for App {
         }
         self.desktop_messages(ctx);
         self.content.update(&self.data_dir, ctx);
+        // Windows 首帧有时早于桌面合成器接管新窗口，短暂重绘以覆盖首次呈现。
+        #[cfg(windows)]
+        if self.started.elapsed() < Duration::from_secs(2) {
+            ctx.request_repaint_after(Duration::from_millis(120));
+        }
         #[cfg(windows)]
         if let Some(deadline) = self.focus_native_until {
             if Instant::now() >= deadline
