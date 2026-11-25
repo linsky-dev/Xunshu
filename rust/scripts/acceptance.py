@@ -142,7 +142,10 @@ def main() -> int:
                 [str(ui), "--standalone", "--smoke-test", "--data-dir", str(work_root / "gui-data")],
                 capture_output=True, text=True, timeout=30, env=gui_environment,
             )
-            gui_backend = "Wayland" if gui_environment.get("WAYLAND_DISPLAY") else "X11/native"
+            if os.name == "nt":
+                gui_backend = "Windows native"
+            else:
+                gui_backend = "Wayland" if gui_environment.get("WAYLAND_DISPLAY") else "X11/native"
             if (gui.returncode != 0 or "XS_UI_SMOKE_OK: native window rendered" not in gui.stderr) \
                     and gui_environment.get("WAYLAND_DISPLAY") and os.name != "nt":
                 gui_environment.pop("WAYLAND_DISPLAY", None)
@@ -239,15 +242,16 @@ def main() -> int:
         try:
             recovery_bin_dir = bin_dir
             if args.with_models:
-                recovery_bin_dir = work_root / "model-test-bin"
-                recovery_bin_dir.mkdir()
-                suffix = ".exe" if os.name == "nt" else ""
-                for name in ("xunshu", "xs-content-worker", "xs-model-worker"):
-                    os.link(bin_dir / f"{name}{suffix}", recovery_bin_dir / f"{name}{suffix}")
-                shutil.copytree(bin_dir / "resources", recovery_bin_dir / "resources", copy_function=os.link)
                 fixtures = args.model_fixtures or (args.payload / "self-test" if args.payload else bin_dir / "self-test")
                 fixtures = fixtures.resolve(strict=True)
-                shutil.copytree(fixtures, recovery_bin_dir / "self-test")
+                if fixtures != (bin_dir / "self-test").resolve():
+                    recovery_bin_dir = work_root / "model-test-bin"
+                    recovery_bin_dir.mkdir()
+                    suffix = ".exe" if os.name == "nt" else ""
+                    for name in ("xunshu", "xs-content-worker", "xs-model-worker"):
+                        os.link(bin_dir / f"{name}{suffix}", recovery_bin_dir / f"{name}{suffix}")
+                    shutil.copytree(bin_dir / "resources", recovery_bin_dir / "resources", copy_function=os.link)
+                    shutil.copytree(fixtures, recovery_bin_dir / "self-test")
             recovery_args = [sys.executable, str(recovery_helper), "--bin-dir", str(recovery_bin_dir),
                              "--temp-root", str(work_root)]
             if args.with_models:

@@ -33,13 +33,13 @@ pwsh -File scripts/accept-windows.ps1 `
 在目标 UOS 终端运行：
 
 ```sh
-sh scripts/accept-uos.sh /opt/xunshu/bin /opt/xunshu/acceptance
+bash scripts/accept-uos.sh /opt/xunshu/bin /opt/xunshu/acceptance
 ```
 
 可选传入本机 `xs-install` 和载荷目录：
 
 ```sh
-sh scripts/accept-uos.sh /opt/xunshu/bin /opt/xunshu/acceptance \
+bash scripts/accept-uos.sh /opt/xunshu/bin /opt/xunshu/acceptance \
   /opt/xunshu/bin/xs-install /opt/xunshu/payload
 ```
 

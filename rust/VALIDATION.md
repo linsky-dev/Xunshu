@@ -12,7 +12,9 @@
 
 最终产品源码在 Windows 11 x64 和 Debian 13 x86_64 上通过格式检查、锁定离线类型检查、严格 Clippy、工作区回归和 Release 构建。测试日志分别统计 255 和 274 个成功摘要，含跨进程子测试。Windows 本机构建使用 GNU x64，候选基线另有 Windows Server MSVC 通过证据。两端原生模型专项通过。Windows 向导完成中文试扫、确认后授权、发布和合成文件命中，Linux 完成窗口及正文预览。
 
-统信 UOS Desktop 20 1070 amd64 虚拟机实测 GLIBC 2.28。该环境中的新编译探针和 Rust 工具链在启动时均出现段错误，原生安装、运行和桌面验收待完成。Windows 10、目标平台人工项目、有效签名和 72 小时稳定性仍需单独取证。见 [双平台实机验收](docs/PLATFORM_ACCEPTANCE.md)。
+Windows 11 测试安装包通过安装、窗口启动、同版本升级、回退、损坏修复和卸载保留数据。Linux 测试包以 GLIBC 2.28 为兼容目标，5 个程序及 ONNX Runtime 通过 ABI 检查，在 Debian 完成安装和模型验证。
+
+统信 UOS Desktop 20 1070 amd64 虚拟机实测 GLIBC 2.28。该环境的新编译探针、Rust 工具链和候选安装管理器均在启动时出现段错误，原生安装、运行和桌面验收待完成。Windows 10、目标平台人工项目、有效签名和 72 小时稳定性仍需单独取证。六维复评暂为 88.25/100。见 [双平台实机验收](docs/PLATFORM_ACCEPTANCE.md)。
 
 ## 历史验证
 
