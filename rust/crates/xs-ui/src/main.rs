@@ -2913,7 +2913,7 @@ impl App {
                 .and_then(|n| self.results.as_ref()?.results.get(n))
                 .cloned();
             if let Some(hit) = selected_hit {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.add_enabled_ui(!self.opening, |ui| {
                         if let Some(next) = result_actions(ui, &hit, false) {
                             action = Some(next);
