@@ -42,6 +42,7 @@ pub enum RendererMessage {
     Failure(String),
     View(View),
     Query { view: View, query: String },
+    Hidden(usize),
     Closing,
     StartScan,
     CancelScan,

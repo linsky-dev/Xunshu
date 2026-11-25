@@ -3247,9 +3247,14 @@ impl eframe::App for App {
                 && (self.content.building() || self.saving || self.wizard.is_some())
             {
                 // 正文任务或未完成的向导保留在后台，托盘可恢复同一窗口。
-                self.tray_hidden = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                if let Some(window) = self.native_window {
+                    self.tray_hidden = true;
+                    desktop::windows::hide_renderer_window(window);
+                    self.emit_desktop(&RendererMessage::Hidden(window as usize));
+                } else {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+                }
                 return;
             }
             if self.content.building()

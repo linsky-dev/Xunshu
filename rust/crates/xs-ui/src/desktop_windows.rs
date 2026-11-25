@@ -274,6 +274,10 @@ pub fn take_minimize_request() -> bool {
     MINIMIZE_REQUESTED.with(|request| request.replace(false))
 }
 
+pub fn hide_renderer_window(hwnd: HWND) {
+    unsafe { ShowWindow(hwnd, SW_HIDE) };
+}
+
 unsafe extern "system" fn renderer_window_proc(
     hwnd: HWND,
     message: u32,
@@ -323,6 +327,7 @@ struct Renderer {
     commands: SyncSender<HostMessage>,
     updates: Receiver<RendererMessage>,
     view: View,
+    hidden_window: Option<HWND>,
     close_deadline: Option<Instant>,
 }
 
@@ -385,6 +390,7 @@ impl Renderer {
             commands,
             updates,
             view,
+            hidden_window: None,
             close_deadline: None,
         })
     }
@@ -501,6 +507,16 @@ impl Host {
                     .is_ok()
                 {
                     renderer.view = view;
+                    if let Some(window) = renderer.hidden_window.take() {
+                        let mut pid = 0;
+                        unsafe {
+                            GetWindowThreadProcessId(window, &mut pid);
+                            if pid == renderer.child.id() {
+                                // 被隐藏的窗口可能不处理重绘，先由宿主显式唤醒。
+                                ShowWindowAsync(window, SW_SHOW);
+                            }
+                        }
+                    }
                 } else {
                     self.pending_view = Some(view);
                     renderer.hide();
@@ -537,6 +553,7 @@ impl Host {
                     limit_query(&mut query);
                     self.queries[view.index()] = query;
                 }
+                RendererMessage::Hidden(window) => renderer.hidden_window = Some(window as HWND),
                 RendererMessage::Closing => {
                     renderer
                         .close_deadline
