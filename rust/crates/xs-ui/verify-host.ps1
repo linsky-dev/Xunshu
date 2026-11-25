@@ -298,7 +298,17 @@ try {
     if ($CheckFolderRefresh) {
         $entry = Wait-Fixture { Find-AccessibleItem $main.Window '补扫单个目录' } '指定目录补扫入口'
         $entry.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-        $folder = Wait-Fixture { Find-AccessibleItem $main.Window 'documents' } '已配置的测试目录'
+        $folder = Wait-Fixture {
+            $window = [System.Windows.Automation.AutomationElement]::FromHandle($main.Window)
+            $criterion = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::NameProperty, 'documents')
+            $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $criterion) |
+                Where-Object {
+                    $_.Current.ControlType -in @(
+                        [System.Windows.Automation.ControlType]::Button,
+                        [System.Windows.Automation.ControlType]::MenuItem)
+                } | Select-Object -First 1
+        } '补扫菜单中的测试目录按钮'
         $folder.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         $null = Wait-Fixture {
             $window = [System.Windows.Automation.AutomationElement]::FromHandle($main.Window)
