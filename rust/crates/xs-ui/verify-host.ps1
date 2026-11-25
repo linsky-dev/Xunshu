@@ -8,6 +8,7 @@ param(
     [switch]$CheckDiagnostics,
     [switch]$CheckWizard,
     [switch]$CheckCategoryFilters,
+    [switch]$CheckFolderRefresh,
     [string]$FixtureRoot = ''
 )
 
@@ -20,7 +21,7 @@ $cliPath = (Resolve-Path -LiteralPath $Cli).Path
 if ([IO.Path]::GetDirectoryName($uiPath) -ne [IO.Path]::GetDirectoryName($cliPath)) {
     throw 'xs-ui.exe 和 xunshu.exe 必须位于同一构建目录。'
 }
-if ($CheckAccessibility -or $CheckDiagnostics -or $CheckWizard -or $CheckCategoryFilters) {
+if ($CheckAccessibility -or $CheckDiagnostics -or $CheckWizard -or $CheckCategoryFilters -or $CheckFolderRefresh) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 }
 
@@ -235,7 +236,13 @@ if ($CheckCategoryFilters) {
     }
     [void][IO.Directory]::CreateDirectory((Join-Path $documents '合成报告-目录.pdf'))
 }
-$null = & $cliPath --data-dir $profile init --root $documents
+$init = @('--data-dir', $profile, 'init', '--root', $documents)
+if ($CheckFolderRefresh) {
+    $sibling = Join-Path $fixture 'sibling'
+    $null = New-Item -ItemType Directory -Path $sibling
+    $init += @('--root', $sibling)
+}
+$null = & $cliPath @init
 if ($LASTEXITCODE -ne 0) { throw '无法建立合成设置。' }
 $null = & $cliPath --data-dir $profile scan
 if ($LASTEXITCODE -ne 0) { throw '无法建立合成文件名索引。' }
@@ -286,6 +293,21 @@ try {
             }
             $categoryFilters[$case.Label] = $true
         }
+    }
+    $folderRefresh = $null
+    if ($CheckFolderRefresh) {
+        $entry = Wait-Fixture { Find-AccessibleItem $main.Window '补扫单个目录' } '指定目录补扫入口'
+        $entry.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        $folder = Wait-Fixture { Find-AccessibleItem $main.Window 'documents' } '已配置的测试目录'
+        $folder.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        $null = Wait-Fixture {
+            $window = [System.Windows.Automation.AutomationElement]::FromHandle($main.Window)
+            $window.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.Condition]::TrueCondition
+            ) | Where-Object { $_.Current.Name -like '指定目录已刷新：*' } | Select-Object -First 1
+        } '托盘宿主完成并发布指定目录补扫'
+        $folderRefresh = $true
     }
     $diagnosticsPanel = $null
     $diagnosticsCliExport = $null
@@ -359,7 +381,7 @@ try {
         $cjkFont = $true
     }
     $wizard = if ($CheckWizard) { Test-Wizard $fixture } else { $null }
-    [pscustomobject]@{ result = '通过'; fixture = $fixture; hidden_private_bytes = $privateBytes; native_window = $true; single_instance = $true; tray_registered = $true; minimize_to_tray = $true; tray_activation_dispatch = $true; hotkey_dispatch = $true; physical_ctrl = $false; hidden_watch = $true; exit_cleanup = $true; content_preview = $contentPreview; cjk_font = $cjkFont; windows_uia = $accessibility; filename_category_filters = $categoryFilters; diagnostics_panel_uia = $diagnosticsPanel; diagnostics_cli_export = $diagnosticsCliExport; synthetic_wizard = $wizard } | ConvertTo-Json
+    [pscustomobject]@{ result = '通过'; fixture = $fixture; hidden_private_bytes = $privateBytes; native_window = $true; single_instance = $true; tray_registered = $true; minimize_to_tray = $true; tray_activation_dispatch = $true; hotkey_dispatch = $true; physical_ctrl = $false; hidden_watch = $true; exit_cleanup = $true; content_preview = $contentPreview; cjk_font = $cjkFont; windows_uia = $accessibility; filename_category_filters = $categoryFilters; targeted_folder_refresh = $folderRefresh; diagnostics_panel_uia = $diagnosticsPanel; diagnostics_cli_export = $diagnosticsCliExport; synthetic_wizard = $wizard } | ConvertTo-Json
 } finally {
     if (!$hostProcess.HasExited) { $hostProcess.Kill(); $hostProcess.WaitForExit() }
     $hostProcess.Dispose()

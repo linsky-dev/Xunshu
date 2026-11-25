@@ -430,6 +430,7 @@ struct Loaded {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct ScanSummary {
     published: bool,
+    targeted: bool,
     coverage_complete: bool,
     durability_warning: Option<String>,
     indexed: usize,
@@ -651,11 +652,12 @@ fn monitor_profile(dir: PathBuf, stop: Arc<AtomicBool>, tx: Sender<Message>, ctx
 
 fn run_scan(
     dir: &Path,
+    root: Option<&Path>,
     cancel: &AtomicBool,
     mut progress: impl FnMut(ScanProgress),
 ) -> std::result::Result<ScanSummary, String> {
     let mut last = Instant::now() - Duration::from_secs(1);
-    operations::rebuild(dir, cancel, |mut update| {
+    let update_progress = |mut update: ScanProgress| {
         if last.elapsed() >= Duration::from_millis(100) {
             if let Some(path) = &mut update.current_path {
                 desktop::limit_query(path);
@@ -663,9 +665,14 @@ fn run_scan(
             progress(update);
             last = Instant::now();
         }
-    })
+    };
+    match root {
+        Some(root) => operations::rebuild_root(dir, root, cancel, update_progress),
+        None => operations::rebuild(dir, cancel, update_progress),
+    }
     .map(|outcome| ScanSummary {
         published: outcome.published,
+        targeted: root.is_some(),
         coverage_complete: outcome.report.complete && !outcome.report.cancelled,
         durability_warning: outcome.durability_warning,
         indexed: outcome.indexed,
@@ -1483,12 +1490,15 @@ impl App {
         });
     }
     fn scan(&mut self, ctx: &egui::Context) {
+        self.scan_scope(ctx, None);
+    }
+    fn scan_scope(&mut self, ctx: &egui::Context, root: Option<PathBuf>) {
         if self.scan_cancel.is_some() || self.settings.as_ref().is_none_or(|s| s.roots.is_empty()) {
             return;
         }
         self.mark_scan();
         if self.desktop_commands.is_some() {
-            self.emit_desktop(&RendererMessage::StartScan);
+            self.emit_desktop(&RendererMessage::StartScan { root });
             return;
         }
         let request = self.scan_request;
@@ -1497,7 +1507,7 @@ impl App {
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            let result = run_scan(&dir, &cancel, |progress| {
+            let result = run_scan(&dir, root.as_deref(), &cancel, |progress| {
                 send(&tx, &ctx, Message::Progress { request, progress });
             });
             send(&tx, &ctx, Message::Scan { request, result });
@@ -1728,7 +1738,12 @@ impl App {
                         Ok(summary) if summary.published && summary.coverage_complete => {
                             self.reload(ctx, false);
                             let message = format!(
-                                "扫描完成：{} 项，耗时 {:.1} 秒，按策略跳过 {} 项。",
+                                "{}：{} 项，耗时 {:.1} 秒，按策略跳过 {} 项。",
+                                if summary.targeted {
+                                    "指定目录已刷新"
+                                } else {
+                                    "扫描完成"
+                                },
                                 summary.indexed,
                                 summary.elapsed_ms / 1000.0,
                                 summary.skipped
@@ -1759,7 +1774,7 @@ impl App {
                             self.notice = Some(if summary.cancelled {
                                 "扫描已取消，未替换已保存的索引。若范围已更改，请重新扫描。".into()
                             } else {
-                                "扫描未完整完成，未替换原索引。".into()
+                                "本次扫描未覆盖完整，仍保留原索引。可在侧栏选“补扫单个目录”刷新需要的收录目录。".into()
                             });
                             if !summary.errors.is_empty() {
                                 self.error = Some(summary.errors.join("\n"));
@@ -2012,7 +2027,7 @@ impl App {
                     });
                 ui.add_space(18.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("已收录范围").small().color(MUTED));
+                    ui.label(RichText::new("已配置范围").small().color(MUTED));
                     if let Some(s) = &self.settings {
                         ui.label(
                             RichText::new(s.roots.len().to_string())
@@ -2056,6 +2071,39 @@ impl App {
                     .clicked()
                 {
                     self.scan(ctx);
+                }
+                if self
+                    .settings
+                    .as_ref()
+                    .is_some_and(|settings| settings.mode == SpeedMode::Standard)
+                    && !roots.is_empty()
+                {
+                    let mut chosen = None;
+                    ui.add_enabled_ui(
+                        self.scan_cancel.is_none() && !self.loading && !self.saving,
+                        |ui| {
+                            ui.menu_button("补扫单个目录", |ui| {
+                                for scope in &roots {
+                                    let path = Path::new(&scope.path);
+                                    let label = path
+                                        .file_name()
+                                        .and_then(|name| name.to_str())
+                                        .unwrap_or(&scope.path);
+                                    if ui
+                                        .button(shorten(label, 28))
+                                        .on_hover_text(&scope.path)
+                                        .clicked()
+                                    {
+                                        chosen = Some(path.to_path_buf());
+                                        ui.close();
+                                    }
+                                }
+                            });
+                        },
+                    );
+                    if let Some(root) = chosen {
+                        self.scan_scope(ctx, Some(root));
+                    }
                 }
                 ui.add_space(15.0);
                 ui.separator();
@@ -2517,9 +2565,17 @@ impl App {
             } else if let Some(result) = &self.results {
                 if result.results.is_empty() {
                     let complete = result.complete;
-                    empty_state(ui, if complete { "没有匹配的文件" } else { "查询尚未完成" }, if complete { "试试更短的关键词，或检查搜索范围与类型。" } else { "已到达本次查询时间预算，尚未找到匹配项。可继续查询或缩小条件。" }, false);
+                    let covered = result.coverage_complete;
+                    let (title, description) = if !covered {
+                        ("已收录部分暂无匹配", "当前索引尚未覆盖全部收录范围。可补扫需要的目录，再用原关键词搜索。")
+                    } else if complete {
+                        ("没有匹配的文件", "试试更短的关键词，或检查搜索范围与类型。")
+                    } else {
+                        ("查询尚未完成", "当前查询未得出完整结果。可延长查询时间或缩小条件。")
+                    };
+                    empty_state(ui, title, description, false);
                     ui.vertical_centered(|ui| {
-                        if !complete && self.budget_ms < 60_000 && ui.button("继续完整查询").clicked() { self.budget_ms = (self.budget_ms * 4).min(60_000); self.run_search(ctx); }
+                        if covered && !complete && self.budget_ms < 60_000 && ui.button("延长查询时间").clicked() { self.budget_ms = (self.budget_ms * 4).min(60_000); self.run_search(ctx); }
                         if self.offset > 0 && ui.button("返回第一页").clicked() { self.offset = 0; self.run_search(ctx); }
                     });
                 } else { self.results_workspace(ui, ctx); }
@@ -2931,10 +2987,11 @@ impl App {
                 self.offset += PAGE_SIZE;
                 self.run_search(ctx);
             }
-            if !complete
+            if coverage_complete
+                && !complete
                 && self.budget_ms < 60_000
                 && ui
-                    .small_button("继续完整查询")
+                    .small_button("延长查询时间")
                     .on_hover_text("扩大本次查询的时间预算，重新检索当前索引")
                     .clicked()
             {

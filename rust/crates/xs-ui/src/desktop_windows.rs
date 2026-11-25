@@ -6,10 +6,14 @@ use super::{
 use anyhow::{ensure, Context as _, Result};
 use std::{
     cell::{Cell, RefCell},
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     io::BufReader,
     mem::{size_of, size_of_val, zeroed},
-    os::windows::{ffi::OsStrExt, io::AsRawHandle, process::CommandExt},
+    os::windows::{
+        ffi::{OsStrExt, OsStringExt},
+        io::AsRawHandle,
+        process::CommandExt,
+    },
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     ptr::{null, null_mut},
@@ -29,7 +33,10 @@ use windows_sys::Win32::{
         JobObjects::*,
         LibraryLoader::GetModuleHandleW,
         Registry::*,
-        Threading::{CreateMutexW, BELOW_NORMAL_PRIORITY_CLASS, CREATE_NO_WINDOW},
+        Threading::{
+            CreateMutexW, OpenProcess, QueryFullProcessImageNameW, BELOW_NORMAL_PRIORITY_CLASS,
+            CREATE_NO_WINDOW, PROCESS_QUERY_LIMITED_INFORMATION,
+        },
     },
     UI::{Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*},
 };
@@ -542,7 +549,7 @@ impl Host {
             return Ok(());
         };
         let mut ready = false;
-        let mut start_scan = false;
+        let mut start_scan = None;
         let mut cancel_scan = false;
         for update in renderer.updates.try_iter() {
             match update {
@@ -559,7 +566,7 @@ impl Host {
                         .close_deadline
                         .get_or_insert(Instant::now() + Duration::from_secs(3));
                 }
-                RendererMessage::StartScan => start_scan = true,
+                RendererMessage::StartScan { root } => start_scan = Some(root),
                 RendererMessage::CancelScan => cancel_scan = true,
             }
         }
@@ -569,8 +576,8 @@ impl Host {
                 self.show(view, None)?;
             }
         }
-        if start_scan {
-            self.start_scan();
+        if let Some(root) = start_scan {
+            self.start_scan(root);
         }
         if cancel_scan {
             if let Some(scan) = &self.scan {
@@ -604,7 +611,7 @@ impl Host {
         Ok(())
     }
 
-    fn start_scan(&mut self) {
+    fn start_scan(&mut self, root: Option<PathBuf>) {
         if self.scan.is_some() {
             return;
         }
@@ -617,7 +624,7 @@ impl Host {
         let hwnd_address = self.hwnd as usize;
         let (tx, events) = mpsc::sync_channel(8);
         thread::spawn(move || {
-            let result = crate::run_scan(&dir, &worker_cancel, |progress| {
+            let result = crate::run_scan(&dir, root.as_deref(), &worker_cancel, |progress| {
                 let _ = tx.try_send(ScanEvent::Progress(progress));
                 unsafe { PostMessageW(hwnd_address as HWND, RENDERER_MESSAGE, 0, 0) };
             });
@@ -880,7 +887,49 @@ fn profile_id(data_dir: &Path) -> String {
     format!("寻枢.{hash:016x}")
 }
 
+fn release_directory(executable: &Path) -> Option<&Path> {
+    let release = executable.parent()?;
+    let versions = release.parent()?;
+    (executable
+        .file_name()?
+        .to_str()?
+        .eq_ignore_ascii_case("xs-ui.exe")
+        && release.file_name()?.to_str()?.starts_with("release-")
+        && versions
+            .file_name()?
+            .to_str()?
+            .eq_ignore_ascii_case("versions"))
+    .then_some(versions)
+}
+
+fn different_release_in_same_install(current: &Path, running: &Path) -> bool {
+    match (release_directory(current), release_directory(running)) {
+        (Some(current_versions), Some(running_versions)) => {
+            current_versions
+                .as_os_str()
+                .eq_ignore_ascii_case(running_versions.as_os_str())
+                && !current
+                    .as_os_str()
+                    .eq_ignore_ascii_case(running.as_os_str())
+        }
+        _ => false,
+    }
+}
+
+fn process_executable(process_id: u32) -> Option<PathBuf> {
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id) };
+    if process.is_null() {
+        return None;
+    }
+    let process = Handle(process);
+    let mut buffer = vec![0u16; 32_768];
+    let mut len = buffer.len() as u32;
+    let read = unsafe { QueryFullProcessImageNameW(process.0, 0, buffer.as_mut_ptr(), &mut len) };
+    (read != 0).then(|| PathBuf::from(OsString::from_wide(&buffer[..len as usize])))
+}
+
 fn activate_existing(title: &[u16], view: View, query: String) -> Result<()> {
+    let current = std::env::current_exe().ok();
     let deadline = Instant::now() + Duration::from_secs(2);
     let class = wide(WINDOW_CLASS);
     let data = serde_json::to_vec(&HostMessage::Show {
@@ -897,10 +946,14 @@ fn activate_existing(title: &[u16], view: View, query: String) -> Result<()> {
         if !hwnd.is_null() {
             let mut response = 0;
             let mut process_id = 0;
-            unsafe {
-                GetWindowThreadProcessId(hwnd, &mut process_id);
-                AllowSetForegroundWindow(process_id);
+            unsafe { GetWindowThreadProcessId(hwnd, &mut process_id) };
+            if let (Some(current), Some(running)) = (&current, process_executable(process_id)) {
+                ensure!(
+                    !different_release_in_same_install(current, &running),
+                    "当前安装目录的另一版本仍在托盘运行。请在通知区域选择“退出寻枢”，再从桌面快捷方式启动。"
+                );
             }
+            unsafe { AllowSetForegroundWindow(process_id) };
             let sent = unsafe {
                 SendMessageTimeoutW(
                     hwnd,
@@ -1260,7 +1313,6 @@ pub(crate) fn jump_active_file_dialog(target_dir: &Path) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
 
     #[test]
     fn tray_brand_png_loads_as_native_icon() {
@@ -1288,5 +1340,23 @@ mod tests {
             profile_id(Path::new("D:\\Xunshu")),
             profile_id(Path::new("D:\\other"))
         );
+    }
+
+    #[test]
+    fn activation_distinguishes_a_resident_older_build_from_the_current_install() {
+        let active = Path::new(r"D:\Xunshu\versions\release-active\xs-ui.exe");
+        assert!(different_release_in_same_install(
+            active,
+            Path::new(r"d:\xunshu\versions\release-prior\xs-ui.exe")
+        ));
+        assert!(!different_release_in_same_install(active, active));
+        assert!(!different_release_in_same_install(
+            active,
+            Path::new(r"D:\portable\xs-ui.exe")
+        ));
+        assert!(!different_release_in_same_install(
+            active,
+            Path::new(r"D:\isolated\versions\release-other\xs-ui.exe")
+        ));
     }
 }

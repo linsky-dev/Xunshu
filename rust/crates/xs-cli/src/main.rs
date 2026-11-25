@@ -63,8 +63,11 @@ enum Command {
         #[arg(long)]
         export: Option<PathBuf>,
     },
-    /// 只扫描当前已保存范围，Ctrl-C 取消，失败保留原索引
-    Scan,
+    /// 扫描当前范围，也可只补扫指定的收录根目录
+    Scan {
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
     /// 监听当前文件名范围，在变更、通知丢失或范围调整时校准索引
     Watch,
     /// 从当前授权范围的历史完整代次恢复文件名索引
@@ -314,12 +317,12 @@ fn run() -> Result<()> {
             };
             json!({"version":env!("CARGO_PKG_VERSION"),"runtime":"Rust","data_dir":dir,"settings":settings,"index":index,"network":false,"model_resources":model,"capabilities":{"filename_search":true,"stdio_ipc":true,"stdio_ipc_v2":true,"mmap_snapshot":true,"native_ui":true,"directory_watch":true,"content_search":true,"mcp_content":true,"mft_usn":cfg!(windows),"fast_service":false,"ocr":true,"semantic":true,"legacy_query_full_parity":false}})
         }
-        Command::Scan => {
+        Command::Scan { root } => {
             let cancel = Arc::new(AtomicBool::new(false));
             let c = cancel.clone();
             ctrlc::set_handler(move || c.store(true, std::sync::atomic::Ordering::Relaxed))?;
             let mut last = Instant::now();
-            let outcome = operations::rebuild(&dir, &cancel, |p| {
+            let progress = |p: xs_platform::ScanProgress| {
                 if last.elapsed().as_millis() > 500 {
                     eprintln!(
                         "已查看 {} 项，收录 {} 项，错误 {} 项",
@@ -327,7 +330,11 @@ fn run() -> Result<()> {
                     );
                     last = Instant::now();
                 }
-            })?;
+            };
+            let outcome = match root {
+                Some(root) => operations::rebuild_root(&dir, &absolute(root)?, &cancel, progress),
+                None => operations::rebuild(&dir, &cancel, progress),
+            }?;
             let value = serde_json::to_value(&outcome)?;
             if !outcome.published {
                 print_json(&value)?;

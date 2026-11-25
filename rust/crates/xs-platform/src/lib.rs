@@ -20,8 +20,8 @@ pub use journal::{
 };
 pub use revision::{FileIdentity, FileRevision, FileTimestamp};
 pub use scanner::{
-    inspect_scoped_entry, scan, scan_with_batches, scan_with_exclusions, FileEntry,
-    NativeCheckpoint, ScanError, ScanProgress, ScanReport,
+    check_filename_scope, inspect_scoped_entry, scan, scan_with_batches, scan_with_exclusions,
+    FileEntry, FilenameCoverage, NativeCheckpoint, ScanError, ScanProgress, ScanReport,
 };
 pub use settings::{Scope, Settings, SetupState, SpeedMode, SETTINGS_VERSION};
 pub use volume::{suggested_roots, volumes, VolumeCapability};

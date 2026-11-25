@@ -110,18 +110,45 @@ pub fn inspect_scoped_entry(
     path: &Path,
     excluded_paths: &[PathBuf],
 ) -> Result<Option<FileEntry>> {
+    Ok(
+        match check_filename_scope(settings, path, excluded_paths)? {
+            FilenameCoverage::Eligible(entry) => Some(entry),
+            _ => None,
+        },
+    )
+}
+
+/// 路径按当前文件名收录策略检查的结果，不代表该路径已经写入索引。
+#[derive(Debug)]
+pub enum FilenameCoverage {
+    OutsideScope,
+    ExplicitExclusion,
+    SmartExclusion,
+    Missing,
+    OtherMount,
+    UnsupportedEntry,
+    ExtensionExcluded,
+    Eligible(FileEntry),
+}
+
+/// 先检查明确的本地收录范围，再通过扫描器核对文件元数据。
+pub fn check_filename_scope(
+    settings: &Settings,
+    path: &Path,
+    excluded_paths: &[PathBuf],
+) -> Result<FilenameCoverage> {
     let settings = settings.normalized()?;
     let path = normalize_path(path)?;
     let Some(scope) = scope_for(&settings.roots, &path) else {
-        return Ok(None);
+        return Ok(FilenameCoverage::OutsideScope);
     };
     for excluded in excluded_paths {
         if is_within(&path, &normalize_path(excluded)?) {
-            return Ok(None);
+            return Ok(FilenameCoverage::ExplicitExclusion);
         }
     }
     if is_smart_excluded(scope, &path) {
-        return Ok(None);
+        return Ok(FilenameCoverage::SmartExclusion);
     }
     implementation::inspect(scope, &path)
 }
@@ -180,7 +207,7 @@ fn scan_inner(
     excluded_paths: &[PathBuf],
     mut output: Option<BatchOutput<'_>>,
 ) -> Result<ScanReport> {
-    let settings = settings.normalized()?;
+    let mut settings = settings.normalized()?;
     if settings.mode == SpeedMode::FastService
         || (!cfg!(windows) && settings.mode == SpeedMode::OnDemandElevated)
     {
@@ -190,6 +217,10 @@ fn scan_inner(
         .iter()
         .map(|p| normalize_path(p))
         .collect::<Result<_>>()?;
+    // 同一批既有整盘又有明确目录时，优先扫描具体目录。
+    settings
+        .roots
+        .sort_by_key(|scope| std::cmp::Reverse(Path::new(&scope.path).components().count()));
     let mut report = ScanReport {
         complete: true,
         ..ScanReport::default()
@@ -288,7 +319,7 @@ mod implementation {
         stream: DirStream,
     }
 
-    pub(super) fn inspect(scope: &Scope, path: &Path) -> Result<Option<FileEntry>> {
+    pub(super) fn inspect(scope: &Scope, path: &Path) -> Result<FilenameCoverage> {
         let root = Path::new(&scope.path);
         let mut node = imp::resolve(root, false)?.expect("缺失路径必须返回错误");
         if !node.is_dir() {
@@ -312,13 +343,13 @@ mod implementation {
             let name = CString::new(part.as_bytes())
                 .map_err(|_| PlatformError::InvalidPath("文件名含 NUL".into()))?;
             node = match imp::open_child(&node, &name, &current, Some(root_mount), &mounts) {
-                Ok(Child::OtherMount) => return Ok(None),
+                Ok(Child::OtherMount) => return Ok(FilenameCoverage::OtherMount),
                 Ok(Child::Node(child)) => child,
                 Err(PlatformError::Io { source, .. })
                     if source.kind() == std::io::ErrorKind::NotFound =>
                 {
                     verify_root()?;
-                    return Ok(None);
+                    return Ok(FilenameCoverage::Missing);
                 }
                 Err(error) => return Err(error),
             };
@@ -330,10 +361,13 @@ mod implementation {
             }
         }
         verify_root()?;
-        Ok(
-            ((node.is_file() || node.is_dir()) && scope.accepts(path, node.is_dir()))
-                .then(|| entry(path, &node, &scope.path)),
-        )
+        if !node.is_file() && !node.is_dir() {
+            return Ok(FilenameCoverage::UnsupportedEntry);
+        }
+        if !scope.accepts(path, node.is_dir()) {
+            return Ok(FilenameCoverage::ExtensionExcluded);
+        }
+        Ok(FilenameCoverage::Eligible(entry(path, &node, &scope.path)))
     }
     pub fn walk(
         scopes: &[Scope],
@@ -516,7 +550,7 @@ mod implementation {
         stream: std::fs::ReadDir,
     }
 
-    pub(super) fn inspect(scope: &Scope, path: &Path) -> Result<Option<FileEntry>> {
+    pub(super) fn inspect(scope: &Scope, path: &Path) -> Result<FilenameCoverage> {
         let root = Path::new(&scope.path);
         let root_guard = guard(root, false)?;
         let root_info = file_info(root_guard.handles.last().expect("已验证根目录"), root)?;
@@ -528,17 +562,18 @@ mod implementation {
             Err(PlatformError::Io { source, .. })
                 if source.kind() == std::io::ErrorKind::NotFound =>
             {
-                return Ok(None)
+                return Ok(FilenameCoverage::Missing)
             }
             Err(error) => return Err(error),
         };
         let info = file_info(held.handles.last().expect("已验证文件"), path)?;
         if info.dwVolumeSerialNumber != root_info.dwVolumeSerialNumber {
-            return Ok(None);
+            return Ok(FilenameCoverage::OtherMount);
         }
-        Ok(scope
-            .accepts(path, info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0)
-            .then(|| entry(path, &info, &held)))
+        if !scope.accepts(path, info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0) {
+            return Ok(FilenameCoverage::ExtensionExcluded);
+        }
+        Ok(FilenameCoverage::Eligible(entry(path, &info, &held)))
     }
 
     pub(super) fn walk_native(
@@ -609,7 +644,7 @@ mod implementation {
                 return Err(error);
             }
         };
-        if let Some(entry) = inspect(scope, root)? {
+        if let FilenameCoverage::Eligible(entry) = inspect(scope, root)? {
             report.entries.push(entry);
             notify(root, state, report, progress, output)?;
         }
@@ -638,7 +673,7 @@ mod implementation {
                         continue;
                     }
                     match inspect(scope, &path) {
-                        Ok(Some(entry))
+                        Ok(FilenameCoverage::Eligible(entry))
                             if entry.revision.is_some_and(|revision| {
                                 revision.identity.object == record.object
                             }) =>
@@ -911,7 +946,7 @@ mod implementation {
 #[cfg(not(any(target_os = "linux", windows)))]
 mod implementation {
     use super::*;
-    pub(super) fn inspect(_: &Scope, _: &Path) -> Result<Option<FileEntry>> {
+    pub(super) fn inspect(_: &Scope, _: &Path) -> Result<FilenameCoverage> {
         Err(PlatformError::InvalidPath(
             "当前平台不支持本地文件元数据核对".into(),
         ))

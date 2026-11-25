@@ -44,7 +44,7 @@ pub enum RendererMessage {
     Query { view: View, query: String },
     Hidden(usize),
     Closing,
-    StartScan,
+    StartScan { root: Option<std::path::PathBuf> },
     CancelScan,
 }
 

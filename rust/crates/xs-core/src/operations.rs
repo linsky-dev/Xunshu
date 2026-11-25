@@ -187,6 +187,114 @@ pub fn rebuild(
     rebuild_inner(dir, None, cancel, progress)
 }
 
+/// 只刷新明确配置的收录根及其嵌套范围，保留其他目录与离线目录的索引。
+pub fn rebuild_root(
+    dir: &Path,
+    root: &Path,
+    cancel: &AtomicBool,
+    progress: impl FnMut(ScanProgress),
+) -> Result<RebuildOutcome> {
+    let start = Instant::now();
+    let settings = load_settings(dir)?;
+    ensure!(
+        settings.mode == xs_platform::SpeedMode::Standard,
+        "指定目录补扫只适用于标准扫描模式。"
+    );
+    let token = settings.scope_token()?;
+    let mut selected = settings.clone();
+    selected.roots.clear();
+    let mut explicitly_configured = false;
+    for scope in &settings.roots {
+        let path = Path::new(&scope.path);
+        if xs_platform::local_path_within(path, root)? {
+            explicitly_configured |= xs_platform::local_path_within(root, path)?;
+            selected.roots.push(scope.clone());
+        }
+    }
+    ensure!(explicitly_configured, "补扫目录必须是已明确配置的收录根。");
+    ensure!(
+        !xs_platform::local_path_within(root, dir)?,
+        "寻枢的数据目录不参与文件收录。"
+    );
+    if selected.roots.len() == settings.roots.len() {
+        return rebuild_inner(dir, Some(&token), cancel, progress);
+    }
+
+    let store = Store::open(dir.join("index"))?;
+    let mut builder = IndexBuilder::new(token.clone());
+    let mut build_error = None;
+    let scanned = xs_platform::scan_with_batches(
+        &selected,
+        cancel,
+        progress,
+        &[dir.to_path_buf()],
+        SCAN_BATCH,
+        |entries| capture_batch_error(add_entries(&mut builder, entries), &mut build_error),
+    );
+    if let Some(error) = build_error {
+        return Err(error);
+    }
+    let mut report = scanned?;
+    let indexed = builder.len();
+    if cancel.load(Ordering::Acquire) {
+        report.cancelled = true;
+        report.complete = false;
+    }
+    if !report.complete {
+        return Ok(unpublished(start, indexed, report));
+    }
+
+    let mut deleted_ids = Vec::new();
+    let current = if store.has_snapshot()? {
+        let current = store.load()?;
+        validate_index_scope(&current, &settings)?;
+        for id in 0..current.len() as u32 {
+            if id % 256 == 0 && cancel.load(Ordering::Acquire) {
+                report.cancelled = true;
+                report.complete = false;
+                return Ok(unpublished(start, indexed, report));
+            }
+            let record = current.record(id)?;
+            if record.source == "local"
+                && xs_platform::local_path_within(Path::new(&record.path), root)?
+            {
+                deleted_ids.push(id);
+            }
+        }
+        Some(current)
+    } else {
+        // 只收录了配置中的一部分，不能把新快照标为完整。
+        builder.set_coverage_complete(false);
+        None
+    };
+    ensure!(
+        load_settings(dir)?.scope_token()? == token,
+        "补扫期间收录范围已更改，本次结果未发布。"
+    );
+    if cancel.load(Ordering::Acquire) {
+        report.cancelled = true;
+        report.complete = false;
+        return Ok(unpublished(start, indexed, report));
+    }
+    let publication = if let Some(current) = current {
+        let generation = current.generation();
+        let additions =
+            builder.finish(generation.checked_add(1).context("generation exhausted")?)?;
+        store.publish_delta(generation, &deleted_ids, &additions)?
+    } else {
+        store.publish(&builder.finish(1)?)?
+    };
+    Ok(RebuildOutcome {
+        published: true,
+        generation: Some(publication.generation),
+        durable: publication.durable,
+        durability_warning: publication.warning,
+        indexed,
+        elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
+        report,
+    })
+}
+
 /// 监听器只校准已经订阅的范围。打开索引前检查设置，发布前再次校验。
 pub fn rebuild_if_scope(
     dir: &Path,
@@ -241,7 +349,11 @@ fn rebuild_inner(
     }
     let mut report = scanned?;
     let indexed = builder.len();
-    if !report.complete || report.cancelled || cancel.load(Ordering::Relaxed) {
+    if cancel.load(Ordering::Acquire) {
+        report.cancelled = true;
+        report.complete = false;
+    }
+    if !report.complete {
         return Ok(unpublished(start, indexed, report));
     }
     if let Some(previous) = previous {
@@ -573,6 +685,39 @@ fn rebuild_initial<const BATCH: usize, const FIRST: usize>(
             report.cancelled = true;
             report.complete = false;
         }
+        // 首扫还没有旧的完整快照。保留错误发生前后已安全读出的尾批，
+        // 并明确标记覆盖不完整。用户取消时仍只保留已经提交的批次。
+        if !report.cancelled && !builder.is_empty() {
+            ensure!(
+                load_settings(dir)?.scope_token()? == token,
+                "扫描期间范围已更改，本次结果未发布，请重新扫描。"
+            );
+            if cancel.load(Ordering::Acquire) {
+                report.cancelled = true;
+            } else {
+                builder.set_coverage_complete(false);
+                let publication = if let Some(prior) = latest {
+                    let additions = builder.finish(
+                        prior
+                            .generation
+                            .checked_add(1)
+                            .context("generation exhausted")?,
+                    )?;
+                    store.publish_delta(prior.generation, &[], &additions)?
+                } else {
+                    store.publish(&builder.finish(1)?)?
+                };
+                return Ok(RebuildOutcome {
+                    published: true,
+                    generation: Some(publication.generation),
+                    durable: publication.durable,
+                    durability_warning: publication.warning,
+                    indexed,
+                    elapsed_ms: start.elapsed().as_secs_f64() * 1000.0,
+                    report,
+                });
+            }
+        }
         return Ok(match latest {
             Some(publication) => RebuildOutcome {
                 published: true,
@@ -657,6 +802,95 @@ pub fn authorize_indexed_open(dir: &Path, index: &Index, id: u32) -> Result<Path
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_scan_keeps_readable_files_when_another_root_is_unavailable() {
+        let temporary = tempfile::tempdir().unwrap();
+        let data = temporary.path().join("profile");
+        let desktop = temporary.path().join("disk").join("Desktop");
+        std::fs::create_dir_all(&desktop).unwrap();
+        std::fs::write(desktop.join("desktop-only.pdf"), b"synthetic").unwrap();
+        let settings = Settings {
+            roots: vec![
+                xs_platform::Scope::new(temporary.path().join("missing").to_str().unwrap()),
+                xs_platform::Scope::new(desktop.to_str().unwrap()),
+            ],
+            ..Default::default()
+        };
+        save_settings(&data, &settings).unwrap();
+
+        let outcome = rebuild(&data, &AtomicBool::new(false), |_| {}).unwrap();
+        assert!(outcome.published && !outcome.report.complete && !outcome.report.cancelled);
+        assert!(!outcome.report.errors.is_empty());
+        let result = load_index(&data)
+            .unwrap()
+            .search("desktop-only", &Default::default(), None)
+            .unwrap();
+        assert_eq!(result.total, 1);
+        assert!(!result.coverage_complete && !result.complete);
+    }
+
+    #[test]
+    fn rebuilding_an_explicit_desktop_repairs_partial_index_without_touching_other_roots() {
+        let temporary = tempfile::tempdir().unwrap();
+        let data = temporary.path().join("profile");
+        let disk = temporary.path().join("disk");
+        let desktop = disk.join("Desktop");
+        let file = desktop.join("desktop-only.pdf");
+        std::fs::create_dir_all(&desktop).unwrap();
+        std::fs::write(&file, b"synthetic").unwrap();
+        std::fs::write(disk.join("unscanned-sibling.txt"), b"synthetic").unwrap();
+        let settings = Settings {
+            roots: vec![
+                xs_platform::Scope::new(disk.to_str().unwrap()),
+                xs_platform::Scope::new(desktop.to_str().unwrap()),
+            ],
+            ..Default::default()
+        };
+        save_settings(&data, &settings).unwrap();
+        let store = Store::open(data.join("index")).unwrap();
+        let mut builder = IndexBuilder::new(settings.scope_token().unwrap());
+        builder.set_coverage_complete(false);
+        for path in [
+            disk.join("already-indexed.txt"),
+            desktop.join("obsolete.txt"),
+        ] {
+            builder
+                .add(FileRecord {
+                    path: path.to_str().unwrap().into(),
+                    size: 0,
+                    modified: 0,
+                    is_dir: false,
+                    source: "local".into(),
+                })
+                .unwrap();
+        }
+        store.publish(&builder.finish(1).unwrap()).unwrap();
+        let cancel = AtomicBool::new(false);
+        assert!(rebuild_root(&data, &desktop.join("not-configured"), &cancel, |_| {}).is_err());
+        assert!(
+            rebuild_root(&data, &desktop, &cancel, |_| {})
+                .unwrap()
+                .published
+        );
+        let index = load_index(&data).unwrap();
+        assert!(!index.coverage_complete());
+        let names: Vec<_> = index.records().map(|entry| entry.path).collect();
+        assert!(names.contains(&file.to_string_lossy().into_owned()));
+        assert!(names
+            .iter()
+            .any(|name| name.ends_with("already-indexed.txt")));
+        assert!(!names.iter().any(|name| name.ends_with("obsolete.txt")));
+        assert!(!names
+            .iter()
+            .any(|name| name.ends_with("unscanned-sibling.txt")));
+
+        std::fs::remove_file(file).unwrap();
+        std::fs::remove_dir(&desktop).unwrap();
+        let failed = rebuild_root(&data, &desktop, &cancel, |_| {}).unwrap();
+        assert!(!failed.published && !failed.report.complete);
+        assert_eq!(load_index(&data).unwrap().generation(), index.generation());
+    }
 
     #[test]
     fn cancelled_first_scan_keeps_only_committed_batches_marked_partial() {

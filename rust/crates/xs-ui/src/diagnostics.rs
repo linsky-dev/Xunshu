@@ -9,7 +9,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 use xs_core::persistence::Store;
-use xs_platform::{FileRevision, ScanProgress, Settings};
+use xs_platform::{check_filename_scope, FileRevision, FilenameCoverage, ScanProgress, Settings};
 
 enum Task {
     Read,
@@ -58,7 +58,7 @@ pub(crate) struct Pane {
     open: bool,
     destination: String,
     probe_path: String,
-    probe_result: Option<Vec<String>>,
+    probe_result: Option<String>,
     pending: Option<Receiver<Outcome>>,
     snapshot: Option<Snapshot>,
     notice: Option<&'static str>,
@@ -203,14 +203,15 @@ impl Pane {
                     }
                 }
                 ui.separator();
-                ui.label(
-                    "为什么搜不到？输入任意本地文件路径，即时排查范围、过滤策略与云盘占位符原因：",
-                );
-                ui.add(
+                ui.label("为什么搜不到？输入任意本地文件路径，核对范围、排除规则及文件系统状态：");
+                let path = ui.add(
                     egui::TextEdit::singleline(&mut self.probe_path)
                         .desired_width(f32::INFINITY)
                         .hint_text("输入需要排查的本地文件绝对路径"),
                 );
+                if path.changed() {
+                    self.probe_result = None;
+                }
                 if ui
                     .add_enabled(
                         !self.probe_path.trim().is_empty(),
@@ -221,12 +222,11 @@ impl Pane {
                     self.probe_result = Some(diagnose_missing_path(
                         Path::new(self.probe_path.trim()),
                         settings,
+                        dir,
                     ));
                 }
-                if let Some(lines) = &self.probe_result {
-                    for line in lines {
-                        ui.label(line);
-                    }
+                if let Some(result) = &self.probe_result {
+                    ui.label(result);
                 }
             });
         self.open = open;
@@ -295,9 +295,9 @@ fn show_report(ui: &mut egui::Ui, snapshot: &Snapshot, current_generation: Optio
         index["coverage_complete"].as_bool(),
     ) {
         let coverage = if complete {
-            "扫描覆盖完整"
+            "已发布快照覆盖完整"
         } else {
-            "扫描覆盖未完成"
+            "已发布快照覆盖不完整"
         };
         ui.label(format!("代次 {generation} · {entries} 项 · {coverage}"));
         ui.label(format!("索引快照占用磁盘 {}", crate::size_label(bytes)));
@@ -311,71 +311,54 @@ fn show_report(ui: &mut egui::Ui, snapshot: &Snapshot, current_generation: Optio
 }
 
 /// 面向用户的“为什么搜不到？”路径诊断器，按范围、类型策略、智能排除与文件存在性逐项排查。
-pub(crate) fn diagnose_missing_path(path: &Path, settings: Option<&Settings>) -> Vec<String> {
-    let mut findings = Vec::new();
+fn diagnose_missing_path(path: &Path, settings: Option<&Settings>, data_dir: &Path) -> String {
     if !path.is_absolute() {
-        findings.push("路径不是绝对路径，请输入完整本地路径。".into());
-        return findings;
-    }
-    if let Err(err) = xs_platform::validate_local_path(path, false) {
-        findings.push(format!("本地路径安全检查提示：{err}"));
-    }
-    match std::fs::symlink_metadata(path) {
-        Ok(meta) => {
-            if meta.file_type().is_symlink() {
-                findings.push("该条目是符号链接：为避免死循环，默认扫描会跳过符号链接。".into());
-            }
-            #[cfg(windows)]
-            {
-                use std::os::windows::fs::MetadataExt;
-                const CLOUD_MASK: u32 = 0x0000_1000 | 0x0004_0000 | 0x0040_0000;
-                if meta.file_attributes() & CLOUD_MASK != 0 {
-                    findings.push("该文件是未下载到本地的云盘占位符：正文索引会主动跳过以防止误触发自动下载。".into());
-                }
-            }
-        }
-        Err(err) => {
-            findings.push(format!("文件系统无法访问该路径：{err}"));
-        }
+        return "路径不是绝对路径，请输入完整本地路径。".into();
     }
     let Some(settings) = settings else {
-        findings.push("尚未加载索引范围设置，请先完成首次范围向导。".into());
-        return findings;
+        return "尚未加载索引范围设置，请先完成首次范围向导。".into();
     };
-    if settings.roots.is_empty() {
-        findings.push("当前尚未配置任何扫描磁盘或目录。".into());
-        return findings;
-    }
-    let matched_scope = settings.roots.iter().find(|scope| {
-        let root = Path::new(&scope.path);
-        path.starts_with(root)
-    });
-    match matched_scope {
-        None => findings.push("该路径不在任何已勾选的扫描磁盘或目录范围内，请在“搜索范围与设置”中添加其所在磁盘或父目录。".into()),
-        Some(scope) => {
-            findings.push(format!("已命中扫描范围：{}", scope.path));
-            if let Some(allowed) = &scope.extensions {
-                let ext = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(str::to_ascii_lowercase)
-                    .unwrap_or_default();
-                if allowed.is_empty() {
-                    findings.push("该范围当前设置为“仅文件夹”，不会收录普通文件。".into());
-                } else if !ext.is_empty() && !allowed.iter().any(|item| item == &ext) {
-                    findings.push(format!(
-                        "扩展名 .{ext} 不在该范围的收录文件类型白名单中，请切换为“所有文件类型”或补充该后缀。"
-                    ));
-                }
+    match check_filename_scope(settings, path, &[data_dir.to_path_buf()]) {
+        Ok(FilenameCoverage::OutsideScope) => {
+            "该路径不在文件名索引的收录范围内。请在“搜索范围与设置”中核对父目录。".into()
+        }
+        Ok(FilenameCoverage::ExplicitExclusion) => {
+            "该路径位于寻枢的数据目录，扫描时会跳过。".into()
+        }
+        Ok(FilenameCoverage::SmartExclusion) => {
+            "该路径命中了收录范围的智能排除规则，例如版本库或缓存目录。可在“搜索范围与设置”中核对。"
+                .into()
+        }
+        Ok(FilenameCoverage::Missing) => "文件或目录目前不存在，可能已删除或移动。".into(),
+        Ok(FilenameCoverage::OtherMount) => {
+            "该路径所在文件系统与收录根目录不同，扫描不会跨卷或跨挂载点。".into()
+        }
+        Ok(FilenameCoverage::UnsupportedEntry) => {
+            "该条目不是普通文件或文件夹，扫描时会跳过。".into()
+        }
+        Ok(FilenameCoverage::ExtensionExcluded) => {
+            let extension = path.extension().and_then(|ext| ext.to_str());
+            match extension {
+                Some(ext) => format!(
+                    "扩展名 .{ext} 受到该范围的收录类型限制。请核对扩展名白名单或“仅文件夹”设置。"
+                ),
+                None => "该文件没有扩展名，当前范围限制了文件类型。请选择“所有文件类型”才能收录。"
+                    .into(),
             }
         }
+        Ok(FilenameCoverage::Eligible(entry)) => {
+            const CLOUD_PLACEHOLDER: u32 = 0x0000_1000 | 0x0004_0000 | 0x0040_0000;
+            if entry
+                .attributes
+                .is_some_and(|flags| flags & CLOUD_PLACEHOLDER != 0)
+            {
+                return "当前文件符合名称收录条件。云盘占位文件需先在本机下载，才能收录正文。"
+                    .into();
+            }
+            "当前路径符合文件名收录条件。若结果中缺失，请核对搜索界面的类别和关键词，并检查索引代次或重新扫描。".into()
+        }
+        Err(error) => format!("无法核对该路径：{error}"),
     }
-    if findings.len() == 1 {
-        findings.push(
-            "范围与策略检查均已通过：若仍搜不到，请点击“重新扫描已授权范围”刷新索引代次。".into(),
-        );
-    }
-    findings
 }
 
 #[cfg(test)]
@@ -394,19 +377,48 @@ mod tests {
     }
 
     #[test]
-    fn missing_path_diagnoser_identifies_scope_and_extension_mismatch() {
-        let base = std::env::temp_dir().join("xunshu-diagnostics-synthetic");
-        assert!(base.is_absolute());
-        let docs = base.join("docs");
-        let mut settings = Settings::default();
-        settings.roots.push(xs_platform::Scope {
-            path: docs.to_string_lossy().into_owned(),
-            extensions: Some(vec!["pdf".into()]),
-            smart_excludes: true,
-        });
-        let outside = diagnose_missing_path(&base.join("other").join("a.pdf"), Some(&settings));
-        assert!(outside.iter().any(|line| line.contains("不在任何已勾选")));
-        let wrong_ext = diagnose_missing_path(&docs.join("note.txt"), Some(&settings));
-        assert!(wrong_ext.iter().any(|line| line.contains(".txt")));
+    fn missing_path_diagnosis_uses_the_same_scope_and_exclusions_as_the_scanner() {
+        let fixture = tempfile::tempdir().unwrap();
+        let root = fixture.path().join("docs");
+        let nested = root.join("nested");
+        let data = root.join("profile");
+        let smart = root.join(".git");
+        for dir in [&nested, &data, &smart] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let settings = Settings {
+            roots: vec![
+                xs_platform::Scope {
+                    extensions: Some(vec!["pdf".into()]),
+                    ..xs_platform::Scope::new(root.to_str().unwrap())
+                },
+                xs_platform::Scope::new(nested.to_str().unwrap()),
+            ],
+            ..Settings::default()
+        };
+        for (name, expected) in [
+            ("nested/notes.TXT", "符合文件名收录条件"),
+            ("nested/README", "符合文件名收录条件"),
+            ("note.txt", "扩展名 .txt"),
+            ("README", "没有扩展名"),
+            (".git/object.pdf", "智能排除规则"),
+            ("profile/data.pdf", "寻枢的数据目录"),
+            ("missing.txt", "目前不存在"),
+            ("../outside.pdf", "无法核对该路径"),
+        ] {
+            let path = root.join(name);
+            if !name.starts_with("missing") && !name.starts_with("..") {
+                std::fs::write(&path, b"synthetic").unwrap();
+            }
+            let result = diagnose_missing_path(&path, Some(&settings), &data);
+            assert!(result.contains(expected), "{name}: {result}");
+        }
+        assert!(
+            diagnose_missing_path(&nested, Some(&settings), &data).contains("符合文件名收录条件")
+        );
+        assert!(
+            diagnose_missing_path(&fixture.path().join("outside.pdf"), Some(&settings), &data)
+                .contains("不在文件名索引")
+        );
     }
 }
