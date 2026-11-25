@@ -60,6 +60,7 @@ thread_local! {
     static HWND: Cell<HWND> = const { Cell::new(null_mut()) };
     static TASKBAR_CREATED: Cell<u32> = const { Cell::new(0) };
     static DOUBLE_CTRL: RefCell<DoubleCtrl> = RefCell::new(DoubleCtrl::default());
+    static MINIMIZE_REQUESTED: Cell<bool> = const { Cell::new(false) };
 }
 
 fn wide(text: impl AsRef<OsStr>) -> Vec<u16> {
@@ -201,12 +202,37 @@ impl Drop for KeyboardHook {
     }
 }
 
-struct Tray(HWND);
+struct Tray {
+    window: HWND,
+    icon: HICON,
+}
+
 impl Tray {
+    fn new(window: HWND) -> Self {
+        const FILE: &[u8] = include_bytes!("../../../assets/xunshu.ico");
+        const IMAGE_OFFSET: usize = 22; // ICONDIR 和一个 ICONDIRENTRY。
+        #[repr(align(4))]
+        struct IconImage([u8; FILE.len() - IMAGE_OFFSET]);
+        let mut image = IconImage([0; FILE.len() - IMAGE_OFFSET]);
+        image.0.copy_from_slice(&FILE[IMAGE_OFFSET..]);
+        let icon = unsafe {
+            CreateIconFromResourceEx(
+                image.0.as_ptr(),
+                image.0.len() as u32,
+                1,
+                0x0003_0000,
+                GetSystemMetrics(SM_CXSMICON),
+                GetSystemMetrics(SM_CYSMICON),
+                LR_DEFAULTCOLOR,
+            )
+        };
+        Self { window, icon }
+    }
+
     fn data(&self) -> NOTIFYICONDATAW {
         let mut data: NOTIFYICONDATAW = unsafe { zeroed() };
         data.cbSize = size_of::<NOTIFYICONDATAW>() as u32;
-        data.hWnd = self.0;
+        data.hWnd = self.window;
         data.uID = 1;
         data
     }
@@ -214,7 +240,11 @@ impl Tray {
         let mut data = self.data();
         data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
         data.uCallbackMessage = TRAY_MESSAGE;
-        data.hIcon = unsafe { LoadIconW(null_mut(), IDI_APPLICATION) };
+        data.hIcon = if self.icon.is_null() {
+            unsafe { LoadIconW(null_mut(), IDI_APPLICATION) }
+        } else {
+            self.icon
+        };
         let tip = wide("寻枢 · 双击 Ctrl 唤起快捷搜索");
         data.szTip[..tip.len()].copy_from_slice(&tip);
         unsafe {
@@ -230,7 +260,39 @@ impl Tray {
 impl Drop for Tray {
     fn drop(&mut self) {
         unsafe { Shell_NotifyIconW(NIM_DELETE, &self.data()) };
+        if !self.icon.is_null() {
+            unsafe { DestroyIcon(self.icon) };
+        }
     }
+}
+
+pub fn install_minimize_handler(hwnd: HWND) -> bool {
+    unsafe { SetWindowSubclass(hwnd, Some(renderer_window_proc), 1, 0) != 0 }
+}
+
+pub fn take_minimize_request() -> bool {
+    MINIMIZE_REQUESTED.with(|request| request.replace(false))
+}
+
+unsafe extern "system" fn renderer_window_proc(
+    hwnd: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    subclass: usize,
+    _: usize,
+) -> LRESULT {
+    if message == WM_SYSCOMMAND && wparam & 0xfff0 == SC_MINIMIZE as usize {
+        // 复用窗口关闭事件，由渲染端区分最小化与用户主动关闭。
+        if unsafe { PostMessageW(hwnd, WM_CLOSE, 0, 0) } != 0 {
+            MINIMIZE_REQUESTED.with(|request| request.set(true));
+            return 0;
+        }
+    }
+    if message == WM_NCDESTROY {
+        unsafe { RemoveWindowSubclass(hwnd, Some(renderer_window_proc), subclass) };
+    }
+    unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
 }
 
 fn configure_job() -> Result<Handle> {
@@ -909,7 +971,7 @@ pub fn run(
         return Err(os_error("无法启用全局双 Ctrl"));
     }
     let _hook = KeyboardHook(hook);
-    let tray = Tray(hwnd);
+    let tray = Tray::new(hwnd);
     ensure!(tray.add(), "Windows 托盘不可用，无法启动寻枢常驻模式");
     let mut queries = [String::new(), String::new()];
     queries[view.index()] = query;

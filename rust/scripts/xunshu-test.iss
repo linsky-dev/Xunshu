@@ -19,7 +19,7 @@ SetupLogging=yes
 UninstallLogging=yes
 OutputBaseFilename=Xunshu-Windows-x64-Setup-Test
 OutputDir={#StageDir}
-UninstallDisplayIcon={app}\xs-install.exe
+UninstallDisplayIcon={app}\xunshu.ico
 InfoBeforeFile={#StageDir}\README.txt
 
 [Files]
@@ -30,8 +30,12 @@ Source: "{#StageDir}\VERSION.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: recursesubdirs ignoreversion
 
 [Icons]
-Name: "{group}\寻枢测试候选版"; Filename: "{app}\xs-install.exe"; Parameters: "--root ""{app}"" launch"; WorkingDir: "{app}"
+Name: "{commondesktop}\寻枢测试候选版"; Filename: "{app}\xs-install.exe"; Parameters: "--root ""{app}"" launch"; WorkingDir: "{app}"; IconFilename: "{app}\xunshu.ico"
+Name: "{group}\寻枢测试候选版"; Filename: "{app}\xs-install.exe"; Parameters: "--root ""{app}"" launch"; WorkingDir: "{app}"; IconFilename: "{app}\xunshu.ico"
 Name: "{group}\卸载寻枢测试候选版"; Filename: "{uninstallexe}"
+
+[Run]
+Filename: "{app}\xs-install.exe"; Parameters: "--root ""{app}"" launch"; WorkingDir: "{app}"; Description: "启动寻枢并在通知区域运行"; Flags: postinstall skipifsilent runasoriginaluser nowait
 
 [UninstallDelete]
 ; 原生卸载成功后清理安装状态。目录仅在完全为空时移除。

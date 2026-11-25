@@ -111,8 +111,9 @@ def portable_pack(stage, payload, manager, output):
         subprocess.run(['gzip', '--test', str(output)], check=True)
 
 
-def windows_pack(args, stage, manager, info, output):
+def windows_pack(args, stage, manager, info, output, digest):
     managers = manager.parent
+    copy_verified(WORKSPACE / 'assets/xunshu.ico', managers / 'xunshu.ico', digest)
     # 同一套应用本地运行库也支撑安装管理程序本身的 CRT 或 MinGW 导入。
     for path in args.runtime_dll:
         shutil.copy2(stage / 'payload' / path.name.lower(), managers / path.name.lower())
@@ -252,7 +253,7 @@ def package(args):
         info = metadata(args, stage, payload, digest)
         first, second = (stage / name for name in names)
         if args.platform == 'windows':
-            windows_pack(args, stage, manager, info, first)
+            windows_pack(args, stage, manager, info, first, digest)
         else:
             linux_pack(args, stage, payload, manager, first)
         portable_pack(stage, payload, manager, second)

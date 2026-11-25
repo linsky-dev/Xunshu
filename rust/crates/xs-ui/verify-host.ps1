@@ -29,12 +29,27 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class XunshuNativeFixture {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NotifyIconIdentifier {
+        public uint cbSize;
+        public IntPtr Window;
+        public uint Id;
+        public Guid Guid;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect { public int Left, Top, Right, Bottom; }
     private delegate bool EnumProc(IntPtr window, IntPtr data);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder text, int size);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int size);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wparam, IntPtr lparam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("shell32.dll")] private static extern int Shell_NotifyIconGetRect(ref NotifyIconIdentifier icon, out Rect rect);
+    public static bool HasTrayIcon(IntPtr window) {
+        var id = new NotifyIconIdentifier { cbSize = (uint)Marshal.SizeOf<NotifyIconIdentifier>(), Window = window, Id = 1 };
+        return Shell_NotifyIconGetRect(ref id, out _) == 0;
+    }
     public static IntPtr Find(int process, string title, string className) {
         IntPtr match = IntPtr.Zero;
         EnumWindows(delegate(IntPtr window, IntPtr data) {
@@ -101,13 +116,15 @@ function Test-Wizard([string]$Fixture) {
     [void][IO.Directory]::CreateDirectory($docs)
     [IO.File]::WriteAllText((Join-Path $docs '估算合成报告.txt'), '只用于向导验收。')
     $watch = [Diagnostics.Stopwatch]::StartNew()
-    $process = Start-UiFixture @('--standalone', '--data-dir', $data) $testHome
+    $process = Start-UiFixture @('--data-dir', $data) $testHome
     try {
-        $window = Wait-Fixture {
-            $handle = [XunshuNativeFixture]::Find($process.Id, '寻枢 · 本地文件搜索', $null)
-            if ($handle -ne [IntPtr]::Zero) { $handle }
-        } '新配置向导窗口'
+        $renderer = Wait-Fixture { Find-Renderer $process.Id '寻枢 · 本地文件搜索' } '新配置向导窗口'
+        $window = [XunshuNativeFixture]::Find($renderer.Id, '寻枢 · 本地文件搜索', $null)
         Invoke-WizardButton $window '一键使用常用目录直达确认'
+        if (![XunshuNativeFixture]::PostMessage($window, 0x0112, [IntPtr]0xf020, [IntPtr]::Zero)) { throw '无法最小化向导。' }
+        $null = Wait-Fixture { ![XunshuNativeFixture]::IsWindowVisible($window) } '隐藏未确认的向导'
+        Invoke-Activation @('--data-dir', $data)
+        $null = Wait-Fixture { [XunshuNativeFixture]::IsWindowVisible($window) } '恢复同一个向导窗口'
         # 首次展示向导可保存提醒次数。试扫不可修改配置或发布索引。
         $beforeEstimate = if (Test-Path -LiteralPath $settings) {
             $initial = Get-Content -LiteralPath $settings -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -146,7 +163,7 @@ function Test-Wizard([string]$Fixture) {
             @($saved.roots).Count -ne 1 -or $saved.roots[0].path -ne $docs) {
             throw '推荐设置偏离了显式确认的标准范围。'
         }
-        [pscustomobject]@{ estimate = $estimate; synthetic_first_hit_ms = $watch.ElapsedMilliseconds }
+        [pscustomobject]@{ estimate = $estimate; synthetic_first_hit_ms = $watch.ElapsedMilliseconds; retained_on_minimize = $true }
     } finally {
         if (!$process.HasExited) { $process.Kill(); $process.WaitForExit() }
         $process.Dispose()
@@ -222,6 +239,7 @@ try {
         $window = [XunshuNativeFixture]::Find($hostProcess.Id, $null, 'Xunshu.DesktopHost')
         if ($window -ne [IntPtr]::Zero) { $window }
     } 'Windows 托盘宿主'
+    $null = Wait-Fixture { [XunshuNativeFixture]::HasTrayIcon($hostWindow) } 'Explorer 通知区域图标'
     $quick = Wait-Fixture { Find-Renderer $hostProcess.Id '寻枢 · 快捷搜索' } '快捷搜索原生窗口'
     Invoke-Activation @('--data-dir', $profile, '--query', '合成报告')
     $main = Wait-Fixture { Find-Renderer $hostProcess.Id '寻枢 · 本地文件搜索' } '现有进程切换到主窗口'
@@ -274,6 +292,14 @@ try {
     Invoke-Activation @('--data-dir', $profile, '--quick')
     $reopened = Wait-Fixture { Find-Renderer $hostProcess.Id '寻枢 · 快捷搜索' } '关闭后重新唤起'
     if ($reopened.Id -eq $quick.Id) { throw '重新唤起没有创建独立渲染进程。' }
+    Invoke-Activation @('--data-dir', $profile)
+    $minimized = Wait-Fixture { Find-Renderer $hostProcess.Id '寻枢 · 本地文件搜索' } '最小化测试主窗口'
+    $mainWindow = [XunshuNativeFixture]::Find($minimized.Id, '寻枢 · 本地文件搜索', $null)
+    if (![XunshuNativeFixture]::PostMessage($mainWindow, 0x0112, [IntPtr]0xf020, [IntPtr]::Zero)) { throw '无法发送系统最小化消息。' }
+    $null = Wait-Fixture { !(Get-Process -Id $minimized.Id -ErrorAction SilentlyContinue) } '最小化后释放渲染进程'
+    if ($hostProcess.HasExited -or ![XunshuNativeFixture]::HasTrayIcon($hostWindow)) { throw '最小化后托盘退出。' }
+    if (![XunshuNativeFixture]::PostMessage($hostWindow, 0x8001, [IntPtr]::Zero, [IntPtr]0x0400)) { throw '无法分派通知区域激活消息。' }
+    $reopened = Wait-Fixture { Find-Renderer $hostProcess.Id '寻枢 · 快捷搜索' } '托盘激活重新显示快捷框'
     if (![XunshuNativeFixture]::PostMessage($hostWindow, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)) { throw '无法退出托盘宿主。' }
     if (!$hostProcess.WaitForExit(7000) -or $hostProcess.ExitCode -ne 0) { throw '托盘宿主退出失败。' }
     $null = Wait-Fixture {
@@ -298,7 +324,7 @@ try {
         $cjkFont = $true
     }
     $wizard = if ($CheckWizard) { Test-Wizard $fixture } else { $null }
-    [pscustomobject]@{ result = '通过'; fixture = $fixture; hidden_private_bytes = $privateBytes; native_window = $true; single_instance = $true; hotkey_dispatch = $true; physical_ctrl = $false; hidden_watch = $true; exit_cleanup = $true; content_preview = $contentPreview; cjk_font = $cjkFont; windows_uia = $accessibility; diagnostics_panel_uia = $diagnosticsPanel; diagnostics_cli_export = $diagnosticsCliExport; synthetic_wizard = $wizard } | ConvertTo-Json
+    [pscustomobject]@{ result = '通过'; fixture = $fixture; hidden_private_bytes = $privateBytes; native_window = $true; single_instance = $true; tray_registered = $true; minimize_to_tray = $true; tray_activation_dispatch = $true; hotkey_dispatch = $true; physical_ctrl = $false; hidden_watch = $true; exit_cleanup = $true; content_preview = $contentPreview; cjk_font = $cjkFont; windows_uia = $accessibility; diagnostics_panel_uia = $diagnosticsPanel; diagnostics_cli_export = $diagnosticsCliExport; synthetic_wizard = $wizard } | ConvertTo-Json
 } finally {
     if (!$hostProcess.HasExited) { $hostProcess.Kill(); $hostProcess.WaitForExit() }
     $hostProcess.Dispose()

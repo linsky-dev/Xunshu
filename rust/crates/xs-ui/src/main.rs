@@ -565,6 +565,8 @@ struct App {
     view_positions: [Option<egui::Pos2>; 2],
     desktop_commands: Option<Receiver<HostMessage>>,
     close_notified: bool,
+    #[cfg(windows)]
+    tray_hidden: bool,
     focus_query: bool,
     ime_composing: bool,
     monitor_stop: Arc<AtomicBool>,
@@ -972,6 +974,8 @@ impl App {
             view_positions: [None; 2],
             desktop_commands,
             close_notified: false,
+            #[cfg(windows)]
+            tray_hidden: false,
             focus_query: true,
             ime_composing: false,
             monitor_stop,
@@ -1051,6 +1055,9 @@ impl App {
         self.focus_query = true;
         #[cfg(windows)]
         {
+            if std::mem::take(&mut self.tray_hidden) {
+                ctx.send_viewport_cmd(Cmd::Visible(true));
+            }
             self.focus_native_until = self
                 .desktop_commands
                 .is_some()
@@ -3235,6 +3242,16 @@ impl eframe::App for App {
             }
         }
         if ctx.input(|i| i.viewport().close_requested()) {
+            #[cfg(windows)]
+            if desktop::windows::take_minimize_request()
+                && (self.content.building() || self.saving || self.wizard.is_some())
+            {
+                // 正文任务或未完成的向导保留在后台，托盘可恢复同一窗口。
+                self.tray_hidden = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                return;
+            }
             if self.content.building()
                 || needs_defer_on_close(self.settings.as_ref(), self.wizard.is_some())
             {
@@ -3251,6 +3268,11 @@ impl eframe::App for App {
         }
         if self.close_after_content && !self.content.building() {
             self.close_after_content = false;
+            self.request_close(ctx);
+        }
+        #[cfg(windows)]
+        if self.tray_hidden && !self.content.building() && !self.saving && self.wizard.is_none() {
+            self.tray_hidden = false;
             self.request_close(ctx);
         }
     }
@@ -3791,7 +3813,17 @@ fn run_renderer(mut args: Args) -> Result<()> {
     eframe::run_native(
         "寻枢",
         options,
-        Box::new(move |cc| Ok(Box::new(App::new(cc, args, queries, font)))),
+        Box::new(move |cc| {
+            #[cfg(windows)]
+            if args.mode == DesktopMode::Renderer {
+                let installed = desktop::windows::native_window(cc)
+                    .is_some_and(desktop::windows::install_minimize_handler);
+                if !installed {
+                    eprintln!("未能启用最小化到通知区域，继续使用系统最小化");
+                }
+            }
+            Ok(Box::new(App::new(cc, args, queries, font)))
+        }),
     )
     .map_err(|e| anyhow::anyhow!("无法显示寻枢原生窗口：{e}"))
 }

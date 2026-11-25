@@ -140,6 +140,7 @@ def verify(installer, work):
     launch_pointer = launch_root / "active.json"
     launch_state = {"active": version, "previous": None, "retained": [version]}
     launch_pointer.write_text(json.dumps(launch_state), encoding="utf-8")
+    (launch_root / "install.lock").touch()
 
     def refuse(label, action, expected):
         before = launch_pointer.read_bytes()

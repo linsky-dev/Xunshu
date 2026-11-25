@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs::File,
     io::{self, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -868,9 +867,18 @@ fn remove_version(root: &Path, version: &Version) -> Result<()> {
 fn run() -> Result<()> {
     let args = Args::parse();
     let root = std::path::absolute(args.root)?;
-    xs_platform::create_local_dir_all(&root)?;
-    let lock: File = xs_platform::open_or_create_local_lock(&root.join("install.lock"))?;
-    FileExt::lock_exclusive(&lock)?;
+    let lock_path = root.join("install.lock");
+    // 普通用户从 Program Files 启动时只需读取已安装版本。
+    let _lock = if matches!(args.command, Action::Launch { .. }) {
+        let lock = xs_platform::open_local_read(&lock_path)?;
+        FileExt::lock_shared(&lock)?;
+        lock
+    } else {
+        xs_platform::create_local_dir_all(&root)?;
+        let lock = xs_platform::open_or_create_local_lock(&lock_path)?;
+        FileExt::lock_exclusive(&lock)?;
+        lock
+    };
     let mut state = read_state(&root)?;
     match args.command {
         Action::Install { payload, sha256 } => {
