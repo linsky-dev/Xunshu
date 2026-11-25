@@ -26,12 +26,12 @@ mod diagnostics;
 mod scope_estimate;
 mod utility;
 
-const INK: Color32 = Color32::from_rgb(24, 43, 64);
-const MUTED: Color32 = Color32::from_rgb(75, 91, 108);
-const ACCENT: Color32 = Color32::from_rgb(0, 121, 108);
-const SOFT: Color32 = Color32::from_rgb(229, 245, 240);
-const BORDER: Color32 = Color32::from_rgb(224, 232, 238);
-const BACKGROUND: Color32 = Color32::from_rgb(245, 248, 251);
+const INK: Color32 = Color32::from_rgb(23, 34, 32);
+const MUTED: Color32 = Color32::from_rgb(76, 91, 87);
+const ACCENT: Color32 = Color32::from_rgb(8, 103, 89);
+const SOFT: Color32 = Color32::from_rgb(223, 241, 234);
+const BORDER: Color32 = Color32::from_rgb(215, 225, 221);
+const BACKGROUND: Color32 = Color32::from_rgb(246, 248, 246);
 const ERROR: Color32 = Color32::from_rgb(164, 48, 48);
 const PAGE_SIZE: usize = 200;
 const QUICK_PAGE_SIZE: usize = 8;
@@ -519,6 +519,7 @@ impl SearchGate {
 
 struct App {
     data_dir: PathBuf,
+    brand_icon: egui::TextureHandle,
     tx: Sender<Message>,
     rx: Receiver<Message>,
     settings: Option<Settings>,
@@ -895,8 +896,12 @@ impl App {
         args: Args,
         view_queries: [String; 2],
         font: Option<Vec<u8>>,
+        icon: egui::ColorImage,
     ) -> Self {
         let cjk_font = configure_ui(&cc.egui_ctx, font);
+        let brand_icon =
+            cc.egui_ctx
+                .load_texture("xunshu_brand", icon, egui::TextureOptions::LINEAR);
         let initial_content_query = (args.content
             && !view_queries[View::Main.index()].trim().is_empty())
         .then(|| view_queries[View::Main.index()].clone());
@@ -928,6 +933,7 @@ impl App {
         });
         let mut app = Self {
             data_dir: args.data_dir,
+            brand_icon,
             tx,
             rx,
             settings: None,
@@ -1843,22 +1849,14 @@ impl App {
             .frame(
                 egui::Frame::new()
                     .fill(Color32::WHITE)
-                    .inner_margin(egui::Margin::symmetric(24, 16)),
+                    .inner_margin(egui::Margin::symmetric(18, 8)),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    let (rect, _) = ui.allocate_exact_size(Vec2::splat(36.0), egui::Sense::hover());
-                    ui.painter().rect_filled(rect, 10.0, ACCENT);
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "寻",
-                        FontId::proportional(24.0),
-                        Color32::WHITE,
-                    );
+                    ui.image((self.brand_icon.id(), Vec2::splat(28.0)));
                     ui.add_space(8.0);
-                    ui.label(RichText::new("寻枢").size(24.0).strong().color(INK));
-                    ui.add_space(12.0);
+                    ui.label(RichText::new("寻枢").size(19.0).strong().color(INK));
+                    ui.separator();
                     ui.label(RichText::new("本地文件搜索").color(MUTED));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
@@ -1867,7 +1865,7 @@ impl App {
                                     && self.scan_cancel.is_none()
                                     && !self.saving,
                                 egui::Button::new("搜索范围与设置")
-                                    .min_size(Vec2::new(144.0, 34.0)),
+                                    .min_size(Vec2::new(116.0, 28.0)),
                             )
                             .clicked()
                         {
@@ -1899,7 +1897,6 @@ impl App {
                                 self.schedule_search(true);
                             }
                         }
-                        ui.label(RichText::new("离线运行").color(ACCENT).size(13.0));
                     });
                 });
             });
@@ -1958,27 +1955,27 @@ impl App {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("sidebar")
             .resizable(false)
-            .exact_width(202.0)
+            .exact_width(152.0)
             .frame(
                 egui::Frame::new()
                     .fill(BACKGROUND)
-                    .inner_margin(egui::Margin::symmetric(20, 24)),
+                    .inner_margin(egui::Margin::symmetric(13, 16)),
             )
             .show(ctx, |ui| {
                 ui.label(RichText::new("工作空间").size(12.0).color(MUTED));
-                ui.add_space(12.0);
+                ui.add_space(8.0);
                 egui::Frame::new()
                     .fill(SOFT)
                     .corner_radius(8)
-                    .inner_margin(12)
+                    .inner_margin(9)
                     .show(ui, |ui| {
-                        ui.set_min_width(132.0);
+                        ui.set_min_width(108.0);
                         ui.horizontal(|ui| {
                             magnifier(ui, 18.0, ACCENT);
                             ui.label(RichText::new("搜索文件").color(ACCENT).strong());
                         });
                     });
-                ui.add_space(28.0);
+                ui.add_space(18.0);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("已收录范围").small().color(MUTED));
                     if let Some(s) = &self.settings {
@@ -2019,23 +2016,15 @@ impl App {
                             && self.scan_cancel.is_none()
                             && !self.loading
                             && !self.saving,
-                        egui::Button::new("重新扫描范围").min_size(Vec2::new(160.0, 33.0)),
+                        egui::Button::new("重新扫描范围").min_size(Vec2::new(114.0, 30.0)),
                     )
                     .clicked()
                 {
                     self.scan(ctx);
                 }
-                ui.add_space(22.0);
+                ui.add_space(15.0);
                 ui.separator();
-                ui.add_space(14.0);
-                ui.label(RichText::new("按文件信息搜索").strong().size(13.0));
-                ui.add_space(7.0);
-                ui.label(
-                    RichText::new("添加本地目录并完成扫描后，即可按文件名与属性检索。")
-                        .size(12.0)
-                        .color(MUTED),
-                );
-                ui.add_space(16.0);
+                ui.add_space(10.0);
                 if ui.small_button("搜索语法").clicked() {
                     self.show_help = !self.show_help;
                 }
@@ -2043,8 +2032,6 @@ impl App {
                     self.show_activity = true;
                     self.activity_job(ctx, None);
                 }
-                ui.add_space(10.0);
-                ui.label(RichText::new("正文范围可单独设置").size(12.0).color(MUTED));
             });
     }
     fn content_panel(&mut self, ctx: &egui::Context) {
@@ -2330,29 +2317,74 @@ impl App {
         }
     }
 
-    fn main_panel(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(egui::Margin::symmetric(28, 24))).show(ctx, |ui| {
-            ui.label(RichText::new("找到你需要的文件").size(26.0).strong().color(INK));
-            ui.add_space(6.0); ui.label(RichText::new("文件、应用与已授权书签/仓库/本地来源，一个入口检索。").color(MUTED)); ui.add_space(20.0);
-            let mut changed = false; let mut immediate = false;
-            ui.horizontal(|ui| {
-                egui::Frame::new().fill(BACKGROUND).stroke(Stroke::new(1.0_f32, BORDER)).corner_radius(9).inner_margin(egui::Margin::symmetric(12, 10)).show(ui, |ui| {
-                    let available = (ui.available_width() - 95.0).max(180.0);
-                    let edit = ui.add_sized([available, 24.0], egui::TextEdit::singleline(&mut self.query).id_salt("main_query").font(FontId::proportional(18.0)).hint_text("输入文件名，或 ext:pdf、path:项目").frame(false));
-                    changed = edit.changed();
-                    if self.focus_query { self.focus_query = false; edit.request_focus(); }
-                    if edit.lost_focus() && ui.input(|i|i.key_pressed(egui::Key::Enter)) { immediate = true; edit.request_focus(); }
-                    if ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K)) { edit.request_focus(); }
+    fn search_bar(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::top("search_bar")
+            .frame(
+                egui::Frame::new()
+                    .fill(Color32::WHITE)
+                    .inner_margin(egui::Margin::symmetric(18, 14)),
+            )
+            .show(ctx, |ui| {
+                let mut changed = false;
+                let mut immediate = false;
+                ui.horizontal(|ui| {
+                    let width = ui.available_width();
+                    egui::Frame::new()
+                        .fill(BACKGROUND)
+                        .stroke(ui.visuals().widgets.inactive.bg_stroke)
+                        .corner_radius(8)
+                        .inner_margin(egui::Margin::symmetric(12, 8))
+                        .show(ui, |ui| {
+                            magnifier(ui, 20.0, ACCENT);
+                            let edit = ui.add_sized(
+                                [(width - 182.0).max(160.0), 26.0],
+                                egui::TextEdit::singleline(&mut self.query)
+                                    .id_salt("main_query")
+                                    .font(FontId::proportional(19.0))
+                                    .hint_text("搜索文件名、路径或扩展名")
+                                    .frame(false),
+                            );
+                            changed = edit.changed();
+                            if self.focus_query
+                                || ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K))
+                            {
+                                self.focus_query = false;
+                                edit.request_focus();
+                            }
+                            if edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                immediate = true;
+                                edit.request_focus();
+                            }
+                            if ui
+                                .add_enabled(!self.query.is_empty(), egui::Button::new("×"))
+                                .on_hover_text("清空搜索")
+                                .clicked()
+                            {
+                                self.query.clear();
+                                changed = true;
+                                edit.request_focus();
+                            }
+                        });
+                    if ui.add_sized([88.0, 44.0], primary("搜索")).clicked() {
+                        immediate = true;
+                    }
                 });
-                if ui.add_sized([75.0, 48.0], primary("搜索")).clicked() { immediate = true; }
+                if changed {
+                    self.query_edited();
+                }
+                if immediate && !self.query.trim().is_empty() {
+                    self.activity_job(ctx, Some(activity::Edit::Remember(self.query.clone())));
+                }
+                if changed || immediate {
+                    self.schedule_search(immediate);
+                }
             });
-            if changed { self.query_edited(); }
-            if immediate && !self.query.trim().is_empty() {
-                self.activity_job(ctx, Some(activity::Edit::Remember(self.query.clone())));
-            }
-            if changed || immediate { self.schedule_search(immediate); }
-            ui.add_space(16.0);
+    }
+
+    fn main_panel(&mut self, ctx: &egui::Context) {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(egui::Margin::symmetric(18, 14))).show(ctx, |ui| {
             ui.horizontal(|ui| {
+                ui.label(RichText::new("类型").small().color(MUTED));
                 for filter in [Filter::All, Filter::Files, Filter::Folders] {
                     if ui.selectable_value(&mut self.filter, filter, filter.label()).changed() { self.schedule_search(true); }
                 }
@@ -2444,7 +2476,7 @@ impl App {
                         if !complete && self.budget_ms < 60_000 && ui.button("继续完整查询").clicked() { self.budget_ms = (self.budget_ms * 4).min(60_000); self.run_search(ctx); }
                         if self.offset > 0 && ui.button("返回第一页").clicked() { self.offset = 0; self.run_search(ctx); }
                     });
-                } else { self.result_list(ui, ctx); }
+                } else { self.results_workspace(ui, ctx); }
             } else if self.searching { empty_state(ui, "正在搜索", "输入新关键词可立即取消旧查询。", true); }
         });
     }
@@ -2501,31 +2533,166 @@ impl App {
                 });
         }
     }
-    fn result_list(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn results_workspace(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let width = ui.available_width();
+        if width < 800.0 {
+            self.result_list(ui, ctx, false);
+            return;
+        }
+
+        // 宽窗口同时显示结果和所选文件的详情，窄窗口保留行尾操作。
+        let details_width = (width * 0.31).clamp(266.0, 370.0);
+        let height = ui.available_height();
+        ui.horizontal_top(|ui| {
+            let list_width = width - details_width - 13.0;
+            ui.allocate_ui_with_layout(
+                Vec2::new(list_width, height),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.set_width(list_width);
+                    self.result_list(ui, ctx, true);
+                },
+            );
+            ui.separator();
+            ui.allocate_ui_with_layout(
+                Vec2::new(details_width, height),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.set_width(details_width);
+                    self.file_details(ui, ctx);
+                },
+            );
+        });
+    }
+
+    fn file_details(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let Some(hit) = self
+            .selected
+            .and_then(|row| self.results.as_ref()?.results.get(row))
+            .cloned()
+        else {
+            ui.add_space(12.0);
+            ui.label(RichText::new("文件详情").strong().color(INK));
+            ui.label(RichText::new("选择一条结果查看详情和操作。").color(MUTED));
+            return;
+        };
+        let local = hit.source == "local";
+        let mut action = None;
+        egui::ScrollArea::vertical()
+            .id_salt("file_details")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.add_space(12.0);
+                ui.label(
+                    RichText::new(file_kind(&hit))
+                        .small()
+                        .strong()
+                        .color(ACCENT),
+                );
+                ui.label(RichText::new(&hit.name).size(20.0).strong().color(INK))
+                    .on_hover_text(&hit.name);
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(if hit.is_dir {
+                        modified_label(hit.modified)
+                    } else {
+                        format!(
+                            "{} · {}",
+                            size_label(hit.size),
+                            modified_label(hit.modified)
+                        )
+                    })
+                    .color(MUTED),
+                );
+                ui.add_space(10.0);
+                ui.add_enabled_ui(!self.opening, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.add_enabled(local, primary("打开")).clicked() {
+                            action = Some(ResultAction::Open);
+                        }
+                        if ui
+                            .add_enabled(local, egui::Button::new("所在文件夹"))
+                            .clicked()
+                        {
+                            action = Some(ResultAction::OpenParent);
+                        }
+                        if ui
+                            .add_enabled(
+                                local
+                                    && !hit.is_dir
+                                    && preview_format(Path::new(&hit.path)).is_some(),
+                                egui::Button::new("预览"),
+                            )
+                            .clicked()
+                        {
+                            action = Some(ResultAction::Preview);
+                        }
+                    });
+                });
+                ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
+                ui.label(RichText::new("完整路径").small().strong().color(MUTED));
+                ui.add(egui::Label::new(&hit.path).wrap())
+                    .on_hover_text(&hit.path);
+                if ui
+                    .add_enabled(!self.opening, egui::Button::new("复制路径"))
+                    .clicked()
+                {
+                    action = Some(ResultAction::CopyPath);
+                }
+                ui.add_space(12.0);
+                ui.label(
+                    RichText::new(if local {
+                        "本地文件系统"
+                    } else {
+                        "离线目录"
+                    })
+                    .small()
+                    .color(MUTED),
+                );
+            });
+        if let Some(action) = action {
+            self.result_action(ctx, action);
+        }
+    }
+
+    fn result_list(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, inspector: bool) {
         let response = self.results.as_ref().unwrap();
         let total = response.total;
         let complete = response.complete;
         let coverage_complete = response.coverage_complete;
         let count = response.results.len();
         let items = &response.results;
-        ui.add_space(7.0);
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("名称 / 所在位置").small().color(MUTED));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(RichText::new("类型 · 大小").small().color(MUTED));
-            });
-        });
         ui.add_space(5.0);
+        let table = ui.available_width() >= 485.0;
+        let (header, _) =
+            ui.allocate_exact_size(Vec2::new(ui.available_width(), 27.0), egui::Sense::hover());
+        let labels = if table {
+            ["名称", "所在位置", "类型", "大小", "修改时间"].as_slice()
+        } else {
+            ["名称 / 所在位置"].as_slice()
+        };
+        for (i, label) in labels.iter().enumerate() {
+            ui.painter().text(
+                egui::pos2(result_columns(header)[i], header.center().y),
+                egui::Align2::LEFT_CENTER,
+                label,
+                FontId::proportional(12.0),
+                MUTED,
+            );
+        }
         let mut action = None;
         let mut selected = self.selected;
         #[cfg(windows)]
         let mut dragged = None;
-        let list_height = (ui.available_height() - 118.0).max(100.0);
+        let list_height = (ui.available_height() - if inspector { 70.0 } else { 108.0 }).max(100.0);
+        let row_height = if table { 42.0 } else { 51.0 };
         egui::ScrollArea::vertical()
             .id_salt("results")
             .max_height(list_height)
             .auto_shrink([false, false])
-            .show_rows(ui, 61.0, count, |ui, rows| {
+            .show_rows(ui, row_height, count, |ui, rows| {
                 for row in rows {
                     let hit = &items[row];
                     #[cfg(windows)]
@@ -2533,7 +2700,7 @@ impl App {
                     #[cfg(not(windows))]
                     let can_drag = false;
                     let (rect, response) = ui.allocate_exact_size(
-                        Vec2::new(ui.available_width(), 61.0),
+                        Vec2::new(ui.available_width(), row_height),
                         if can_drag {
                             egui::Sense::click_and_drag()
                         } else {
@@ -2556,14 +2723,6 @@ impl App {
                             format!("{}，{}", hit.name, hit.path),
                         )
                     });
-                    if response.has_focus() {
-                        ui.painter().rect_stroke(
-                            rect.shrink(1.0),
-                            6.0,
-                            Stroke::new(2.0_f32, ACCENT),
-                            egui::StrokeKind::Inside,
-                        );
-                    }
                     if response.double_clicked() {
                         selected = Some(row);
                         if hit.source == "local" {
@@ -2591,73 +2750,88 @@ impl App {
                             Color32::WHITE
                         },
                     );
-                    let icon = egui::Rect::from_min_size(
-                        rect.min + Vec2::new(9.0, 12.0),
-                        Vec2::new(35.0, 35.0),
-                    );
-                    ui.painter().rect_filled(
-                        icon,
-                        7.0,
-                        if hit.is_dir {
-                            Color32::from_rgb(237, 241, 249)
-                        } else {
-                            Color32::from_rgb(239, 246, 246)
-                        },
-                    );
-                    ui.painter().text(
-                        icon.center(),
-                        egui::Align2::CENTER_CENTER,
-                        if hit.is_dir { "目录" } else { "文件" },
-                        FontId::proportional(11.0),
-                        if hit.is_dir {
-                            Color32::from_rgb(67, 93, 140)
-                        } else {
-                            ACCENT
-                        },
-                    );
-                    let text_left = rect.left() + 55.0;
-                    let text_width = (rect.width() - 210.0).max(100.0);
-                    let text_clip = egui::Rect::from_min_size(
-                        egui::pos2(text_left, rect.top()),
-                        Vec2::new(text_width, rect.height()),
-                    );
-                    let painter = ui
+                    if chosen {
+                        let stripe = egui::Rect::from_min_size(
+                            rect.min + Vec2::new(0.0, 3.0),
+                            Vec2::new(3.0, rect.height() - 6.0),
+                        );
+                        ui.painter().rect_filled(stripe, 2.0, ACCENT);
+                    }
+                    if response.has_focus() {
+                        ui.painter().rect_stroke(
+                            rect.shrink(1.0),
+                            6.0,
+                            Stroke::new(2.0_f32, ACCENT),
+                            egui::StrokeKind::Inside,
+                        );
+                    }
+                    ui.painter()
+                        .hline(rect.x_range(), rect.bottom(), Stroke::new(1.0_f32, BORDER));
+
+                    let columns = result_columns(rect);
+                    let name_end = if table {
+                        columns[1] - 7.0
+                    } else {
+                        rect.right() - 65.0
+                    };
+                    let name_y = if table {
+                        rect.top() + 10.0
+                    } else {
+                        rect.top() + 5.0
+                    };
+                    let name_cell =
+                        egui::Rect::from_x_y_ranges(columns[0]..=name_end, rect.y_range());
+                    let name = ui
                         .painter()
-                        .with_clip_rect(text_clip.intersect(ui.clip_rect()));
-                    painter.galley(
-                        egui::pos2(text_left, rect.top() + 13.0),
-                        painter.layout_job(name_highlight(&hit.name, &self.query)),
-                        INK,
-                    );
-                    painter.text(
-                        egui::pos2(text_left, rect.top() + 35.0),
-                        egui::Align2::LEFT_TOP,
-                        &hit.path,
-                        FontId::proportional(12.0),
-                        MUTED,
-                    );
-                    ui.painter().text(
-                        egui::pos2(rect.right() - 12.0, rect.top() + 14.0),
-                        egui::Align2::RIGHT_TOP,
-                        if hit.is_dir {
-                            "文件夹".into()
-                        } else {
-                            size_label(hit.size)
-                        },
-                        FontId::proportional(12.0),
-                        MUTED,
-                    );
-                    ui.painter().text(
-                        egui::pos2(rect.right() - 12.0, rect.top() + 35.0),
-                        egui::Align2::RIGHT_TOP,
-                        if hit.source == "local" {
-                            "本地"
-                        } else {
-                            "离线目录"
-                        },
-                        FontId::proportional(11.0),
-                        if hit.source == "local" { MUTED } else { ACCENT },
-                    );
+                        .with_clip_rect(name_cell.intersect(ui.clip_rect()));
+                    let mut label = name_highlight(&hit.name, &self.query);
+                    label.wrap.max_width = name_cell.width();
+                    label.wrap.max_rows = 1;
+                    label.wrap.break_anywhere = true;
+                    name.galley(egui::pos2(columns[0], name_y), name.layout_job(label), INK);
+                    let folder = Path::new(&hit.path)
+                        .parent()
+                        .filter(|path| !path.as_os_str().is_empty());
+                    let kind = if hit.source == "local" {
+                        file_kind(hit)
+                    } else {
+                        "离线目录".into()
+                    };
+                    let size = if hit.is_dir {
+                        "—".into()
+                    } else {
+                        size_label(hit.size)
+                    };
+                    if table {
+                        let location = folder.map_or("—".into(), |dir| {
+                            dir.file_name().unwrap_or(dir.as_os_str()).to_string_lossy()
+                        });
+                        let modified = modified_label(hit.modified);
+                        for (i, value) in [location.as_ref(), &kind, &size, &modified]
+                            .iter()
+                            .enumerate()
+                        {
+                            paint_result_cell(
+                                ui,
+                                rect,
+                                columns[i + 1],
+                                columns[i + 2],
+                                rect.center().y,
+                                value,
+                            );
+                        }
+                    } else {
+                        let location = folder.map_or("—".into(), Path::to_string_lossy);
+                        paint_result_cell(
+                            ui,
+                            rect,
+                            columns[0],
+                            name_end,
+                            rect.top() + 36.0,
+                            &location,
+                        );
+                        paint_result_cell(ui, rect, name_end, rect.right(), rect.center().y, &size);
+                    }
                     response.on_hover_text(&hit.path);
                 }
             });
@@ -2732,34 +2906,36 @@ impl App {
             };
             ui.label(RichText::new(status).small().color(MUTED));
         }
-        ui.add_space(7.0);
-        let selected_hit = self
-            .selected
-            .and_then(|n| self.results.as_ref()?.results.get(n))
-            .cloned();
-        if let Some(hit) = selected_hit {
-            ui.horizontal(|ui| {
-                ui.add_enabled_ui(!self.opening, |ui| {
-                    if let Some(next) = result_actions(ui, &hit, false) {
-                        action = Some(next);
-                    }
+        if !inspector {
+            ui.add_space(7.0);
+            let selected_hit = self
+                .selected
+                .and_then(|n| self.results.as_ref()?.results.get(n))
+                .cloned();
+            if let Some(hit) = selected_hit {
+                ui.horizontal(|ui| {
+                    ui.add_enabled_ui(!self.opening, |ui| {
+                        if let Some(next) = result_actions(ui, &hit, false) {
+                            action = Some(next);
+                        }
+                    });
+                    ui.label(
+                        RichText::new(if hit.source == "local" {
+                            "双击打开 · 打开前重新校验范围"
+                        } else {
+                            "离线目录仅显示文件信息"
+                        })
+                        .small()
+                        .color(MUTED),
+                    );
                 });
+            } else {
                 ui.label(
-                    RichText::new(if hit.source == "local" {
-                        "双击打开 · 打开前重新校验范围"
-                    } else {
-                        "离线目录仅显示文件信息"
-                    })
-                    .small()
-                    .color(MUTED),
+                    RichText::new("选择一项查看操作，双击打开本地文件。")
+                        .small()
+                        .color(MUTED),
                 );
-            });
-        } else {
-            ui.label(
-                RichText::new("选择一项查看操作，双击打开本地文件。")
-                    .small()
-                    .color(MUTED),
-            );
+            }
         }
         #[cfg(windows)]
         if let Some(row) = dragged {
@@ -3179,6 +3355,7 @@ impl eframe::App for App {
                 if self.content_tab {
                     self.content_panel(ctx);
                 } else {
+                    self.search_bar(ctx);
                     self.sidebar(ctx);
                     self.main_panel(ctx);
                     self.activity_panel(ctx);
@@ -3354,10 +3531,11 @@ fn configure_ui(ctx: &egui::Context, requested_font: Option<Vec<u8>>) -> bool {
             .push("local-cjk".into());
         ctx.set_fonts(fonts);
     }
+    ctx.set_theme(egui::Theme::Light);
     configure_visuals(ctx, false);
-    let mut style = (*ctx.style()).clone();
+    let mut style = (*ctx.style_of(egui::Theme::Light)).clone();
     style.spacing.item_spacing = Vec2::new(8.0, 6.0);
-    style.spacing.button_padding = Vec2::new(14.0, 8.0);
+    style.spacing.button_padding = Vec2::new(9.0, 5.0);
     style
         .text_styles
         .insert(egui::TextStyle::Body, FontId::proportional(14.0));
@@ -3367,7 +3545,7 @@ fn configure_ui(ctx: &egui::Context, requested_font: Option<Vec<u8>>) -> bool {
     style
         .text_styles
         .insert(egui::TextStyle::Small, FontId::proportional(12.0));
-    ctx.set_style(style);
+    ctx.set_style_of(egui::Theme::Light, style);
     cjk_font
 }
 
@@ -3396,10 +3574,12 @@ fn configure_visuals(ctx: &egui::Context, high_contrast: bool) {
     visuals.widgets.hovered.weak_bg_fill = SOFT;
     visuals.widgets.hovered.bg_stroke = Stroke::new(stroke, edge);
     if high_contrast {
-        visuals.widgets.active.bg_stroke = Stroke::new(stroke, edge);
         visuals.widgets.noninteractive.bg_stroke = Stroke::new(stroke, border);
     }
-    ctx.set_visuals(visuals);
+    visuals.widgets.active.bg_fill = SOFT;
+    visuals.widgets.active.weak_bg_fill = SOFT;
+    visuals.widgets.active.bg_stroke = Stroke::new(stroke, edge);
+    ctx.set_visuals_of(egui::Theme::Light, visuals);
 }
 fn primary(text: &str) -> egui::Button<'_> {
     egui::Button::new(RichText::new(text).color(Color32::WHITE))
@@ -3456,6 +3636,58 @@ fn size_label(size: u64) -> String {
         format!("{:.1} GB", size as f64 / (1024.0 * 1024.0 * 1024.0))
     }
 }
+// 为列表和表头使用相同的列基准，避免放大或缩放时文字错位。
+fn result_columns(rect: egui::Rect) -> [f32; 6] {
+    let right = rect.right();
+    let flexible = rect.width() - 227.0;
+    [
+        rect.left() + 9.0,
+        rect.left() + flexible * 0.57,
+        right - 227.0,
+        right - 177.0,
+        right - 111.0,
+        right,
+    ]
+}
+
+fn paint_result_cell(ui: &egui::Ui, rect: egui::Rect, left: f32, right: f32, y: f32, value: &str) {
+    let clip = egui::Rect::from_x_y_ranges(left..=(right - 4.0).max(left), rect.y_range());
+    let painter = ui.painter().with_clip_rect(clip.intersect(ui.clip_rect()));
+    let mut job = egui::text::LayoutJob::simple_singleline(
+        value.to_owned(),
+        FontId::proportional(12.0),
+        MUTED,
+    );
+    job.wrap.max_width = clip.width();
+    job.wrap.max_rows = 1;
+    job.wrap.break_anywhere = true;
+    let galley = painter.layout_job(job);
+    painter.galley(egui::pos2(left, y - galley.size().y / 2.0), galley, MUTED);
+}
+
+fn file_kind(hit: &xs_core::SearchHit) -> String {
+    if hit.is_dir {
+        return "文件夹".into();
+    }
+    Path::new(&hit.name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .filter(|ext| !ext.is_empty())
+        .map_or_else(|| "文件".into(), str::to_uppercase)
+}
+
+fn modified_label(seconds: i64) -> String {
+    chrono::DateTime::from_timestamp(seconds, 0).map_or_else(
+        || "—".into(),
+        |stamp| {
+            stamp
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M")
+                .to_string()
+        },
+    )
+}
+
 fn result_actions(ui: &mut egui::Ui, hit: &xs_core::SearchHit, menu: bool) -> Option<ResultAction> {
     let local = hit.source == "local";
     let mut action = None;
@@ -3799,9 +4031,20 @@ fn run_renderer(mut args: Args) -> Result<()> {
         });
     let (title, size, minimum) = view_geometry(args.view);
     let quick = args.view == View::Quick;
+    let icon = image::load_from_memory(include_bytes!("../../../assets/xunshu.png"))
+        .context("无法读取内置寻枢图标")?
+        .into_rgba8();
+    let (width, height) = icon.dimensions();
+    let color_icon =
+        egui::ColorImage::from_rgba_unmultiplied([width as usize, height as usize], icon.as_raw());
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(title)
+            .with_icon(egui::IconData {
+                rgba: icon.into_raw(),
+                width,
+                height,
+            })
             .with_inner_size(size)
             .with_min_inner_size(minimum)
             .with_decorations(!quick)
@@ -3827,7 +4070,7 @@ fn run_renderer(mut args: Args) -> Result<()> {
                     eprintln!("未能启用最小化到通知区域，继续使用系统最小化");
                 }
             }
-            Ok(Box::new(App::new(cc, args, queries, font)))
+            Ok(Box::new(App::new(cc, args, queries, font, color_icon)))
         }),
     )
     .map_err(|e| anyhow::anyhow!("无法显示寻枢原生窗口：{e}"))

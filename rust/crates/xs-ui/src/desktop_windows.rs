@@ -209,16 +209,16 @@ struct Tray {
 
 impl Tray {
     fn new(window: HWND) -> Self {
-        const FILE: &[u8] = include_bytes!("../../../assets/xunshu.ico");
-        const IMAGE_OFFSET: usize = 22; // ICONDIR 和一个 ICONDIRENTRY。
+        // 通知区域使用小尺寸 PNG，独立于包含多个分辨率的快捷方式 ICO。
+        const FILE: &[u8; include_bytes!("../../../assets/xunshu-tray.png").len()] =
+            include_bytes!("../../../assets/xunshu-tray.png");
         #[repr(align(4))]
-        struct IconImage([u8; FILE.len() - IMAGE_OFFSET]);
-        let mut image = IconImage([0; FILE.len() - IMAGE_OFFSET]);
-        image.0.copy_from_slice(&FILE[IMAGE_OFFSET..]);
+        struct IconImage([u8; FILE.len()]);
+        static IMAGE: IconImage = IconImage(*FILE);
         let icon = unsafe {
             CreateIconFromResourceEx(
-                image.0.as_ptr(),
-                image.0.len() as u32,
+                IMAGE.0.as_ptr(),
+                IMAGE.0.len() as u32,
                 1,
                 0x0003_0000,
                 GetSystemMetrics(SM_CXSMICON),
@@ -1261,6 +1261,12 @@ pub(crate) fn jump_active_file_dialog(target_dir: &Path) -> Result<bool> {
 mod tests {
     use super::*;
     use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+
+    #[test]
+    fn tray_brand_png_loads_as_native_icon() {
+        let tray = Tray::new(std::ptr::null_mut());
+        assert!(!tray.icon.is_null(), "内置托盘图标未被 Windows 解码");
+    }
 
     #[test]
     fn login_arguments_quote_spaces_quotes_and_trailing_slashes() {

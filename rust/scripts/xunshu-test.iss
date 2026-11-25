@@ -19,6 +19,7 @@ SetupLogging=yes
 UninstallLogging=yes
 OutputBaseFilename=Xunshu-Windows-x64-Setup-Test
 OutputDir={#StageDir}
+SetupIconFile={#StageDir}\manager\xunshu.ico
 UninstallDisplayIcon={app}\xunshu.ico
 InfoBeforeFile={#StageDir}\README.txt
 

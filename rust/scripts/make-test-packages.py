@@ -14,7 +14,7 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -97,6 +97,7 @@ def portable_pack(stage, payload, manager, output):
     if abi.is_file():
         shutil.copy2(abi, root / abi.name)
     if output.suffix == '.zip':
+        shutil.copy2(manager.with_name('xunshu.ico'), root / 'xunshu.ico')
         with zipfile.ZipFile(output, 'x', zipfile.ZIP_DEFLATED, compresslevel=3) as archive:
             for path in sorted(root.rglob('*')):
                 if path.is_file():
@@ -166,12 +167,8 @@ StartupNotify=true
 ''')
     icons = share / 'icons/hicolor/64x64/apps'
     icons.mkdir(parents=True)
-    icon = Image.new('RGBA', (64, 64))
-    draw = ImageDraw.Draw(icon)
-    draw.rounded_rectangle((0, 0, 63, 63), radius=14, fill='#173556')
-    draw.ellipse((14, 13, 43, 42), outline='#f4f8ff', width=5)
-    draw.line((38, 38, 50, 51), fill='#f4f8ff', width=6)
-    icon.save(icons / 'xunshu-test.png')
+    with Image.open(WORKSPACE / 'assets/xunshu.png') as icon:
+        icon.resize((64, 64), Image.Resampling.LANCZOS).save(icons / 'xunshu-test.png')
 
     control = package / 'DEBIAN'
     control.mkdir()
