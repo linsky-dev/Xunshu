@@ -189,7 +189,7 @@ def main():
     parser.add_argument("--temp-root", type=Path, required=True)
     args = parser.parse_args()
     if os.name == "nt":
-        verify_windows_launcher(args.installer)
+        verify_windows_launcher(args.installer.with_name("xs-launch.exe"))
     with tempfile.TemporaryDirectory(prefix="xunshu-negative-install-", dir=args.temp_root.resolve()) as directory:
         verify(args.installer.resolve(), Path(directory))
 

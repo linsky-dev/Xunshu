@@ -114,6 +114,9 @@ def portable_pack(stage, payload, manager, output):
 
 def windows_pack(args, stage, manager, info, output, digest):
     managers = manager.parent
+    launcher = managers / 'xs-launch.exe'
+    copy_verified(args.bin_dir / launcher.name, launcher, digest)
+    runpy.run_path(str(SCRIPTS / 'make-install-payload.py'))['verify_native_header'](launcher, 'windows')
     copy_verified(WORKSPACE / 'assets/xunshu.ico', managers / 'xunshu.ico', digest)
     # 同一套应用本地运行库也支撑安装管理程序本身的 CRT 或 MinGW 导入。
     for path in args.runtime_dll:

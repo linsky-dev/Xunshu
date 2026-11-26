@@ -1,5 +1,3 @@
-#![cfg_attr(windows, windows_subsystem = "windows")]
-
 //! 安装激活与回退都使用经过摘要校验及真实推理自检的独立版本目录。
 use anyhow::{ensure, Context, Result};
 use clap::{Parser, Subcommand};
@@ -988,12 +986,6 @@ fn run(args: Args) -> Result<()> {
 }
 
 fn main() {
-    #[cfg(windows)]
-    unsafe {
-        use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
-        // 保留命令行入口的输出，桌面双击时没有父控制台可附加。
-        AttachConsole(ATTACH_PARENT_PROCESS);
-    }
     let args = Args::parse();
     #[cfg(windows)]
     let interactive = matches!(

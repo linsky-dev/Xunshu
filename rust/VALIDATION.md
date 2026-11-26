@@ -2,7 +2,7 @@
 
 ## Windows 安装后启动
 
-桌面和开始菜单快捷方式使用无控制台的安装管理器。启动前仍检查活动版本、载荷摘要和有效离线规则。失败时桌面入口给出明确错误，命令行继续提供退出码和重定向输出。启动器和桌面宿主也分别报告进程加载阶段的 Windows 退出码。
+桌面和开始菜单快捷方式使用无控制台的启动器，由它调用原有的命令行安装管理程序。启动前仍检查活动版本、载荷摘要和有效离线规则。失败时桌面入口给出明确错误，命令行继续提供退出码和重定向输出。启动器和桌面宿主也分别报告进程加载阶段的 Windows 退出码。
 
 Windows 启动回归检查启动器 PE 子系统、无效安装的错误输出和正常安装的原生工作台。GitHub 托管 Windows x64 runner 使用 Windows Server。Windows 10 客户端验收须使用 Windows 10 x64 机器或配置相同系统的自托管 runner，并记录实际系统版本。[GitHub 托管 runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) · [自托管 runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)
 
