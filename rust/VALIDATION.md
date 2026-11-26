@@ -1,12 +1,22 @@
 # 寻枢 Rust 历史验证与当前版本差异
 
+## UOS ARM64 EGL 启动修复
+
+2026-11-26，`0.18.0-alpha.8`。用户提供的 UOS 20 ARM64 回溯显示旧 GLVND 在 `glXGetProcAddress` 中触发信号 11。上游 eframe 的 X11 启动先尝试 GLX。Linux ARM64 已改用 EGL，同时保留 X11 与 Wayland 窗口支持。修复进入正式的 `xs-ui` 二进制，安装器与桌面快捷方式照常调用该程序。
+
+GitHub Actions 使用原生 Ubuntu ARM64 runner，在关闭 GLX 扩展的 X11 上绘制窗口。动态加载记录显示载入 `libEGL.so.1`，没有加载 GLX。Windows 和 Linux x64 分别走自己的回归项目。[GitHub Actions 运行记录](https://github.com/linsky-dev/Xunshu/actions/runs/45786149884)
+
+本机 QEMU Debian 12 ARM64 使用同一 X11 环境对比，旧包会加载 `libGLX.so.0`，新 DEB 从 `0.18.0~alpha.7-1` 升级到 `0.18.0~alpha.8-1` 后通过 EGL、中文文件名和正文检索、桌面快捷方式、托盘恢复和退出。两个 DEB 继续通过 GLIBC 2.28 审计。Windows 11 Build 26200 本机完成升级、桌面快捷方式启动、托盘及普通权限防火墙校验。
+
+本机还通过官方 UOS Desktop 20 Professional 1070 ARM64 镜像进入 DDE/X11，会话内安装同一 DEB。使用 GLVND `1.1.0.3-deepin1`、Mesa `19.2.6.11-1` 和 glibc 2.28，确认原生窗口绘制、EGL 已加载且 GLX 未加载，并在隔离的本地 ext4 上通过中文文件名和正文检索。Live 会话的 OverlayFS 受产品本地路径规则约束，检索验证将应用与合成数据放在单独的 ext4 上。虚拟机通过软件图形运行，用户报错机器上的 Radeon RX 550 和厂商签名环境仍待实机复验。[当前候选安装包](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126-r3)
+
 ## 普通权限启动与 UOS 桌面集成
 
 2026-11-26 第二轮候选。Windows 10 用户报告安装后从桌面启动时，`Get-NetFirewallRule -PolicyStore ActiveStore` 返回系统错误 5。桌面启动改由 Windows 防火墙 COM 接口只读校验，各应用的出站阻断继续生效。高权限安装、回退及补偿仍使用 ActiveStore。启动器以 UTF-8 读取校验错误。
 
 最终 Windows 安装包源码为 `5cd2326`。在 Windows 11 专业版 Build 26200 实测安装升级、现有配置保留、桌面入口原生窗口及托盘，隔离配置的窗口首次显示约 1.8 秒。使用非管理员 LocalService 运行安装包中的启动策略校验，规则完整时返回 0，缺失规则测试返回 1。Windows 10 目标机仍待验证。[Microsoft 防火墙接口](https://learn.microsoft.com/en-us/windows/win32/api/netfw/nn-netfw-inetfwpolicy2)
 
-UOS amd64 与 ARM64 安装包源码为 `a11e918`。安装包通过 GLIBC 2.28 兼容性检查，携带应用菜单、桌面快捷方式、托盘图标和登录补建入口。安装钩子以当前图形会话用户创建快捷方式，离线安装时在下一次图形登录补建。同名自建快捷方式保留。面板提供 StatusNotifierItem 托盘后，用户可以收起窗口、重新打开和从托盘退出。Debian amd64（WSL）与 Debian 12 ARM64（QEMU）使用 X11 和模拟托盘验证快捷方式、图标、最小化、恢复、单实例和退出。目标统信系统的 DDE 展示及签名环境仍待验证。[当前候选安装包](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126-r2)
+UOS amd64 与 ARM64 安装包源码为 `a11e918`。安装包通过 GLIBC 2.28 兼容性检查，携带应用菜单、桌面快捷方式、托盘图标和登录补建入口。安装钩子以当前图形会话用户创建快捷方式，离线安装时在下一次图形登录补建。同名自建快捷方式保留。面板提供 StatusNotifierItem 托盘后，用户可以收起窗口、重新打开和从托盘退出。Debian amd64（WSL）与 Debian 12 ARM64（QEMU）使用 X11 和模拟托盘验证快捷方式、图标、最小化、恢复、单实例和退出。目标统信系统的 DDE 展示及签名环境仍待验证。
 
 ## UOS ARM64 候选包
 

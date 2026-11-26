@@ -8,11 +8,11 @@
 
 | 平台 | 下载 |
 | --- | --- |
-| Windows x64 | [安装包，含普通用户启动修复](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r2/Xunshu-Windows-x64-Setup-Test.exe) |
-| 统信 UOS amd64（Intel／AMD 64 位） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r2/Xunshu-UOS-amd64-Test.deb) |
-| 统信 UOS ARM64（aarch64） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r2/Xunshu-UOS-arm64-Test.deb) |
+| Windows x64 | [安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r3/Xunshu-Windows-x64-Setup-Test.exe) |
+| 统信 UOS amd64（Intel／AMD 64 位） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r3/Xunshu-UOS-amd64-Test.deb) |
+| 统信 UOS ARM64（aarch64） | [DEB 安装包，含 EGL 启动修复](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r3/Xunshu-UOS-arm64-Test.deb) |
 
-以上均为 Alpha8 测试候选，各平台的验收状态见下文。[发布说明](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126-r2) · [SHA-256 校验文件](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r2/SHA256SUMS) · [平台验收](rust/VALIDATION.md)
+以上均为 Alpha8 测试候选，各平台的验收状态见下文。[发布说明](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126-r3) · [SHA-256 校验文件](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126-r3/SHA256SUMS) · [平台验收](rust/VALIDATION.md)
 
 ![寻枢的文件名搜索工作台。图中为合成示例，左侧是已收录目录，中间是结果表，右侧是选中文件的详情与操作。](docs/assets/xunshu-search-workspace.png)
 
@@ -68,7 +68,7 @@
 
 ## 当前版本与验证状态
 
-当前版本为 **`0.18.0-alpha.7`（Alpha8 第二轮安装候选，2026 年 11 月 26 日）**。Windows 修复普通用户启动时的防火墙读取错误，在 Windows 11 验证了安装升级、普通权限规则读取、桌面启动和托盘。Windows 10 客户端仍待实机确认。两个 UOS 安装包内置统一的应用菜单、桌面和托盘图标，并通过 GLIBC 2.28 检查和同架构 Debian 桌面回归。UOS Desktop 20 1070 amd64 上一次原生测试因系统验签相关问题退出，两个架构在统信 DDE 和厂商签名环境仍待验收。[平台验收记录](rust/VALIDATION.md)
+当前版本为 **`0.18.0-alpha.8`（2026 年 11 月 26 日）**。UOS ARM64 桌面端使用 EGL，避开旧版 GLVND 在 GLX 初始化时的崩溃。Windows 11 已复验安装升级、普通权限校验、桌面启动和托盘。两个 UOS 安装包均通过 GLIBC 2.28 检查。各平台的虚拟机、真实硬件和签名验证范围见验收记录。[平台验收记录](rust/VALIDATION.md)
 
 [当前验证记录](rust/VALIDATION.md) · [双平台验收路径](rust/docs/PLATFORM_ACCEPTANCE.md) · [历史 alpha.7 验收数据](checkpoints/alpha7/QA_Evidence.json)
 
