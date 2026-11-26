@@ -31,6 +31,15 @@ class AbiContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             abi.parse(HEADER, "No version information found", DYNAMIC, PROGRAM)
 
+    def test_arm64_checks_machine_and_interpreter(self):
+        header = HEADER.replace("Advanced Micro Devices X86-64", "AArch64")
+        program = PROGRAM.replace("/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1")
+        result = abi.parse(header, VERSIONS, DYNAMIC, program, "2.34", "arm64")
+        self.assertEqual(result["architecture"], "arm64")
+        self.assertEqual(result["ceiling_status"], "PASS")
+        with self.assertRaises(ValueError):
+            abi.parse(header, VERSIONS, DYNAMIC, PROGRAM, "2.34", "arm64")
+
     def test_ignore_exported_versions(self):
         export = "Version definition section:\n Name: GLIBC_9.99 Flags: none Version: 1\n"
         self.assertEqual(abi.parse(HEADER, export + VERSIONS, DYNAMIC, PROGRAM)["max_strong_glibc"], "2.34")

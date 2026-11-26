@@ -117,6 +117,12 @@ class PayloadContracts(unittest.TestCase):
         path.write_bytes(header)
         with self.assertRaises(ValueError):
             payload.verify_native_header(path, "linux")
+        payload.verify_native_header(path, "linux", architecture="arm64")
+        struct.pack_into("<H", header, 16, 3)
+        path.write_bytes(header)
+        payload.verify_native_header(path, "linux", library=True, architecture="arm64")
+        with self.assertRaises(ValueError):
+            payload.verify_native_header(path, "linux", library=True)
         path.write_bytes(b"\x7fELF")
         with self.assertRaises(ValueError):
             payload.verify_native_header(path, "linux")

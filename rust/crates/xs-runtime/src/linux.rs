@@ -1,9 +1,14 @@
 use std::{io, mem::size_of, os::fd::RawFd, sync::OnceLock};
 
-const AUDIT_ARCH_X86_64: u32 = 0xc000_003e;
+#[cfg(target_arch = "x86_64")]
+const AUDIT_ARCH: u32 = 0xc000_003e;
+#[cfg(target_arch = "aarch64")]
+const AUDIT_ARCH: u32 = 0xc000_00b7;
+#[cfg(target_arch = "x86_64")]
 const X32_SYSCALL_BIT: u32 = 0x4000_0000;
 const LOAD_WORD: u16 = 0x20;
 const EQUAL: u16 = 0x15;
+#[cfg(target_arch = "x86_64")]
 const BIT_SET: u16 = 0x45;
 const RETURN: u16 = 0x06;
 const DENY: u32 = libc::SECCOMP_RET_ERRNO | libc::EPERM as u32;
@@ -63,13 +68,16 @@ pub(crate) fn enforce() -> io::Result<()> {
 
 fn install() -> io::Result<()> {
     ensure_local_descriptors()?;
-    // seccomp_data: nr@0、arch@4、args[0]@16。x86_64 为小端，套接字族为 int。
+    // seccomp_data: nr@0、arch@4、args[0]@16。两种目标架构均为小端，套接字族为 int。
     let mut filters = [
         op(LOAD_WORD, 4),
-        jump(EQUAL, AUDIT_ARCH_X86_64, 1, 0),
+        jump(EQUAL, AUDIT_ARCH, 1, 0),
         op(RETURN, DENY),
         op(LOAD_WORD, 0),
+        // x32 与 x86_64 共用审计架构。
+        #[cfg(target_arch = "x86_64")]
         jump(BIT_SET, X32_SYSCALL_BIT, 0, 1),
+        #[cfg(target_arch = "x86_64")]
         op(RETURN, DENY),
         // io_uring 可以间接创建套接字，避免绕过系统调用过滤。
         jump(EQUAL, libc::SYS_io_uring_setup as u32, 0, 1),

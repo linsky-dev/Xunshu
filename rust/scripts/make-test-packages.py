@@ -50,7 +50,7 @@ def metadata(args, stage, payload, digest):
             copy_verified(source, destination, digest)
 
     info = {'status': 'internal_test_candidate', 'signed': False, 'platform': args.platform,
-            'version': args.version, 'source_commit': args.source_commit,
+            'version': args.version, 'source_commit': args.source_commit, 'architecture': args.architecture,
             'cargo_lock_sha256': digest(WORKSPACE / 'Cargo.lock'),
             'payload_manifest_sha256': digest(payload / 'release.json')}
     if args.platform == 'linux':
@@ -59,8 +59,8 @@ def metadata(args, stage, payload, digest):
     purpose = (
         'Windows 10/11 x64 实机测试候选版。\n'
         if args.platform == 'windows' else (
-            '统信 UOS V20 1070 amd64 实机测试候选版。\n' if args.linux_kind == 'uos' else
-            '通用 Linux amd64 测试候选版，尚未取得统信 UOS 实机结论。\n'))
+            f'统信 UOS V20 {args.architecture} 测试候选版。\n' if args.linux_kind == 'uos' else
+            f'通用 Linux {args.architecture} 测试候选版，尚未取得统信 UOS 实机结论。\n'))
     steps = (
         '安装包：运行 Setup-Test.exe，选择本机安装目录。管理员权限用于配置应用程序的离线防火墙规则。\n'
         '升级或修复：关闭寻枢后再次运行安装器，使用原安装目录。\n'
@@ -130,7 +130,7 @@ def windows_pack(args, stage, manager, info, output, digest):
 def linux_pack(args, stage, payload, manager, output):
     audit = runpy.run_path(str(SCRIPTS / 'audit-linux-abi.py'))['inspect']
     binaries = [payload / name for name in PROGRAMS[:-1]]
-    audited = [audit(path, args.max_glibc) for path in
+    audited = [audit(path, args.max_glibc, args.architecture) for path in
                (*binaries, manager, payload / 'resources/libonnxruntime.so')]
     over = [entry for entry in audited if entry['ceiling_status'] == 'FAIL']
     if over:
@@ -182,7 +182,7 @@ StartupNotify=true
     installed_kib = sum(path.stat().st_size for path in package.rglob('*') if path.is_file())
     write(control / 'control', f'''Package: xunshu-test
 Version: {version}
-Architecture: amd64
+Architecture: {args.architecture}
 Section: utils
 Priority: optional
 Maintainer: Xunshu contributors
@@ -233,7 +233,7 @@ def package(args):
     suffix = '.exe' if args.platform == 'windows' else ''
     manager_name = PROGRAMS[-1] + suffix
     package_label = 'Windows-x64' if args.platform == 'windows' else (
-        'UOS-amd64' if args.linux_kind == 'uos' else 'Linux-amd64')
+        f'UOS-{args.architecture}' if args.linux_kind == 'uos' else f'Linux-{args.architecture}')
     names = ([f'Xunshu-{package_label}-Setup-Test.exe', f'Xunshu-{package_label}-Portable-Test.zip']
              if args.platform == 'windows' else
              [f'Xunshu-{package_label}-Test.deb', f'Xunshu-{package_label}-Portable-Test.tar.gz'])
@@ -244,12 +244,12 @@ def package(args):
         stage = Path(temporary)
         payload = stage / 'payload'
         payload_api['prepare'](args.bin_dir, args.resources, args.font, args.font_license,
-                               payload, args.platform, args.version, args.runtime_dll)
+                               payload, args.platform, args.version, args.runtime_dll, args.architecture)
         managers = stage / 'manager'
         managers.mkdir()
         manager = managers / manager_name
         copy_verified(args.bin_dir / manager_name, manager, digest)
-        payload_api['verify_native_header'](manager, args.platform)
+        payload_api['verify_native_header'](manager, args.platform, architecture=args.architecture)
         info = metadata(args, stage, payload, digest)
         first, second = (stage / name for name in names)
         if args.platform == 'windows':
@@ -269,6 +269,7 @@ def main():
     parser.add_argument('--inno-compiler', type=Path, help='Windows 打包时使用 Inno Setup 6.7+ 的 ISCC.exe')
     parser.add_argument('--runtime-dll', type=Path, action='append', default=[])
     parser.add_argument('--runtime-notice', type=Path, action='append', default=[])
+    parser.add_argument('--architecture', choices=('amd64', 'arm64'), default='amd64')
     parser.add_argument('--linux-kind', choices=('generic', 'uos'), default='generic')
     parser.add_argument('--max-glibc', help='已核验目标系统提供的 GLIBC 最高版本')
     parser.add_argument('--work-dir', type=Path, help='大文件暂存父目录；WSL 下为 DEB 打包指定 Linux 文件系统')
@@ -279,12 +280,12 @@ def main():
     args.dist = args.dist.resolve()
     if args.platform == 'windows':
         valid = args.inno_compiler and args.runtime_notice and WINDOWS_CRT <= {path.name.lower() for path in args.runtime_dll}
-        if os.name != 'nt' or not valid or args.linux_kind != 'generic' or args.max_glibc:
+        if os.name != 'nt' or not valid or args.architecture != 'amd64' or args.linux_kind != 'generic' or args.max_glibc:
             parser.error('Windows 打包需要 Windows、Inno 编译器、ONNX 所需 x64 CRT DLL 和许可证')
     elif sys.platform != 'linux' or args.inno_compiler or args.runtime_dll:
         parser.error('Linux 打包需要 Linux 及其原生打包工具')
     elif args.linux_kind == 'uos' and args.max_glibc != '2.28':
-        parser.error('UOS V20 1070 amd64 候选包须以实测 GLIBC 2.28 作为审核上限')
+        parser.error('UOS V20 候选包须以 GLIBC 2.28 作为审核上限')
     package(args)
 
 

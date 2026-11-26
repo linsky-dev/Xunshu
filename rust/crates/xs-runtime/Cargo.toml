@@ -4,5 +4,5 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
-[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+[target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))'.dependencies]
 libc = "0.2"

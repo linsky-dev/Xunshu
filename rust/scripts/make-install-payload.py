@@ -43,8 +43,8 @@ def verify_font_object(path, role):
         raise ValueError(f"字体来源 Git 对象摘要不匹配：{path.name}")
 
 
-def verify_native_header(path, platform, library=False):
-    """Reject mistaken platform/architecture before assembling x64 payloads.
+def verify_native_header(path, platform, library=False, architecture="amd64"):
+    """Reject mistaken platform/architecture before assembling native payloads.
 
     Header checks are not code signing, loading or native execution tests.
     """
@@ -59,12 +59,12 @@ def verify_native_header(path, platform, library=False):
             if header[:7] != b"\x7fELF\x02\x01\x01":
                 invalid()
             kind, machine, version = struct.unpack_from("<HHI", header, 16)
-            if machine != 62 or version != 1 or kind not in ((3,) if library else (2, 3)):
+            if machine != {"amd64": 62, "arm64": 183}.get(architecture) or version != 1 or kind not in ((3,) if library else (2, 3)):
                 invalid()
             if struct.unpack_from("<H", header, 52)[0] != 64:
                 invalid()
         elif platform == "windows":
-            if header[:2] != b"MZ":
+            if architecture != "amd64" or header[:2] != b"MZ":
                 invalid()
             offset = struct.unpack_from("<I", header, 60)[0]
             if not 64 <= offset <= 1024 * 1024:
@@ -154,7 +154,7 @@ def copy_runtime(output, platform, libraries):
         used.add(name)
 
 
-def assemble(binaries, resources, font, font_license, output, platform, version, expected_hashes, libraries=()):
+def assemble(binaries, resources, font, font_license, output, platform, version, expected_hashes, libraries=(), architecture="amd64"):
     suffix = ".exe" if platform == "windows" else ""
     names = [name + suffix for name in ("xunshu", "xs-ui", "xs-content-worker", "xs-model-worker")]
     expected = [binaries / name for name in names] + [resources / "inference.json", font, font_license]
@@ -165,12 +165,12 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
     output.mkdir(parents=True, exist_ok=False)
     for name in names:
         source = binaries / name
-        verify_native_header(source, platform)
+        verify_native_header(source, platform, architecture=architecture)
         before = digest(source)
         shutil.copy2(source, output / name)
         if digest(output / name) != before:
             raise ValueError(f"程序在复制期间发生变化：{name}")
-        verify_native_header(output / name, platform)
+        verify_native_header(output / name, platform, architecture=architecture)
     copy_runtime(output, platform, libraries)
     resource_copy = output / "resources"
     resource_copy.mkdir()
@@ -180,7 +180,8 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
         shutil.copyfile(path, resource_copy / path.name)
     if validate_resources(resource_copy, platform) != expected_hashes:
         raise ValueError("模型资源在复制期间发生变化")
-    verify_native_header(resource_copy / ("onnxruntime.dll" if platform == "windows" else "libonnxruntime.so"), platform, library=True)
+    verify_native_header(resource_copy / ("onnxruntime.dll" if platform == "windows" else "libonnxruntime.so"),
+                         platform, library=True, architecture=architecture)
     fonts = resource_copy / "fonts"
     fonts.mkdir()
     shutil.copyfile(font, fonts / "NotoSansSC-Regular.otf")
@@ -211,14 +212,14 @@ def assemble(binaries, resources, font, font_license, output, platform, version,
 
 
 
-def prepare(binaries, resources, font, font_license, output, platform, version, libraries=()):
+def prepare(binaries, resources, font, font_license, output, platform, version, libraries=(), architecture="amd64"):
     if output.exists() or output.is_symlink():
         raise FileExistsError("载荷输出目录必须是新的")
     expected_hashes = validate_resources(resources, platform)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".xunshu-payload-", dir=output.parent) as tmp:
         staged = Path(tmp) / "payload"
-        sha, count = assemble(binaries, resources, font, font_license, staged, platform, version, expected_hashes, libraries)
+        sha, count = assemble(binaries, resources, font, font_license, staged, platform, version, expected_hashes, libraries, architecture)
         if output.exists() or output.is_symlink():
             raise FileExistsError("载荷输出目录已存在")
         staged.rename(output)
@@ -230,9 +231,10 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--platform", choices=("windows", "linux"), required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--architecture", choices=("amd64", "arm64"), default="amd64")
     parser.add_argument("--runtime-dll", type=Path, action="append", default=[])
     args = parser.parse_args()
-    prepare(args.binaries, args.resources, args.font, args.font_license, args.output, args.platform, args.version, args.runtime_dll)
+    prepare(args.binaries, args.resources, args.font, args.font_license, args.output, args.platform, args.version, args.runtime_dll, args.architecture)
 
 
 if __name__ == "__main__":

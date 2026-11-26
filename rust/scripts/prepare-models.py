@@ -57,6 +57,10 @@ ORT_ARCHIVES = {
 }
 # 微软官方 PyPI 发布提供同版本的 CPU 动态库。仅提取原生库及许可证。
 ORT_WHEELS = {
+    "linux-arm64": (
+        "https://files.pythonhosted.org/packages/aa/60/c4d1c8043eb42f8a9aa9e931c8c293d289c48ff463267130eca97d13357f/onnxruntime-1.24.4-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+        "1a5c5a544b22f90859c88617ecb30e161ee3349fcc73878854f43d77f00558b5",
+    ),
     "windows": (
         "https://files.pythonhosted.org/packages/8b/f4/6b89e297b93704345f0f3f8c62229bee323ef25682a3f9b4f89a39324950/onnxruntime-1.24.4-cp312-cp312-win_amd64.whl",
         "535b29475ca42b593c45fbb2152fbf1cdf3f287315bf650e6a724a0a1d065cdb",
@@ -248,18 +252,24 @@ def prepare_ocr(cache, work, name, upstream):
 
 
 def add_runtime(cache, work, output, platform):
-    archive, expected, source_name, local_name = ORT_ARCHIVES[platform]
-    url = f"{ORT_RELEASE}/{archive}"
-    from_wheel = False
-    try:
-        cached = fetch(url, cache / archive, expected)
-    except urllib.error.HTTPError as error:
-        if error.code not in (404, 410):
-            raise
+    from_wheel = platform == "linux-arm64"
+    if from_wheel:
+        source_name, local_name = "libonnxruntime.so.1.24.4", "libonnxruntime.so"
         url, expected = ORT_WHEELS[platform]
         archive = url.rsplit("/", 1)[1]
         cached = fetch(url, cache / archive, expected)
-        from_wheel = True
+    else:
+        archive, expected, source_name, local_name = ORT_ARCHIVES[platform]
+        url = f"{ORT_RELEASE}/{archive}"
+        try:
+            cached = fetch(url, cache / archive, expected)
+        except urllib.error.HTTPError as error:
+            if error.code not in (404, 410):
+                raise
+            url, expected = ORT_WHEELS[platform]
+            archive = url.rsplit("/", 1)[1]
+            cached = fetch(url, cache / archive, expected)
+            from_wheel = True
     path = work / archive
     checked_copy(cached, path, expected)
     license_names = {"LICENSE", "ThirdPartyNotices.txt"}
@@ -347,7 +357,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--platform", choices=ORT_ARCHIVES, required=True)
+    parser.add_argument("--platform", choices=ORT_WHEELS, required=True)
     args = parser.parse_args()
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"

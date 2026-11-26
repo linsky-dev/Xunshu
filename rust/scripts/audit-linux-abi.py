@@ -25,10 +25,11 @@ def numeric(tag):
     return parts
 
 
-def parse(header, versions, dynamic, program, max_glibc=None):
+def parse(header, versions, dynamic, program, max_glibc=None, architecture="amd64"):
+    machine = {"amd64": "Advanced Micro Devices X86-64", "arm64": "AArch64"}[architecture]
     if not re.search(r"^\s*Class:\s+ELF64\s*$", header, re.M) or not re.search(
-            r"^\s*Machine:\s+Advanced Micro Devices X86-64\s*$", header, re.M):
-        raise ValueError("Not an x86_64 ELF64 object")
+            rf"^\s*Machine:\s+{re.escape(machine)}\s*$", header, re.M):
+        raise ValueError(f"Not an {architecture} ELF64 object")
     if not re.search(r"^\s*Data:\s+.*little endian\s*$", header, re.M):
         raise ValueError("Not a little-endian ELF object")
     if not re.search(r"^\s*Type:\s+(?:DYN|EXEC)\b", header, re.M):
@@ -37,6 +38,8 @@ def parse(header, versions, dynamic, program, max_glibc=None):
     interpreters = INTERP.findall(program)
     if len(interpreters) > 1:
         raise ValueError("Multiple ELF interpreters")
+    if interpreters and architecture == "arm64" and interpreters[0] != "/lib/ld-linux-aarch64.so.1":
+        raise ValueError("Invalid Linux ARM64 program interpreter")
     # Only dependency version requirements, not versions exported by an ELF.
     need_section = versions.split("Version needs section", 1)
     strong, weak, other = set(), set(), set()
@@ -60,13 +63,13 @@ def parse(header, versions, dynamic, program, max_glibc=None):
         raise ValueError(f"Non-numeric GLIBC ABI requirements: {sorted(other)}")
     maximum = max(strong, key=numeric, default=None)
     exceeds = max_glibc is not None and maximum is not None and numeric(maximum) > numeric(max_glibc)
-    return {"direct_needed": needed, "interpreter": interpreters[0] if interpreters else None,
+    return {"architecture": architecture, "direct_needed": needed, "interpreter": interpreters[0] if interpreters else None,
             "strong_glibc": sorted(strong, key=numeric), "weak_glibc": sorted(weak, key=numeric),
             "max_strong_glibc": maximum, "ceiling": max_glibc,
             "ceiling_status": "NOT_REQUESTED" if max_glibc is None else ("FAIL" if exceeds else "PASS")}
 
 
-def inspect(path, max_glibc):
+def inspect(path, max_glibc, architecture="amd64"):
     if path.is_symlink() or not path.is_file():
         raise ValueError(f"Missing or non-regular object: {path}")
     def readelf(option):
@@ -78,7 +81,7 @@ def inspect(path, max_glibc):
             return hashlib.file_digest(stream, "sha256").hexdigest()
     before = digest()
     result = parse(readelf("--file-header"), readelf("--version-info"),
-                   readelf("--dynamic"), readelf("--program-headers"), max_glibc)
+                   readelf("--dynamic"), readelf("--program-headers"), max_glibc, architecture)
     if digest() != before:
         raise ValueError("Object changed during inspection")
     return {"file": str(path), "sha256": before, **result}
@@ -88,6 +91,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("files", type=Path, nargs="+")
     parser.add_argument("--max-glibc")
+    parser.add_argument("--architecture", choices=("amd64", "arm64"), default="amd64")
     args = parser.parse_args()
     if args.max_glibc is not None:
         try:
@@ -97,7 +101,7 @@ def main():
     results, errors = [], []
     for path in args.files:
         try:
-            results.append(inspect(path, args.max_glibc))
+            results.append(inspect(path, args.max_glibc, args.architecture))
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             errors.append({"file": str(path), "error": str(error)})
     failed = bool(errors) or any(item["ceiling_status"] == "FAIL" for item in results)
