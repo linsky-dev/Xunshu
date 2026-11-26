@@ -4,7 +4,7 @@
 
 2026-11-26 发布的 ARM64 安装包和便携包使用源码 `29345c5`，含同版本的 ARM64 ONNX Runtime 1.24.4、离线 OCR 和语义模型、中文字体、应用菜单和图标。打包器验证 Debian 架构、五个应用程序及推理库的 ELF 架构和 GLIBC 2.28 上限。23 项载荷的字节和摘要在两种包中一致。ARM64 的 Linux 离线约束在虚拟机验证了 TCP 和 UDP 阻断及 Unix IPC 可用，AMD64 离线回归亦通过。
 
-最终安装包在 QEMU 的 Debian 12 ARM64 系统验证了 apt 依赖补装、安装、Xvfb 原生窗口、正文预览、覆盖安装、卸载和合成数据保留。独立模型自检通过。仿真下默认 10 秒的抽取时限曾触发，完整扫描 PDF OCR 和语义索引在 60 秒验收时限内通过，发布程序仍沿用默认时限。UOS ARM64 实机、DDE 与厂商签名仍待验收。[ONNX Runtime 上游发行记录](https://pypi.org/project/onnxruntime/1.24.4/) · [ARM64 测试候选发布](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-uos-arm64-20261126)
+最终安装包在 QEMU 的 Debian 12 ARM64 系统验证了 apt 依赖补装、安装、Xvfb 原生窗口、正文预览、覆盖安装、卸载和合成数据保留。独立模型自检通过。仿真下默认 10 秒的抽取时限曾触发，完整扫描 PDF OCR 和语义索引在 60 秒验收时限内通过，发布程序仍沿用默认时限。UOS ARM64 实机、DDE 与厂商签名仍待验收。[ONNX Runtime 上游发行记录](https://pypi.org/project/onnxruntime/1.24.4/) · [ARM64 测试候选发布](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126)
 
 ## Windows 安装后启动
 

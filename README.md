@@ -4,7 +4,15 @@
 
 寻枢适合经常查找项目资料、办公文档和离线归档的用户。通过原生桌面界面配置收录范围，也可用命令行执行搜索、索引和诊断。索引、查询和可选模型推理都在本机运行，无需云端搜索服务。
 
-[下载 Windows x64 启动修复安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-windows-startup-20261126/Xunshu-Windows-x64-Setup-Test.exe) · [下载 UOS ARM64 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-uos-arm64-20261126/Xunshu-UOS-arm64-Test.deb) · [全部测试候选版](https://github.com/linsky-dev/Xunshu/releases) · [查询语法](rust/crates/xs-query/README.md) · [平台验收](rust/VALIDATION.md) · [从源码构建](#从源码构建)
+## 最新安装包
+
+| 平台 | 下载 |
+| --- | --- |
+| Windows x64 | [安装包，含桌面启动修复](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/Xunshu-Windows-x64-Setup-Test.exe) |
+| 统信 UOS amd64（Intel／AMD 64 位） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/Xunshu-UOS-amd64-Test.deb) |
+| 统信 UOS ARM64（aarch64） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/Xunshu-UOS-arm64-Test.deb) |
+
+以上均为 Alpha8 测试候选。各平台的实机验收状态见下文。[发布说明](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126) · [SHA-256 校验文件](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/SHA256SUMS) · [平台验收](rust/VALIDATION.md)
 
 ![寻枢的文件名搜索工作台。图中为合成示例，左侧是已收录目录，中间是结果表，右侧是选中文件的详情与操作。](docs/assets/xunshu-search-workspace.png)
 
@@ -60,7 +68,7 @@
 
 ## 当前版本与验证状态
 
-当前版本为 **`0.18.0-alpha.7`（Alpha8 内部测试候选，2026 年 11 月 26 日）**。Windows 11 已验证文件类别切换、指定目录补扫、托盘恢复和配置保留。统信 UOS 兼容性测试包以 **UOS Desktop 20 1070 amd64 / GLIBC 2.28** 为目标，已通过 Debian 安装与桌面测试。当前 UOS 1070 虚拟机执行候选程序时退出码为 139，UOS 原生安装、DDE 和 Windows 10 的验收待完成。测试候选包未签名。
+当前版本为 **`0.18.0-alpha.7`（Alpha8 测试候选，2026 年 11 月 26 日）**。Windows 11 已验证新版安装器、桌面快捷方式、托盘及配置保留，Windows 10 客户端仍待实机复验。UOS amd64 和 ARM64 包已通过 GLIBC 2.28 兼容性检查及各自架构的 Debian 安装测试。UOS Desktop 20 1070 amd64 的测试虚拟机启动候选程序时仍退出 139，证据指向系统验签。UOS ARM64 实机及厂商签名仍待验收。
 
 [当前验证记录](rust/VALIDATION.md) · [双平台验收路径](rust/docs/PLATFORM_ACCEPTANCE.md) · [历史 alpha.7 验收数据](checkpoints/alpha7/QA_Evidence.json)
 
