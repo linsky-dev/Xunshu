@@ -6,7 +6,7 @@
 
 Windows 启动回归检查启动器 PE 子系统、无效安装的错误输出和正常安装的原生工作台。GitHub 托管 Windows x64 runner 使用 Windows Server。Windows 10 客户端验收须使用 Windows 10 x64 机器或配置相同系统的自托管 runner，并记录实际系统版本。[GitHub 托管 runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) · [自托管 runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)
 
-2026-11-26 本机 Windows 11 专业版 Build 26200 使用最终安装包完成覆盖升级。桌面快捷方式启动正式安装目录中的原生搜索工作台，隔离配置的首次显示约 10.3 秒。测试故意移除隔离目录里的安装管理程序，启动器显示「寻枢启动失败」，关闭提示后返回退出码 1。原配置保持一致，并保留上一验证版本的回退入口。锁定离线构建、严格 Clippy 和安装管理负向合同通过。Windows 10 目标机的原始闪退仍需复现。[对应源码的 GitHub Actions 回归](https://github.com/linsky-dev/Xunshu/actions/runs/45741217050)
+2026-11-26 本机 Windows 11 专业版 Build 26200 使用最终安装包完成覆盖升级。桌面快捷方式启动正式安装目录中的原生搜索工作台，隔离配置的首次显示约 10.3 秒。测试故意移除隔离目录里的安装管理程序，启动器显示「寻枢启动失败」，关闭提示后返回退出码 1。原配置保持一致，并保留上一验证版本的回退入口。锁定离线构建、严格 Clippy 和安装管理负向合同通过。GitHub Actions 在 Windows Server 2022 上通过 Windows 原生测试、Release 构建、安装器负向测试、恢复测试和监听重启回归。Windows 10 目标机的原始闪退仍需复现。[对应源码的 GitHub Actions 回归](https://github.com/linsky-dev/Xunshu/actions/runs/45741217050)
 
 ## 统一搜索与后台正文收录
 
