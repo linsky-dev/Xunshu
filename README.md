@@ -12,7 +12,7 @@
 | 统信 UOS amd64（Intel／AMD 64 位） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/Xunshu-UOS-amd64-Test.deb) |
 | 统信 UOS ARM64（aarch64） | [DEB 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/Xunshu-UOS-arm64-Test.deb) |
 
-以上均为 Alpha8 测试候选。各平台的实机验收状态见下文。[发布说明](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126) · [SHA-256 校验文件](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/SHA256SUMS) · [平台验收](rust/VALIDATION.md)
+下载需要登录具备本仓库访问权限的 GitHub 账号。以上均为 Alpha8 测试候选，各平台的实机验收状态见下文。[发布说明](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126) · [SHA-256 校验文件](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-installers-20261126/SHA256SUMS) · [平台验收](rust/VALIDATION.md)
 
 ![寻枢的文件名搜索工作台。图中为合成示例，左侧是已收录目录，中间是结果表，右侧是选中文件的详情与操作。](docs/assets/xunshu-search-workspace.png)
 
