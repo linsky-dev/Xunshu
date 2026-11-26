@@ -766,6 +766,11 @@ impl Pane {
     }
 
     pub fn clear_search(&mut self) {
+        if let (Some(request_id), Some(client)) =
+            (self.active.filter(|id| *id == self.id), &self.client)
+        {
+            let _ = client.send(json!({"id":0,"method":"cancel","request_id":request_id}));
+        }
         self.id = self.id.wrapping_add(1).max(2);
         self.pending = None;
         self.keyboard_row = None;
@@ -828,7 +833,7 @@ impl Pane {
                 }
             }
             ui.separator();
-        } else if self.active.is_some() || self.pending.is_some() {
+        } else if self.has_visible_search() {
             ui.label(RichText::new("正在补充正文命中…").small().color(MUTED));
         } else if let Some(error) = &self.error {
             ui.label(RichText::new("正文暂不可用").small().color(MUTED))
@@ -854,6 +859,10 @@ impl Pane {
         );
         xs_content::validate_response(profile, response)?;
         crate::open_path(Path::new(path))
+    }
+
+    pub fn has_visible_search(&self) -> bool {
+        self.hit_count() != 0 || self.pending.is_some() || (self.active == Some(self.id))
     }
 
     pub fn hit_count(&self) -> usize {

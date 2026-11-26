@@ -1183,7 +1183,15 @@ pub struct Coverage {
 }
 
 pub fn coverage(dir: &Path) -> Option<Coverage> {
-    let bytes = xs_platform::read_local_file(&dir.join(CONTENT_COVERAGE), 4096).ok()?;
+    let mut bytes = Vec::new();
+    xs_platform::open_local_read(&dir.join(CONTENT_COVERAGE))
+        .ok()?
+        .take(4097)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() > 4096 {
+        return None;
+    }
     let coverage: Coverage = serde_json::from_slice(&bytes).ok()?;
     let policy = Policy::load(dir).ok()?;
     (coverage.scope_token == policy.token).then_some(coverage)

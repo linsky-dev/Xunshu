@@ -2221,7 +2221,7 @@ impl App {
         if let Some(path) = self.content.combined_results(ui, &self.data_dir, quick) {
             self.open_body_result(&path, ui.ctx());
         }
-        self.content.first_path().is_some()
+        self.content.has_visible_search()
     }
 
     fn open_body_result(&mut self, path: &str, ctx: &egui::Context) {
@@ -2398,6 +2398,9 @@ impl App {
                     edit.request_focus();
                 }
                 changed = edit.changed();
+                if changed {
+                    self.content.clear_search();
+                }
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
                     for filter in Filter::OPTIONS {
