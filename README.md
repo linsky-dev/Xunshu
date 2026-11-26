@@ -8,6 +8,8 @@
 
 ![寻枢的文件名搜索工作台。图中为合成示例，左侧是已收录目录，中间是结果表，右侧是选中文件的详情与操作。](docs/assets/xunshu-search-workspace.png)
 
+![快捷窗以相同关键词显示正文命中，图中为合成验收文档。](docs/assets/xunshu-quick-search.png)
+
 ## 寻枢能做什么
 
 | 使用场景 | 对应能力 |
