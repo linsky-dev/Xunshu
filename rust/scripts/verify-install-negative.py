@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import struct
 import shutil
 import tempfile
 
@@ -167,11 +168,28 @@ def verify(installer, work):
     print(json.dumps({"ok": True, "verified": checked, "scope": "native negative installation contracts only; no valid model or successful install"}, ensure_ascii=False))
 
 
+def verify_windows_launcher(installer):
+    # 快捷方式双击时 Windows 只会给 CUI 可执行文件分配控制台。
+    with installer.open("rb") as executable:
+        assert executable.read(2) == b"MZ"
+        executable.seek(0x3C)
+        pe = struct.unpack("<I", executable.read(4))[0]
+        executable.seek(pe)
+        assert executable.read(4) == b"PE\0\0"
+        # 签名 4 字节 + COFF 头 20 字节 + 可选头的 Subsystem 偏移 68。
+        executable.seek(pe + 4 + 20 + 68)
+        subsystem = struct.unpack("<H", executable.read(2))[0]
+        assert subsystem == 2, f"Windows launcher must use the GUI subsystem, got {subsystem}"
+    print(json.dumps({"case": "windows_launcher_has_no_console_subsystem", "subsystem": subsystem}))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--installer", type=Path, required=True)
     parser.add_argument("--temp-root", type=Path, required=True)
     args = parser.parse_args()
+    if os.name == "nt":
+        verify_windows_launcher(args.installer)
     with tempfile.TemporaryDirectory(prefix="xunshu-negative-install-", dir=args.temp_root.resolve()) as directory:
         verify(args.installer.resolve(), Path(directory))
 

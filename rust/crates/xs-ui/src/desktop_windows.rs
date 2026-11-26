@@ -335,6 +335,7 @@ struct Renderer {
     updates: Receiver<RendererMessage>,
     view: View,
     hidden_window: Option<HWND>,
+    reported_failure: bool,
     close_deadline: Option<Instant>,
 }
 
@@ -398,6 +399,7 @@ impl Renderer {
             updates,
             view,
             hidden_window: None,
+            reported_failure: false,
             close_deadline: None,
         })
     }
@@ -407,13 +409,6 @@ impl Renderer {
             let _ = self.commands.try_send(HostMessage::Hide);
             self.close_deadline = Some(Instant::now() + Duration::from_secs(3));
         }
-    }
-
-    fn exited(&mut self) -> bool {
-        self.child.try_wait().is_ok_and(|status| status.is_some())
-            || self
-                .close_deadline
-                .is_some_and(|limit| Instant::now() >= limit)
     }
 }
 
@@ -557,7 +552,11 @@ impl Host {
         for update in renderer.updates.try_iter() {
             match update {
                 RendererMessage::Ready => ready = true,
-                RendererMessage::Failure(message) => show_error(&message),
+                RendererMessage::Failure(message) => {
+                    renderer.reported_failure = true;
+                    show_error(&message);
+                }
+
                 RendererMessage::View(view) => renderer.view = view,
                 RendererMessage::Query { view, mut query } => {
                     limit_query(&mut query);
@@ -573,7 +572,33 @@ impl Host {
                 RendererMessage::CancelScan => cancel_scan = true,
             }
         }
-        if renderer.exited() {
+        let exit = renderer
+            .child
+            .try_wait()
+            .context("无法读取寻枢界面的进程状态")?;
+        if let Some(status) = exit.filter(|status| !status.success()) {
+            // 进程可能在 DLL 加载阶段退出，尚未来得及建立窗口或回报错误。
+            if !renderer.reported_failure
+                && !renderer.updates.try_iter().any(|event| {
+                    if let RendererMessage::Failure(message) = event {
+                        show_error(&message);
+                        true
+                    } else {
+                        false
+                    }
+                })
+            {
+                show_error(&format!(
+                    "寻枢界面启动失败（退出码 0x{:08X}）。",
+                    status.code().unwrap_or(-1) as u32
+                ));
+            }
+        }
+        if exit.is_some()
+            || renderer
+                .close_deadline
+                .is_some_and(|limit| Instant::now() >= limit)
+        {
             self.renderer = None;
             if let Some(view) = self.pending_view.take() {
                 self.show(view, None)?;

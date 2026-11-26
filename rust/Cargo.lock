@@ -5100,6 +5100,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokenizers",
+ "windows-sys 0.61.2",
  "xs-platform",
  "xs-runtime",
 ]

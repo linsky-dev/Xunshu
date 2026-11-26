@@ -1,3 +1,5 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 //! 安装激活与回退都使用经过摘要校验及真实推理自检的独立版本目录。
 use anyhow::{ensure, Context, Result};
 use clap::{Parser, Subcommand};
@@ -42,6 +44,9 @@ enum Action {
     Rollback,
     /// 从有效安装指针启动原生界面
     Launch {
+        /// 从桌面入口启动时，在失败后显示具体错误。
+        #[arg(long)]
+        interactive: bool,
         #[arg(long)]
         data_dir: Option<PathBuf>,
         /// 仅在当前已授权目录下搜索，适用于目录菜单入口
@@ -789,7 +794,10 @@ $effective = Get-NetFirewallRule -PolicyStore ActiveStore -Name $name
 if ($effective.Action -ne 'Block' -or $effective.Direction -ne 'Outbound' -or $effective.Enabled -ne 'True' -or ($effective | Get-NetFirewallApplicationFilter).Program -ne $program) { throw '离线规则没有生效' }
 if (Get-NetFirewallProfile -PolicyStore ActiveStore | Where-Object Enabled -ne 'True') { throw '防火墙未对所有配置启用' }
 "#;
+        use std::os::windows::process::CommandExt;
+        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
         let result = Command::new(&powershell)
+            .creation_flags(CREATE_NO_WINDOW)
             .args(["-NoProfile", "-NonInteractive", "-Command", script])
             .env("XUNSHU_INSTALL_RULE", rule)
             .env("XUNSHU_INSTALL_PROGRAM", &program)
@@ -864,8 +872,7 @@ fn remove_version(root: &Path, version: &Version) -> Result<()> {
     Ok(())
 }
 
-fn run() -> Result<()> {
-    let args = Args::parse();
+fn run(args: Args) -> Result<()> {
     let root = std::path::absolute(args.root)?;
     let lock_path = root.join("install.lock");
     // 普通用户从 Program Files 启动时只需读取已安装版本。
@@ -893,7 +900,9 @@ fn run() -> Result<()> {
             std::mem::swap(&mut state.active, &mut state.previous);
             save_state(&root, &state)
         }
-        Action::Launch { data_dir, folder } => {
+        Action::Launch {
+            data_dir, folder, ..
+        } => {
             let version = state.active.as_ref().context("寻枢尚未安装")?;
             let directory = version_root(&root, version)?;
             verify(&directory, &version.manifest_sha256)?;
@@ -921,7 +930,25 @@ fn run() -> Result<()> {
             } else {
                 ensure!(folder.is_none(), "目录入口需要明确的 --data-dir");
             }
-            command.spawn()?;
+            let mut child = command.spawn().context("无法启动寻枢桌面程序")?;
+            #[cfg(windows)]
+            {
+                // 捕获启动即退出的加载器错误。已有实例接管请求时允许正常退出。
+                let until = Instant::now() + Duration::from_millis(750);
+                while Instant::now() < until {
+                    if let Some(status) = child.try_wait()? {
+                        ensure!(
+                            status.success(),
+                            "寻枢启动失败（退出码 0x{:08X}）",
+                            status.code().unwrap_or(-1) as u32
+                        );
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(25));
+                }
+            }
+            #[cfg(not(windows))]
+            let _ = child.try_wait();
             Ok(())
         }
         Action::Cleanup => {
@@ -961,8 +988,41 @@ fn run() -> Result<()> {
 }
 
 fn main() {
-    if let Err(error) = run() {
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
+        // 保留命令行入口的输出，桌面双击时没有父控制台可附加。
+        AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+    let args = Args::parse();
+    #[cfg(windows)]
+    let interactive = matches!(
+        args.command,
+        Action::Launch {
+            interactive: true,
+            ..
+        }
+    );
+    if let Err(error) = run(args) {
         eprintln!("安装操作失败：{error:#}");
+        #[cfg(windows)]
+        if interactive {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
+            let title: Vec<u16> = "寻枢启动失败".encode_utf16().chain([0]).collect();
+            let message: Vec<u16> = format!("{error:#}")
+                .encode_utf16()
+                .take(1800)
+                .chain([0])
+                .collect();
+            unsafe {
+                MessageBoxW(
+                    std::ptr::null_mut(),
+                    message.as_ptr(),
+                    title.as_ptr(),
+                    MB_ICONERROR,
+                )
+            };
+        }
         std::process::exit(1);
     }
 }
