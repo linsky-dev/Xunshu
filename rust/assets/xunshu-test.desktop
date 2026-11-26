@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=寻枢测试候选版
+Name[en]=Xunshu Test Candidate
+Comment=在本地搜索文件和正文
+Exec=/opt/xunshu-test/xs-ui
+Icon=xunshu-test
+Terminal=false
+Categories=Utility;FileTools;
+StartupNotify=true

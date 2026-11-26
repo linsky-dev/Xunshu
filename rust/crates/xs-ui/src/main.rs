@@ -22,6 +22,8 @@ mod activity;
 mod connectors_ui;
 mod content;
 mod desktop;
+#[cfg(target_os = "linux")]
+mod desktop_linux;
 mod diagnostics;
 mod scope_estimate;
 mod utility;
@@ -619,6 +621,12 @@ struct App {
     close_notified: bool,
     #[cfg(windows)]
     tray_hidden: bool,
+    #[cfg(target_os = "linux")]
+    linux_tray: Option<desktop_linux::Tray>,
+    #[cfg(target_os = "linux")]
+    linux_hidden: bool,
+    #[cfg(target_os = "linux")]
+    linux_exiting: bool,
     focus_query: bool,
     ime_composing: bool,
     monitor_stop: Arc<AtomicBool>,
@@ -1049,6 +1057,12 @@ impl App {
             close_notified: false,
             #[cfg(windows)]
             tray_hidden: false,
+            #[cfg(target_os = "linux")]
+            linux_tray: None,
+            #[cfg(target_os = "linux")]
+            linux_hidden: false,
+            #[cfg(target_os = "linux")]
+            linux_exiting: false,
             focus_query: true,
             ime_composing: false,
             monitor_stop,
@@ -1254,7 +1268,58 @@ impl App {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    fn linux_hide(&mut self, ctx: &egui::Context) -> bool {
+        if self.linux_exiting
+            || !self
+                .linux_tray
+                .as_ref()
+                .is_some_and(|tray| tray.ready.load(Ordering::Relaxed))
+        {
+            return false;
+        }
+        self.linux_hidden = true;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+        true
+    }
+
+    #[cfg(target_os = "linux")]
+    fn linux_tray_update(&mut self, ctx: &egui::Context) {
+        let Some(tray) = &self.linux_tray else {
+            return;
+        };
+        let actions = tray.events.try_iter().collect::<Vec<_>>();
+        let ready = tray.ready.load(Ordering::Relaxed);
+        if actions
+            .iter()
+            .any(|action| matches!(action, desktop_linux::Action::Quit))
+        {
+            self.linux_exiting = true;
+            self.request_close(ctx);
+        } else if actions
+            .iter()
+            .any(|action| matches!(action, desktop_linux::Action::Open))
+            || (!ready && self.linux_hidden)
+        {
+            self.linux_hidden = false;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            return;
+        } else if !self.linux_hidden && ctx.input(|input| input.viewport().minimized == Some(true))
+        {
+            self.linux_hide(ctx);
+        }
+        if ready && !self.linux_hidden {
+            ctx.request_repaint_after(Duration::from_millis(500));
+        }
+    }
+
     fn request_close(&mut self, ctx: &egui::Context) {
+        #[cfg(target_os = "linux")]
+        if self.linux_hide(ctx) {
+            return;
+        }
         if self.content.building() {
             self.content.cancel_build();
             self.close_after_content = true;
@@ -3714,12 +3779,18 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.messages(ctx);
+        #[cfg(target_os = "linux")]
+        self.linux_tray_update(ctx);
         if self.search_due.is_some_and(|due| Instant::now() >= due) && !self.loading {
             self.run_search(ctx);
         }
         self.desktop_messages(ctx);
         self.content.update(&self.data_dir, ctx);
-        if !self.host_manages_body && !self.smoke_test {
+        if !self.host_manages_body
+            && !self.smoke_test
+            && !self.close_after_content
+            && !self.close_notified
+        {
             let enabled = self.settings.as_ref().is_some_and(|s| {
                 s.content_enabled && s.content_follows_roots && !s.content_roots.is_empty()
             });
@@ -3811,6 +3882,11 @@ impl eframe::App for App {
             }
         }
         if ctx.input(|i| i.viewport().close_requested()) {
+            #[cfg(target_os = "linux")]
+            if self.linux_hide(ctx) {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                return;
+            }
             #[cfg(windows)]
             if desktop::windows::take_minimize_request()
                 && (self.content.building() || self.saving || self.wizard.is_some())
@@ -4393,6 +4469,19 @@ fn view_geometry(view: View) -> (&'static str, Vec2, Vec2) {
 }
 
 fn run_renderer(mut args: Args) -> Result<()> {
+    #[cfg(target_os = "linux")]
+    let tray = if !args.smoke_test && args.mode == DesktopMode::Default {
+        match desktop_linux::Tray::start(&args.data_dir) {
+            Ok(Some(tray)) => Some(tray),
+            Ok(None) => return Ok(()),
+            Err(error) => {
+                eprintln!("Linux 托盘暂不可用：{error:#}");
+                None
+            }
+        }
+    } else {
+        None
+    };
     let queries = if args.mode == DesktopMode::Renderer {
         match desktop::receive(&mut std::io::stdin().lock())? {
             Some(HostMessage::Boot { view, mut queries }) => {
@@ -4462,7 +4551,17 @@ fn run_renderer(mut args: Args) -> Result<()> {
                     eprintln!("未能启用最小化到通知区域，继续使用系统最小化");
                 }
             }
-            Ok(Box::new(App::new(cc, args, queries, font, color_icon)))
+            let app = App::new(cc, args, queries, font, color_icon);
+            #[cfg(target_os = "linux")]
+            let app = {
+                let mut app = app;
+                if let Some(tray) = tray {
+                    tray.attach(&cc.egui_ctx);
+                    app.linux_tray = Some(tray);
+                }
+                app
+            };
+            Ok(Box::new(app))
         }),
     )
     .map_err(|e| anyhow::anyhow!("无法显示寻枢原生窗口：{e}"))
@@ -4470,7 +4569,25 @@ fn run_renderer(mut args: Args) -> Result<()> {
 
 fn main() -> Result<()> {
     xs_runtime::enforce_offline().context("无法启用寻枢的离线运行约束")?;
+    #[cfg(target_os = "linux")]
+    {
+        let mut arguments = std::env::args_os().skip(1);
+        if let (Some(action), None) = (arguments.next(), arguments.next()) {
+            if action == "--install-desktop-shortcut" || action == "--remove-desktop-shortcut" {
+                return desktop_linux::desktop_shortcut(action == "--remove-desktop-shortcut");
+            }
+        }
+    }
     let args = Args::parse()?;
+    #[cfg(target_os = "linux")]
+    if !args.smoke_test
+        && args.mode == DesktopMode::Default
+        && std::env::current_exe().is_ok_and(|path| path == Path::new("/opt/xunshu-test/xs-ui"))
+    {
+        if let Err(error) = desktop_linux::desktop_shortcut(false) {
+            eprintln!("无法创建桌面快捷方式：{error:#}");
+        }
+    }
     let mode = args.mode;
     #[cfg(windows)]
     if !args.smoke_test && matches!(mode, DesktopMode::Default | DesktopMode::Background) {

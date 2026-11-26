@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.xunshu.Xunshu.Test</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Xunshu Test Candidate</name>
+  <name xml:lang="zh-CN">寻枢测试候选版</name>
+  <summary>Offline file and document text search</summary>
+  <summary xml:lang="zh-CN">在本地搜索文件和文档正文</summary>
+  <description><p>Search local file names and indexed document text from the desktop.</p></description>
+  <launchable type="desktop-id">xunshu-test.desktop</launchable>
+  <icon type="stock">xunshu-test</icon>
+  <url type="homepage">https://github.com/linsky-dev/Xunshu</url>
+</component>

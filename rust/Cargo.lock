@@ -5146,6 +5146,7 @@ dependencies = [
  "eframe",
  "fs2",
  "image",
+ "libc",
  "raw-window-handle",
  "serde",
  "serde_json",
@@ -5159,6 +5160,7 @@ dependencies = [
  "xs-platform",
  "xs-query",
  "xs-runtime",
+ "zbus",
 ]
 
 [[package]]

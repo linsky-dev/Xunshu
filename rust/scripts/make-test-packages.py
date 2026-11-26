@@ -157,28 +157,36 @@ def linux_pack(args, stage, payload, manager, output):
     shutil.copy2(stage / 'licenses/Xunshu-LICENSE.txt', docs / 'copyright')
     desktop = share / 'applications'
     desktop.mkdir()
-    write(desktop / 'xunshu-test.desktop', '''[Desktop Entry]
+    shutil.copy2(WORKSPACE / 'assets/xunshu-test.desktop', desktop / 'xunshu-test.desktop')
+    metadata_dir = share / 'metainfo'
+    metadata_dir.mkdir()
+    shutil.copy2(WORKSPACE / 'assets/com.xunshu.Xunshu.Test.metainfo.xml',
+                 metadata_dir / 'com.xunshu.Xunshu.Test.metainfo.xml')
+    autostart = package / 'etc/xdg/autostart'
+    autostart.mkdir(parents=True)
+    write(autostart / 'xunshu-test-shortcut.desktop', """[Desktop Entry]
 Type=Application
-Name=寻枢测试候选版
-Name[en]=Xunshu Test Candidate
-Comment=在本地搜索文件和正文
-Exec=/opt/xunshu-test/xs-ui
-Icon=xunshu-test
+Name=寻枢桌面快捷方式
+Exec=/opt/xunshu-test/xs-ui --install-desktop-shortcut
+TryExec=/opt/xunshu-test/xs-ui
 Terminal=false
-Categories=Utility;FileTools;
-StartupNotify=true
-''')
-    icons = share / 'icons/hicolor/64x64/apps'
-    icons.mkdir(parents=True)
+NoDisplay=true
+""")
     with Image.open(WORKSPACE / 'assets/xunshu.png') as icon:
-        icon.resize((64, 64), Image.Resampling.LANCZOS).save(icons / 'xunshu-test.png')
+        for size in (32, 64, 128, 256):
+            icons = share / f'icons/hicolor/{size}x{size}/apps'
+            icons.mkdir(parents=True)
+            icon.resize((size, size), Image.Resampling.LANCZOS).save(icons / 'xunshu-test.png')
 
     control = package / 'DEBIAN'
     control.mkdir()
+    for maintainer in ('postinst', 'prerm'):
+        shutil.copy2(WORKSPACE / 'scripts/linux-desktop-shortcut-maint', control / maintainer)
+        (control / maintainer).chmod(0o755)
     # 图形后端按需加载的常用库无法从 ELF DT_NEEDED 完整推导。
     dependencies = (f'libc6 (>= {glibc}), libgcc-s1 | libgcc1, libstdc++6, libx11-6, '
                     'libx11-xcb1, libxcursor1, libxi6, libxkbcommon0, libxkbcommon-x11-0, '
-                    'libwayland-client0, libegl1, libgl1, libfontconfig1')
+                    'libwayland-client0, libegl1, libgl1, libfontconfig1, xdg-user-dirs')
     version = args.version.replace('-alpha.', '~alpha.') + '-1'
     installed_kib = sum(path.stat().st_size for path in package.rglob('*') if path.is_file())
     write(control / 'control', f'''Package: xunshu-test

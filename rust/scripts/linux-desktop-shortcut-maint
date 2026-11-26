@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+case "${1:-}" in
+    configure) flag=--install-desktop-shortcut ;;
+    remove) flag=--remove-desktop-shortcut ;;
+    *) exit 0 ;;
+esac
+
+# 离线根目录安装不会匹配宿主的图形会话。
+[ -z "${DPKG_ROOT:-}" ] || exit 0
+command -v loginctl >/dev/null 2>&1 || exit 0
+command -v runuser >/dev/null 2>&1 || exit 0
+
+# 只处理已登录的本机图形会话，以对应用户身份执行，避免管理员写用户文件。
+loginctl list-sessions --no-legend --no-pager 2>/dev/null |
+while read -r session rest; do
+    [ -n "$session" ] || continue
+    [ "$(loginctl show-session "$session" -p Active --value 2>/dev/null)" = yes ] || continue
+    [ "$(loginctl show-session "$session" -p Remote --value 2>/dev/null)" = no ] || continue
+    case "$(loginctl show-session "$session" -p Type --value 2>/dev/null)" in
+        x11|wayland) ;;
+        *) continue ;;
+    esac
+    user=$(loginctl show-session "$session" -p Name --value 2>/dev/null) || continue
+    [ -n "$user" ] && [ "$user" != root ] || continue
+    runuser -u "$user" -- /opt/xunshu-test/xs-ui "$flag" >/dev/null 2>&1 || :
+done
+exit 0
