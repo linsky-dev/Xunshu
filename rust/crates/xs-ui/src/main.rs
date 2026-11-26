@@ -1074,6 +1074,7 @@ impl App {
                 .then(|| Instant::now() + Duration::from_millis(600)),
         };
         app.emit_desktop(&RendererMessage::Ready);
+        app.activity_job(&cc.egui_ctx, None);
         app.reload(&cc.egui_ctx, app.view == View::Main);
         app
     }
