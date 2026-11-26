@@ -4,7 +4,7 @@
 
 寻枢适合经常查找项目资料、办公文档和离线归档的用户。通过原生桌面界面配置收录范围，也可用命令行执行搜索、索引和诊断。索引、查询和可选模型推理都在本机运行，无需云端搜索服务。
 
-[下载 Windows x64 启动修复安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-windows-startup-20261126/Xunshu-Windows-x64-Setup-Test.exe) · [全部测试候选版](https://github.com/linsky-dev/Xunshu/releases) · [查询语法](rust/crates/xs-query/README.md) · [平台验收](rust/VALIDATION.md) · [从源码构建](#从源码构建)
+[下载 Windows x64 启动修复安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-windows-startup-20261126/Xunshu-Windows-x64-Setup-Test.exe) · [下载 UOS ARM64 安装包](https://github.com/linsky-dev/Xunshu/releases/download/alpha8-uos-arm64-20261126/Xunshu-UOS-arm64-Test.deb) · [全部测试候选版](https://github.com/linsky-dev/Xunshu/releases) · [查询语法](rust/crates/xs-query/README.md) · [平台验收](rust/VALIDATION.md) · [从源码构建](#从源码构建)
 
 ![寻枢的文件名搜索工作台。图中为合成示例，左侧是已收录目录，中间是结果表，右侧是选中文件的详情与操作。](docs/assets/xunshu-search-workspace.png)
 
