@@ -17,6 +17,7 @@ use std::{
 };
 use zbus::{
     blocking::{connection::Builder, fdo::DBusProxy, Proxy},
+    fdo::RequestNameFlags,
     zvariant::{OwnedObjectPath, OwnedValue, Str, Value},
 };
 
@@ -273,8 +274,10 @@ impl Tray {
             .components()
             .for_each(|component| component.hash(&mut hash));
         let name = format!("org.xunshu.Desktop.p{:016x}", hash.finish());
-        match connection.request_name(name.as_str()) {
-            Ok(()) => {}
+        // 保留现有实例的托盘名称，后续启动只发送唤醒请求。
+        match connection.request_name_with_flags(name.as_str(), RequestNameFlags::DoNotQueue.into())
+        {
+            Ok(_) => {}
             Err(zbus::Error::NameTaken) => {
                 let existing = Proxy::new(
                     &connection,
