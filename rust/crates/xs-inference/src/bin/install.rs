@@ -45,6 +45,9 @@ enum Action {
         /// 从桌面入口启动时，在失败后显示具体错误。
         #[arg(long)]
         interactive: bool,
+        /// 无头验证和桌面启动共用的检查。
+        #[arg(long, hide = true, conflicts_with = "interactive")]
+        verify_only: bool,
         #[arg(long)]
         data_dir: Option<PathBuf>,
         /// 仅在当前已授权目录下搜索，适用于目录菜单入口
@@ -762,15 +765,54 @@ fn policy(_directory: &Path, _action: &str) -> Result<()> {
 }
 
 #[cfg(windows)]
-fn policy(directory: &Path, action: &str) -> Result<()> {
+fn system_powershell(script: &str) -> Result<Command> {
+    use std::os::windows::process::CommandExt;
+    use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+
     let system =
         PathBuf::from(std::env::var_os("SystemRoot").context("无法定位 Windows 系统目录")?);
-    let powershell = system.join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    let mut command = Command::new(system.join("System32/WindowsPowerShell/v1.0/powershell.exe"));
+    command.creation_flags(CREATE_NO_WINDOW).args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        script,
+    ]);
+    Ok(command)
+}
+
+#[cfg(not(windows))]
+fn verify_launch_policy(_directory: &Path) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(windows)]
+fn verify_launch_policy(directory: &Path) -> Result<()> {
+    let paths: Vec<_> = PROGRAMS
+        .map(executable)
+        .into_iter()
+        .map(|name| directory.join(name))
+        .collect();
+    // CIM ActiveStore 需要管理员权限。启动全部检查通过普通用户可读的 Windows 防火墙 API 完成。
+    let output = system_powershell(include_str!("verify-launch-firewall.ps1"))?
+        .env("XUNSHU_LAUNCH_PROGRAMS", serde_json::to_string(&paths)?)
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "寻枢启动前的离线规则校验未通过：{}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+fn policy(directory: &Path, action: &str) -> Result<()> {
     for name in PROGRAMS.map(executable) {
         let program = directory.join(name);
         let rule = format!("Xunshu-{}", digest(program.to_string_lossy().as_bytes()));
         let script = r#"
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $name = $env:XUNSHU_INSTALL_RULE
 $program = $env:XUNSHU_INSTALL_PROGRAM
 $rule = Get-NetFirewallRule -PolicyStore PersistentStore -Name $name -ErrorAction SilentlyContinue
@@ -792,11 +834,7 @@ $effective = Get-NetFirewallRule -PolicyStore ActiveStore -Name $name
 if ($effective.Action -ne 'Block' -or $effective.Direction -ne 'Outbound' -or $effective.Enabled -ne 'True' -or ($effective | Get-NetFirewallApplicationFilter).Program -ne $program) { throw '离线规则没有生效' }
 if (Get-NetFirewallProfile -PolicyStore ActiveStore | Where-Object Enabled -ne 'True') { throw '防火墙未对所有配置启用' }
 "#;
-        use std::os::windows::process::CommandExt;
-        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
-        let result = Command::new(&powershell)
-            .creation_flags(CREATE_NO_WINDOW)
-            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        let result = system_powershell(script)?
             .env("XUNSHU_INSTALL_RULE", rule)
             .env("XUNSHU_INSTALL_PROGRAM", &program)
             .env("XUNSHU_INSTALL_ACTION", action)
@@ -899,12 +937,18 @@ fn run(args: Args) -> Result<()> {
             save_state(&root, &state)
         }
         Action::Launch {
-            data_dir, folder, ..
+            data_dir,
+            folder,
+            verify_only,
+            ..
         } => {
             let version = state.active.as_ref().context("寻枢尚未安装")?;
             let directory = version_root(&root, version)?;
             verify(&directory, &version.manifest_sha256)?;
-            policy(&directory, "verify")?;
+            verify_launch_policy(&directory)?;
+            if verify_only {
+                return Ok(());
+            }
             let program = directory.join(executable("xs-ui"));
             let mut command = Command::new(program);
             if let Some(data) = data_dir {
