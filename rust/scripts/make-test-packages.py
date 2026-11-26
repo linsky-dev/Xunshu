@@ -177,7 +177,8 @@ StartupNotify=true
     control.mkdir()
     # 图形后端按需加载的常用库无法从 ELF DT_NEEDED 完整推导。
     dependencies = (f'libc6 (>= {glibc}), libgcc-s1 | libgcc1, libstdc++6, libx11-6, '
-                    'libx11-xcb1, libxkbcommon0, libxkbcommon-x11-0, libwayland-client0, libegl1, libgl1, libfontconfig1')
+                    'libx11-xcb1, libxcursor1, libxi6, libxkbcommon0, libxkbcommon-x11-0, '
+                    'libwayland-client0, libegl1, libgl1, libfontconfig1')
     version = args.version.replace('-alpha.', '~alpha.') + '-1'
     installed_kib = sum(path.stat().st_size for path in package.rglob('*') if path.is_file())
     write(control / 'control', f'''Package: xunshu-test
