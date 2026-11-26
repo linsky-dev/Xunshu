@@ -1,10 +1,18 @@
 # 寻枢 Rust 历史验证与当前版本差异
 
+## 普通权限启动与 UOS 桌面集成
+
+2026-11-26 第二轮候选。Windows 10 用户报告安装后从桌面启动时，`Get-NetFirewallRule -PolicyStore ActiveStore` 返回系统错误 5。桌面启动改由 Windows 防火墙 COM 接口只读校验，各应用的出站阻断继续生效。高权限安装、回退及补偿仍使用 ActiveStore。启动器以 UTF-8 读取校验错误。
+
+最终 Windows 安装包源码为 `5cd2326`。在 Windows 11 专业版 Build 26200 实测安装升级、现有配置保留、桌面入口原生窗口及托盘，隔离配置的窗口首次显示约 1.8 秒。使用非管理员 LocalService 运行安装包中的启动策略校验，规则完整时返回 0，缺失规则测试返回 1。Windows 10 目标机仍待验证。[Microsoft 防火墙接口](https://learn.microsoft.com/en-us/windows/win32/api/netfw/nn-netfw-inetfwpolicy2)
+
+UOS amd64 与 ARM64 安装包源码为 `a11e918`。安装包通过 GLIBC 2.28 兼容性检查，携带应用菜单、桌面快捷方式、托盘图标和登录补建入口。安装钩子以当前图形会话用户创建快捷方式，离线安装时在下一次图形登录补建。同名自建快捷方式保留。面板提供 StatusNotifierItem 托盘后，用户可以收起窗口、重新打开和从托盘退出。Debian amd64（WSL）与 Debian 12 ARM64（QEMU）使用 X11 和模拟托盘验证快捷方式、图标、最小化、恢复、单实例和退出。目标统信系统的 DDE 展示及签名环境仍待验证。[当前候选安装包](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126-r2)
+
 ## UOS ARM64 候选包
 
 2026-11-26 发布的 ARM64 安装包和便携包使用源码 `29345c5`，含同版本的 ARM64 ONNX Runtime 1.24.4、离线 OCR 和语义模型、中文字体、应用菜单和图标。打包器验证 Debian 架构、五个应用程序及推理库的 ELF 架构和 GLIBC 2.28 上限。23 项载荷的字节和摘要在两种包中一致。ARM64 的 Linux 离线约束在虚拟机验证了 TCP 和 UDP 阻断及 Unix IPC 可用，AMD64 离线回归亦通过。
 
-最终安装包在 QEMU 的 Debian 12 ARM64 系统验证了 apt 依赖补装、安装、Xvfb 原生窗口、正文预览、覆盖安装、卸载和合成数据保留。独立模型自检通过。仿真下默认 10 秒的抽取时限曾触发，完整扫描 PDF OCR 和语义索引在 60 秒验收时限内通过，发布程序仍沿用默认时限。UOS ARM64 实机、DDE 与厂商签名仍待验收。[ONNX Runtime 上游发行记录](https://pypi.org/project/onnxruntime/1.24.4/) · [ARM64 测试候选发布](https://github.com/linsky-dev/Xunshu/releases/tag/alpha8-installers-20261126)
+该轮安装包在 QEMU 的 Debian 12 ARM64 系统验证了 apt 依赖补装、安装、Xvfb 原生窗口、正文预览、覆盖安装、卸载和合成数据保留。独立模型自检通过。仿真下默认 10 秒的抽取时限曾触发，完整扫描 PDF OCR 和语义索引在 60 秒验收时限内通过，发布程序仍沿用默认时限。UOS ARM64 实机、DDE 与厂商签名仍待验收。[ONNX Runtime 上游发行记录](https://pypi.org/project/onnxruntime/1.24.4/)
 
 ## Windows 安装后启动
 
