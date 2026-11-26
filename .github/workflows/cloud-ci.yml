@@ -208,6 +208,40 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  arm64-egl:
+    name: ARM64 native X11 with EGL
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: '3'
+      CARGO_TERM_COLOR: never
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - name: Native X11 and EGL dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libfontconfig1-dev fonts-noto-cjk libx11-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev libegl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev xvfb xauth
+      - name: Build the locked native ARM64 release
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          cargo fetch --locked
+          cargo build --locked --offline --release -p xs-ui
+      - name: Open a native window with no GLX extension or GLX library
+        run: sh scripts/verify-arm64-egl.sh target/release/xs-ui "$RUNNER_TEMP/xunshu-arm64-egl"
+      - name: Preserve EGL diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: arm64-egl-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/xunshu-arm64-egl/
+          if-no-files-found: warn
+          retention-days: 14
+
   performance:
     name: Synthetic 3M filename latency gate (Linux)
     if: github.event_name == 'workflow_dispatch' && inputs.performance_validation
