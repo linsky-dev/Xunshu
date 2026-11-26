@@ -13,7 +13,8 @@ mod worker;
 pub use extract::Location;
 pub use ipc::serve;
 pub use search::{
-    ContentHit, ContentReader, Highlight, MatchEvidence, SearchMode, SearchOptions, SearchResponse,
+    ContentHit, ContentReader, ExtensionFilter, Highlight, MatchEvidence, SearchMode,
+    SearchOptions, SearchResponse,
 };
 pub use worker::{extract_worker, extract_worker_serve, extract_worker_with_ocr, WorkerOptions};
 
@@ -39,6 +40,7 @@ const MAX_REUSE_SNAPSHOT_BYTES: u64 = MAX_DB_SIZE as u64;
 const MAX_REPORTED_FAILURES: usize = 100;
 const CONTENT_DB: &str = "content.idx";
 const CONTENT_LOCK: &str = "content.lock";
+const CONTENT_COVERAGE: &str = "content.coverage.json";
 // 私有候选库：只供重建器恢复，不是查询入口。
 const CONTENT_CHECKPOINT: &str = "content.pending.idx";
 const CONTENT_REQUESTS: &str = "content.requests.json";
@@ -260,6 +262,53 @@ impl Policy {
         Ok(())
     }
 
+    fn scan_settings(&self) -> Settings {
+        let mut roots = self.settings.content_roots.clone();
+        if self.settings.content_follows_roots {
+            for root in &mut roots {
+                let images = if self.settings.ocr_enabled {
+                    extract::IMAGE_EXTENSIONS
+                } else {
+                    &[]
+                };
+                root.extensions = Some(
+                    extract::TEXT_EXTENSIONS
+                        .iter()
+                        .chain(images)
+                        .copied()
+                        .filter(|ext| {
+                            root.extensions.as_ref().is_none_or(|allowed| {
+                                allowed
+                                    .iter()
+                                    .any(|existing| existing.eq_ignore_ascii_case(ext))
+                            })
+                        })
+                        .map(str::to_owned)
+                        .collect(),
+                );
+            }
+        }
+        Settings {
+            roots,
+            mode: SpeedMode::Standard,
+            ..Settings::default()
+        }
+    }
+
+    fn accepts_change(&self, scan: &Settings, dir: &Path, path: &Path) -> bool {
+        let supported = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| {
+                extract::supports(&ext.to_ascii_lowercase(), self.settings.ocr_enabled)
+            });
+        if supported && self.allows(dir, path).unwrap_or(false) {
+            return true;
+        }
+        xs_platform::inspect_scoped_entry(scan, path, &[dir.to_owned()])
+            .is_ok_and(|entry| entry.is_some_and(|entry| entry.is_dir))
+    }
+
     fn allows(&self, dir: &Path, path: &Path) -> Result<bool> {
         Ok(!xs_platform::local_path_within(path, dir)?
             && self.settings.allows_content(path, false)?)
@@ -278,32 +327,49 @@ pub fn watch_changes(
     use std::time::{Duration, Instant};
     use xs_platform::{ScopeWatcher, WatchEvent};
     let policy = Policy::load(dir)?;
-    let scan_settings = Settings {
-        roots: policy.settings.content_roots.clone(),
-        mode: SpeedMode::Standard,
-        ..Settings::default()
+    let scan_settings = policy.scan_settings();
+    let automatic = policy.settings.content_follows_roots;
+    let interval = Duration::from_secs(if automatic { 1800 } else { 600 });
+    let subscribe = || match ScopeWatcher::new(&scan_settings, &[dir.into()]) {
+        Ok(watcher) => Ok(Some(watcher)),
+        Err(_) if automatic => Ok(None),
+        Err(error) => Err(error),
     };
-    let mut watcher = ScopeWatcher::new(&scan_settings, &[dir.into()])?;
+    let mut watcher = subscribe()?;
     policy.verify(dir)?;
     enqueue_changes(dir, &[])?;
     let mut pending = true;
     let mut next_attempt = Instant::now();
-    let mut reconcile_at = Instant::now() + Duration::from_secs(600);
+    let mut reconcile_at = Instant::now() + interval;
     while !cancel.load(Ordering::Acquire) {
         policy.verify(dir)?;
         if Instant::now() >= reconcile_at {
             enqueue_changes(dir, &[])?;
             pending = true;
-            reconcile_at = Instant::now() + Duration::from_secs(600);
+            reconcile_at = Instant::now() + interval;
+            if watcher.is_none() {
+                watcher = subscribe()?;
+            }
         }
         if pending && Instant::now() >= next_attempt {
             let report = apply_queued_changes(dir, executable, cancel)?;
             let done = report.published
                 && report.durable
-                && report.complete
+                && (report.complete || automatic)
                 && report.request_warning.is_none();
             if done && report.scope_reconciled {
-                reconcile_at = Instant::now() + Duration::from_secs(600);
+                reconcile_at = Instant::now() + interval;
+            }
+            if automatic && report.published && report.durable && !report.targeted_update {
+                let status = Coverage {
+                    scope_token: policy.token.clone(),
+                    complete: report.complete,
+                    failed: report.failed,
+                };
+                if let Ok(bytes) = serde_json::to_vec(&status) {
+                    let _ =
+                        xs_platform::atomic_write_local(&dir.join(CONTENT_COVERAGE), &bytes, true);
+                }
             }
             on_report(&report);
             if report.cancelled || cancel.load(Ordering::Acquire) {
@@ -317,18 +383,25 @@ pub fn watch_changes(
                     Duration::from_secs(10)
                 };
         }
-        match watcher.poll(Duration::from_secs(1)) {
+        let Some(active_watcher) = watcher.as_mut() else {
+            std::thread::sleep(Duration::from_secs(1));
+            continue;
+        };
+        match active_watcher.poll(Duration::from_secs(1)) {
             Ok(WatchEvent::Idle) => (),
             Ok(WatchEvent::Changed) => {
                 policy.verify(dir)?;
-                if let Some(paths) = watcher.take_changed_paths() {
+                if let Some(paths) = active_watcher.take_changed_paths() {
                     // Watch notifications can include files excluded by an extension filter.
                     let mut accepted = Vec::new();
                     for path in paths {
-                        if policy.allows(dir, &path)?
-                            || (policy.settings.allows_content(&path, true)?
-                                && !xs_platform::local_path_within(&path, dir)?)
-                        {
+                        if if automatic {
+                            policy.accepts_change(&scan_settings, dir, &path)
+                        } else {
+                            policy.allows(dir, &path)?
+                                || (policy.settings.allows_content(&path, true)?
+                                    && !xs_platform::local_path_within(&path, dir)?)
+                        } {
                             accepted.push(path);
                         }
                     }
@@ -344,7 +417,7 @@ pub fn watch_changes(
             _ => {
                 policy.verify(dir)?;
                 // Re-subscribe before scheduling a full reconciliation.
-                watcher = ScopeWatcher::new(&scan_settings, &[dir.into()])?;
+                watcher = subscribe()?;
                 enqueue_changes(dir, &[])?;
                 pending = true;
             }
@@ -398,11 +471,7 @@ fn rebuild_inner(
         report.cancelled = true;
         return Ok(report);
     }
-    let scan_settings = Settings {
-        roots: policy.settings.content_roots.clone(),
-        mode: SpeedMode::Standard,
-        ..Settings::default()
-    };
+    let scan_settings = policy.scan_settings();
     let target = dir.join(CONTENT_DB);
     let base_revision = optional_revision(&target)?;
     let generation = next_generation(&target)?;
@@ -467,18 +536,23 @@ fn rebuild_inner(
             }
         }
     }
+    let automatic = use_queue && policy.settings.content_follows_roots;
+    let mut traversal_complete = true;
     report.targeted_update = entries.is_some();
     let entries = match entries {
         Some(entries) => entries,
         None => {
             let scan =
                 xs_platform::scan_with_exclusions(&scan_settings, cancel, |_| {}, &[dir.into()])?;
+            traversal_complete = scan.complete;
             if !scan.complete {
                 report.cancelled = scan.cancelled;
                 for failure in scan.errors {
                     report.failure(failure.path, failure.message);
                 }
-                return Ok(report);
+                if report.cancelled || !automatic {
+                    return Ok(report);
+                }
             }
             scan.entries
         }
@@ -715,7 +789,7 @@ fn rebuild_inner(
     }
     // 任何已支持文件的抽取失败都不得发布覆盖旧库的缺文档快照。
     // 保留上一完整索引，返回失败清单供用户修复后重试。
-    if report.failed != 0 {
+    if report.failed != 0 && !automatic {
         // Preserve successful work so correcting a bad file need not re-extract it.
         if dirty != 0 {
             save_checkpoint(
@@ -732,7 +806,7 @@ fn rebuild_inner(
         return Ok(report);
     }
     let tx = db.transaction()?;
-    if incremental && !report.targeted_update {
+    if incremental && !report.targeted_update && traversal_complete && report.failed == 0 {
         let missing = {
             let mut stmt = tx.prepare(
                 "SELECT path FROM documents WHERE path NOT IN (SELECT path FROM scanned)",
@@ -766,10 +840,10 @@ fn rebuild_inner(
         report.published = true;
         report.unchanged_snapshot = true;
         report.generation = previous_generation;
-        report.complete = true;
+        report.complete = traversal_complete && report.failed == 0;
         report.durable = true;
         clear_checkpoint(&checkpoint)?;
-        report.scope_reconciled = !report.targeted_update;
+        report.scope_reconciled = report.complete && !report.targeted_update;
         acknowledge_requests(dir, &mut report);
         return Ok(report);
     }
@@ -815,9 +889,9 @@ fn rebuild_inner(
     report.generation = Some(generation);
     report.durable = outcome.is_durable();
     report.durability_warning = outcome.warning().map(str::to_owned);
-    report.complete = report.failed == 0;
+    report.complete = traversal_complete && report.failed == 0;
     report.scope_reconciled = report.complete && !report.targeted_update;
-    if report.durable && report.complete {
+    if report.durable && (report.complete || automatic) {
         acknowledge_requests(dir, &mut report);
     }
     if let Err(error) = clear_checkpoint(&checkpoint) {
@@ -1098,6 +1172,26 @@ fn content_revision_readable(path: &Path, expected: FileRevision) -> bool {
     !is_cloud_placeholder(&file)
         && FileRevision::from_file(&file).ok() == Some(expected)
         && FileRevision::at_path(path).ok() == Some(expected)
+}
+
+/// 最近一次正文全范围校准的状态，持久文件不包含用户路径。
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Coverage {
+    scope_token: String,
+    pub complete: bool,
+    pub failed: usize,
+}
+
+pub fn coverage(dir: &Path) -> Option<Coverage> {
+    let bytes = xs_platform::read_local_file(&dir.join(CONTENT_COVERAGE), 4096).ok()?;
+    let coverage: Coverage = serde_json::from_slice(&bytes).ok()?;
+    let policy = Policy::load(dir).ok()?;
+    (coverage.scope_token == policy.token).then_some(coverage)
+}
+
+/// 当前正文快照的发布标记。读取元数据，不加载正文库。
+pub fn index_revision(dir: &Path) -> Option<xs_platform::FileRevision> {
+    xs_platform::FileRevision::at_path(&dir.join(CONTENT_DB)).ok()
 }
 
 pub fn validate_response(dir: &Path, response: &SearchResponse) -> Result<()> {

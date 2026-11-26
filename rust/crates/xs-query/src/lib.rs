@@ -10,6 +10,7 @@ mod parser;
 mod phonetic;
 pub use phonetic::pinyin_initials;
 mod predicates;
+pub use predicates::category_extensions;
 
 use regex::Regex;
 use std::{borrow::Cow, cell::OnceCell, error::Error, fmt};

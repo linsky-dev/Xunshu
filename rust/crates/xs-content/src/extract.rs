@@ -111,26 +111,17 @@ impl Segments {
     }
 }
 
+pub(crate) const TEXT_EXTENSIONS: &[&str] = &[
+    "txt", "md", "markdown", "htm", "html", "docx", "pptx", "xlsx", "odt", "odp", "ods", "pdf",
+];
+pub(crate) const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tif", "tiff", "webp"];
+
 pub(crate) fn supports(extension: &str, ocr: bool) -> bool {
-    matches!(
-        extension,
-        "txt"
-            | "md"
-            | "markdown"
-            | "htm"
-            | "html"
-            | "docx"
-            | "pptx"
-            | "xlsx"
-            | "odt"
-            | "odp"
-            | "ods"
-            | "pdf"
-    ) || (ocr && is_image(extension))
+    TEXT_EXTENSIONS.contains(&extension) || (ocr && is_image(extension))
 }
 
 pub(crate) fn is_image(extension: &str) -> bool {
-    matches!(extension, "png" | "jpg" | "jpeg" | "tif" | "tiff" | "webp")
+    IMAGE_EXTENSIONS.contains(&extension)
 }
 
 fn decode(bytes: &[u8]) -> Result<std::borrow::Cow<'_, str>> {

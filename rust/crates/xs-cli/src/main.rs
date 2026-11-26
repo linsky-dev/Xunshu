@@ -8,7 +8,7 @@ use std::{
     time::Instant,
 };
 use xs_core::{operations, persistence::Store, FileRecord, Index, IndexBuilder, SearchOptions};
-use xs_platform::{Scope, Settings, SetupState};
+use xs_platform::{Scope, Settings};
 
 mod doctor;
 mod efu;
@@ -76,12 +76,14 @@ enum Command {
     ContentConfigure {
         #[arg(
             long = "root",
-            required_unless_present = "disable",
-            conflicts_with = "disable"
+            required_unless_present_any = ["disable", "follow"],
+            conflicts_with_all = ["disable", "follow"]
         )]
         roots: Vec<PathBuf>,
         #[arg(long)]
         disable: bool,
+        #[arg(long, conflicts_with = "disable")]
+        follow: bool,
         #[arg(long, conflicts_with = "disable")]
         ocr: bool,
         #[arg(long, conflicts_with = "disable")]
@@ -251,7 +253,13 @@ fn run() -> Result<()> {
                         .collect()
                 })
             };
-            let mut settings = Settings::default();
+            let mut settings = if path.exists() {
+                operations::load_settings(&dir)?
+            } else {
+                Settings::default()
+            };
+            settings.roots.clear();
+            settings.mode = xs_platform::SpeedMode::Standard;
             for root in roots {
                 let mut scope = Scope::new(absolute(root)?.to_string_lossy().into_owned());
                 scope.extensions = extensions.clone();
@@ -277,10 +285,10 @@ fn run() -> Result<()> {
                     !settings.roots.is_empty(),
                     "请通过 --root 明确添加目录，或 --defer 稍后设置"
                 );
-                settings.setup_state = SetupState::Completed;
+                settings.complete_setup();
             }
             let commit = operations::save_settings(&dir, &settings)?;
-            json!({"ok":true,"settings":settings,"commit":commit,"message":"范围已保存；运行 scan 后生效。正文、OCR、语义默认关闭。"})
+            json!({"ok":true,"settings":settings,"commit":commit,"message":"范围已保存；运行 scan 后生效。桌面应用在后台收录正文；OCR 和语义检索可单独启用。"})
         }
         Command::Volumes => serde_json::to_value(xs_platform::volumes()?)?,
         Command::Doctor { json, export } => {
@@ -358,12 +366,15 @@ fn run() -> Result<()> {
         Command::ContentConfigure {
             roots,
             disable,
+            follow,
             ocr,
             semantic,
         } => {
             let mut settings = operations::load_settings(&dir)?;
             let previous_scope = settings.content_scope_token()?;
-            if !disable {
+            if follow {
+                ensure!(!settings.roots.is_empty(), "请先设置文件收录范围");
+            } else if !disable {
                 settings.content_roots = roots
                     .into_iter()
                     .map(|path| {
@@ -378,6 +389,7 @@ fn run() -> Result<()> {
                     .collect::<Result<Vec<_>>>()?;
             }
             settings.content_enabled = !disable;
+            settings.content_follows_roots = follow;
             settings.ocr_enabled = ocr;
             settings.semantic_enabled = semantic;
             let commit = operations::save_settings(&dir, &settings)?;
@@ -438,7 +450,11 @@ fn run() -> Result<()> {
             semantic,
         } => {
             let mut reader = xs_content::ContentReader::new(&dir);
-            let options = xs_content::SearchOptions { limit, offset };
+            let options = xs_content::SearchOptions {
+                limit,
+                offset,
+                ..Default::default()
+            };
             let cancel = AtomicBool::new(false);
             let response = if semantic {
                 reader.search_mode(&query, xs_content::SearchMode::Semantic, &options, &cancel)?

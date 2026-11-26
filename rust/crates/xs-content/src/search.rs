@@ -43,6 +43,7 @@ pub enum SearchMode {
 pub struct SearchOptions {
     pub offset: usize,
     pub limit: usize,
+    pub extension_filter: Option<ExtensionFilter>,
 }
 
 impl Default for SearchOptions {
@@ -50,8 +51,15 @@ impl Default for SearchOptions {
         Self {
             offset: 0,
             limit: 40,
+            extension_filter: None,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct ExtensionFilter {
+    pub extensions: Vec<String>,
+    pub exclude: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -194,6 +202,14 @@ impl ContentReader {
         ensure!(
             (1..=MAX_PAGE).contains(&options.limit) && options.offset <= usize::MAX - MAX_PAGE,
             "正文分页大小应为 1–200"
+        );
+        ensure!(
+            options.extension_filter.as_ref().is_none_or(|filter| {
+                mode == SearchMode::Lexical
+                    && filter.extensions.len() <= 128
+                    && filter.extensions.iter().all(|ext| ext.len() <= 32)
+            }),
+            "正文类型筛选需要关键词查询与有效的扩展名"
         );
         let terms = Terms::parse(query)?;
         let result = self.search_current(query, &terms, mode, options, &cancel);
@@ -375,10 +391,38 @@ fn lexical_ranked(
     )?;
     let mut rows = rank.query([&terms.expression])?;
     let mut docs = HashSet::new();
+    let mut excluded = HashSet::new();
+    let filter = page.and_then(|options| options.extension_filter.as_ref());
+    let mut lookup = filter
+        .map(|_| {
+            catalog
+                .db
+                .prepare_cached("SELECT path FROM documents WHERE id=?")
+        })
+        .transpose()?;
     let mut ranked = Vec::new();
     while let Some(row) = rows.next()? {
         ensure!(!cancel.load(Ordering::Acquire), "正文查询已取消");
         let doc: i64 = row.get(0)?;
+        if docs.contains(&doc) || excluded.contains(&doc) {
+            continue;
+        }
+        if let (Some(filter), Some(lookup)) = (filter, lookup.as_mut()) {
+            let path: String = lookup.query_row([doc], |row| row.get(0))?;
+            let accepted = Path::new(&path)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| {
+                    filter
+                        .extensions
+                        .iter()
+                        .any(|item| ext.eq_ignore_ascii_case(item))
+                });
+            if accepted == filter.exclude {
+                excluded.insert(doc);
+                continue;
+            }
+        }
         if docs.insert(doc) {
             let rank = docs.len() - 1;
             if page.is_none_or(|options| {
@@ -408,13 +452,14 @@ fn lexical_page(
 
 struct LexicalCache {
     expression: String,
+    extension_filter: Option<ExtensionFilter>,
     total: usize,
     prefix: Vec<Ranked>,
 }
 
 impl LexicalCache {
     fn page(&self, expression: &str, options: &SearchOptions) -> Option<(usize, Vec<Ranked>)> {
-        if self.expression != expression {
+        if self.expression != expression || self.extension_filter != options.extension_filter {
             return None;
         }
         if options.offset >= self.total {
@@ -452,11 +497,13 @@ fn cached_lexical_page(
         &SearchOptions {
             offset: 0,
             limit: MAX_LEXICAL_CACHE_RESULTS,
+            extension_filter: options.extension_filter.clone(),
         },
         cancel,
     )?;
     let next = LexicalCache {
         expression: terms.expression.clone(),
+        extension_filter: options.extension_filter.clone(),
         total,
         prefix,
     };
@@ -508,6 +555,7 @@ fn model_cache_options(mode: SearchMode, options: &SearchOptions) -> Option<Sear
         limit: end
             .saturating_add(MODEL_CACHE_LOOKAHEAD)
             .min(MAX_MODEL_CACHE_RESULTS),
+        ..SearchOptions::default()
     })
 }
 
@@ -572,6 +620,7 @@ mod semantic_budget_tests {
         let options = SearchOptions {
             offset: 0,
             limit: 40,
+            ..SearchOptions::default()
         };
         let prefix = model_cache_options(SearchMode::Semantic, &options).unwrap();
         assert_eq!(prefix.limit, 296);
@@ -596,6 +645,7 @@ mod semantic_budget_tests {
                 &SearchOptions {
                     offset: 250,
                     limit: 40,
+                    ..SearchOptions::default()
                 },
             )
             .unwrap();
@@ -612,7 +662,8 @@ mod semantic_budget_tests {
                 SearchMode::Semantic,
                 &SearchOptions {
                     offset: 280,
-                    limit: 40
+                    limit: 40,
+                    ..SearchOptions::default()
                 }
             )
             .is_none());
@@ -622,7 +673,8 @@ mod semantic_budget_tests {
                 SearchMode::Semantic,
                 &SearchOptions {
                     offset: usize::MAX - 200,
-                    limit: 200
+                    limit: 200,
+                    ..SearchOptions::default()
                 }
             )
             .unwrap()
@@ -632,7 +684,8 @@ mod semantic_budget_tests {
             SearchMode::Semantic,
             &SearchOptions {
                 offset: 4096,
-                limit: 1
+                limit: 1,
+                ..SearchOptions::default()
             }
         )
         .is_none());
@@ -641,7 +694,8 @@ mod semantic_budget_tests {
                 SearchMode::Hybrid,
                 &SearchOptions {
                     offset: 4095,
-                    limit: 1
+                    limit: 1,
+                    ..SearchOptions::default()
                 }
             )
             .unwrap()
@@ -995,6 +1049,7 @@ mod tests {
             &SearchOptions {
                 limit: 1,
                 offset: 0,
+                ..SearchOptions::default()
             },
             &AtomicBool::new(false),
         )
@@ -1072,7 +1127,11 @@ mod semantic_topk_tests {
         assert_eq!(expected.len(), 500);
         assert_eq!(expected[0].doc, 7);
         for offset in [0, 1, 7, 100, 301, 499, 500] {
-            let options = SearchOptions { offset, limit: 17 };
+            let options = SearchOptions {
+                offset,
+                limit: 17,
+                ..SearchOptions::default()
+            };
             let (total, page) =
                 semantic_page(&catalog, std::slice::from_ref(&query), &options, &cancel).unwrap();
             assert_eq!(total, expected.len());
@@ -1195,6 +1254,7 @@ mod hybrid_rrf_tests {
             &SearchOptions {
                 offset: 0,
                 limit: 10,
+                ..SearchOptions::default()
             },
             &AtomicBool::new(false),
         )
@@ -1242,7 +1302,11 @@ mod hybrid_rrf_tests {
             let (total, actual) = rrf_fuse(
                 &lex,
                 &sem,
-                &SearchOptions { offset, limit: 200 },
+                &SearchOptions {
+                    offset,
+                    limit: 200,
+                    ..SearchOptions::default()
+                },
                 &AtomicBool::new(false),
             )
             .unwrap();
@@ -1302,7 +1366,11 @@ mod hybrid_rrf_tests {
             let (total, page) = rrf_fuse(
                 &lex,
                 &sem,
-                &SearchOptions { offset, limit: 37 },
+                &SearchOptions {
+                    offset,
+                    limit: 37,
+                    ..SearchOptions::default()
+                },
                 &AtomicBool::new(false),
             )
             .unwrap();
@@ -1318,6 +1386,7 @@ mod hybrid_rrf_tests {
             &SearchOptions {
                 offset: 450,
                 limit: 37,
+                ..SearchOptions::default()
             },
             &AtomicBool::new(false),
         )
@@ -1349,6 +1418,7 @@ mod lexical_cache_tests {
             })
             .collect();
         let cache = LexicalCache {
+            extension_filter: None,
             expression: "query".into(),
             total: 100,
             prefix,
@@ -1359,6 +1429,7 @@ mod lexical_cache_tests {
                 &SearchOptions {
                     offset: 8,
                     limit: 2,
+                    ..SearchOptions::default()
                 },
             )
             .unwrap();
@@ -1372,7 +1443,8 @@ mod lexical_cache_tests {
                 "query",
                 &SearchOptions {
                     offset: 8,
-                    limit: 3
+                    limit: 3,
+                    ..SearchOptions::default()
                 }
             )
             .is_none());
@@ -1382,7 +1454,8 @@ mod lexical_cache_tests {
                 "query",
                 &SearchOptions {
                     offset: 100,
-                    limit: 1
+                    limit: 1,
+                    ..SearchOptions::default()
                 }
             )
             .unwrap()

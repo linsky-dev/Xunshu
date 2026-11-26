@@ -180,6 +180,7 @@ impl Session<'_> {
                 &xs_content::SearchOptions {
                     limit: arguments.limit,
                     offset: 0,
+                    ..Default::default()
                 },
                 &AtomicBool::new(false),
             )?;

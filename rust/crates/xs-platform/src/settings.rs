@@ -126,6 +126,8 @@ pub struct Settings {
     pub content_roots: Vec<Scope>,
     #[serde(default)]
     pub content_enabled: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub content_follows_roots: bool,
     #[serde(default)]
     pub ocr_enabled: bool,
     #[serde(default)]
@@ -141,6 +143,7 @@ impl Default for Settings {
             roots: Vec::new(),
             content_roots: Vec::new(),
             content_enabled: false,
+            content_follows_roots: false,
             ocr_enabled: false,
             semantic_enabled: false,
         }
@@ -236,9 +239,15 @@ impl Settings {
                 "Reminder count must be between 0 and 3".into(),
             ));
         }
+        let roots = normalize_scopes(&self.roots)?;
+        let content_roots = if self.content_follows_roots {
+            roots.clone()
+        } else {
+            normalize_scopes(&self.content_roots)?
+        };
         Ok(Self {
-            roots: normalize_scopes(&self.roots)?,
-            content_roots: normalize_scopes(&self.content_roots)?,
+            roots,
+            content_roots,
             ..self.clone()
         })
     }
@@ -285,6 +294,15 @@ impl Settings {
         self.setup_state = SetupState::Deferred;
     }
     pub fn complete_setup(&mut self) {
+        if self.setup_state != SetupState::Completed
+            && !self.roots.is_empty()
+            && !self.content_enabled
+            && self.content_roots.is_empty()
+        {
+            self.content_enabled = true;
+            self.content_follows_roots = true;
+            self.content_roots = self.roots.clone();
+        }
         self.setup_state = SetupState::Completed;
     }
     pub fn reopen_setup(&mut self) {

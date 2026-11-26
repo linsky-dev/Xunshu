@@ -19,7 +19,6 @@ use xs_platform::{Scope, Settings};
 
 use crate::{desktop, ACCENT, BACKGROUND, BORDER, ERROR, INK, MUTED};
 
-const PAGE_SIZE: usize = 30;
 const MAX_REPLY_BYTES: usize = 8 * 1024 * 1024;
 const VALIDATION_INTERVAL: Duration = Duration::from_millis(500);
 const VALIDATION_TIMEOUT: Duration = Duration::from_secs(2);
@@ -174,6 +173,7 @@ fn read_reply(reader: &mut impl BufRead) -> Result<Option<Value>> {
 
 struct Form {
     enabled: bool,
+    follows_roots: bool,
     roots: String,
     ocr: bool,
     semantic: bool,
@@ -183,6 +183,7 @@ impl Form {
     fn from_settings(settings: &Settings) -> Self {
         Self {
             enabled: settings.content_enabled,
+            follows_roots: settings.content_follows_roots || !settings.content_enabled,
             roots: settings
                 .content_roots
                 .iter()
@@ -197,9 +198,13 @@ impl Form {
     fn settings(&self, base: &Settings) -> Result<Settings> {
         let mut settings = base.clone();
         settings.content_enabled = self.enabled;
+        settings.content_follows_roots = self.enabled && self.follows_roots;
         settings.ocr_enabled = self.enabled && self.ocr;
         settings.semantic_enabled = self.enabled && self.semantic;
-        if self.enabled {
+        if settings.content_follows_roots {
+            ensure!(!settings.roots.is_empty(), "请先设置文件收录范围");
+            settings.content_roots.clone_from(&settings.roots);
+        } else if self.enabled {
             settings.content_roots = self
                 .roots
                 .lines()
@@ -240,13 +245,16 @@ pub struct Pane {
     client: Option<Client>,
     form: Option<Form>,
     query: String,
-    last_query: String,
+    page_size: usize,
+    extension_filter: Option<xs_content::ExtensionFilter>,
+    next_watch: Option<Instant>,
+    automatic_watch: bool,
     offset: usize,
     id: u64,
     active: Option<u64>,
     pending: Option<SearchRequest>,
     results: Option<Arc<SearchResponse>>,
-    selected: usize,
+    keyboard_row: Option<usize>,
     notice: Option<String>,
     error: Option<String>,
     build: Option<(Arc<AtomicBool>, Receiver<BuildResult>)>,
@@ -254,14 +262,28 @@ pub struct Pane {
     next_validation: Option<Instant>,
     validation: Option<Validation>,
     mode: SearchMode,
-    last_mode: SearchMode,
     model_check: Option<Receiver<bool>>,
     models_ready: Option<bool>,
 }
 
 impl Pane {
-    pub fn start(&mut self, query: String, profile: &Path, ctx: &egui::Context) {
+    pub fn start(
+        &mut self,
+        query: String,
+        profile: &Path,
+        ctx: &egui::Context,
+        extension_filter: Option<xs_content::ExtensionFilter>,
+        quick: bool,
+        semantic: bool,
+    ) {
         self.query = query;
+        self.extension_filter = extension_filter;
+        self.mode = if semantic && self.extension_filter.is_none() {
+            SearchMode::Hybrid
+        } else {
+            SearchMode::Lexical
+        };
+        self.page_size = if quick { 2 } else { 3 };
         desktop::limit_text(&mut self.query, 1024);
         if let Err(error) = self.search(profile, ctx, 0) {
             self.error = Some(format!("无法查询正文：{error:#}"));
@@ -288,6 +310,7 @@ impl Pane {
         self.client = None;
         self.active = None;
         self.pending = None;
+        self.keyboard_row = None;
         self.results = None;
         self.validation = None;
         self.next_validation = None;
@@ -309,12 +332,10 @@ impl Pane {
         if let Some(request) = self.pending.take() {
             client.send(
                 json!({"id":request.id,"method":"search","query":request.query,"mode":request.mode,
-                "options":{"offset":request.offset,"limit":PAGE_SIZE}}),
+                "options":{"offset":request.offset,"limit":self.page_size,"extension_filter":self.extension_filter}}),
             )?;
             self.active = Some(request.id);
             self.offset = request.offset;
-            self.last_query = request.query;
-            self.last_mode = request.mode;
         }
         Ok(())
     }
@@ -326,11 +347,11 @@ impl Pane {
             self.client = Some(Client::spawn(profile, ctx)?);
         }
         self.id = self.id.wrapping_add(1).max(2);
+        self.keyboard_row = None;
         self.results = None;
         self.validation = None;
         self.next_validation = None;
         self.error = None;
-        self.selected = 0;
         self.pending = Some(SearchRequest {
             id: self.id,
             query: query.into(),
@@ -484,6 +505,7 @@ impl Pane {
             if let Some(result) = result {
                 self.build = None;
                 let was_watching = self.watch_status.take().is_some();
+                self.automatic_watch = false;
                 match result {
                     Ok(report) if report.cancelled => {
                         self.notice = Some(
@@ -589,20 +611,24 @@ impl Pane {
             self.mode = SearchMode::Lexical;
             self.release();
         }
-        ui.label(RichText::new("正文搜索").size(26.0).strong().color(INK));
-        ui.label(
-            RichText::new("只搜索单独授权的正文目录。结果包含可核对的段落、页码或表格位置。")
-                .color(MUTED),
-        );
+        ui.label(RichText::new("正文收录").size(26.0).strong().color(INK));
+        ui.label(RichText::new("已收录的正文会出现在主窗口与快捷搜索。").color(MUTED));
+        if let Some(coverage) = xs_content::coverage(profile) {
+            let status = if coverage.complete {
+                "上次全范围校准完成".to_owned()
+            } else {
+                format!("上次校准仅覆盖可读文档 · {} 项无法收录", coverage.failed)
+            };
+            ui.label(RichText::new(status).small().color(MUTED));
+        } else if settings.content_enabled && settings.content_follows_roots {
+            ui.label(RichText::new("后台正在准备索引").small().color(MUTED));
+        }
         ui.add_space(14.0);
         let mut start_build = false;
         let mut start_watch = false;
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(
-                    !saving && self.build.is_none(),
-                    egui::Button::new("正文收录范围"),
-                )
+                .add_enabled(!saving, egui::Button::new("正文收录范围"))
                 .clicked()
             {
                 self.form = Some(Form::from_settings(settings));
@@ -629,7 +655,7 @@ impl Pane {
                 ui.spinner();
             } else if ui
                 .add_enabled(
-                    !saving && settings.content_enabled,
+                    !saving && settings.content_enabled && !settings.content_follows_roots,
                     egui::Button::new("更新正文索引"),
                 )
                 .clicked()
@@ -638,7 +664,10 @@ impl Pane {
             }
             if ui
                 .add_enabled(
-                    !saving && settings.content_enabled && self.build.is_none(),
+                    !saving
+                        && settings.content_enabled
+                        && !settings.content_follows_roots
+                        && self.build.is_none(),
                     egui::Button::new("启动实时收录"),
                 )
                 .on_hover_text("仅在当前应用运行时监听已授权范围；停止后下次启动先完整校准")
@@ -681,12 +710,15 @@ impl Pane {
                 .show(ui, |ui| {
                     ui.checkbox(&mut form.enabled, "启用正文收录");
                     if form.enabled {
-                        ui.label("输入本地绝对路径，每行一个目录。");
-                        ui.add(
-                            egui::TextEdit::multiline(&mut form.roots)
-                                .desired_width(f32::INFINITY)
-                                .desired_rows(3),
-                        );
+                        ui.checkbox(&mut form.follows_roots, "跟随文件收录范围");
+                        if !form.follows_roots {
+                            ui.label("输入本地绝对路径，每行一个目录。");
+                            ui.add(
+                                egui::TextEdit::multiline(&mut form.roots)
+                                    .desired_width(f32::INFINITY)
+                                    .desired_rows(3),
+                            );
+                        }
                         let models_ready = self.models_ready == Some(true);
                         ui.horizontal(|ui| {
                             ui.add_enabled(
@@ -730,135 +762,147 @@ impl Pane {
         if let Some(notice) = &self.notice {
             ui.label(RichText::new(notice).small().color(MUTED));
         }
-        if !settings.content_enabled || saving {
-            return change;
-        }
-        ui.add_space(12.0);
-        if settings.semantic_enabled {
-            ui.horizontal(|ui| {
-                let previous = self.mode;
-                ui.selectable_value(&mut self.mode, SearchMode::Lexical, "关键词");
-                ui.selectable_value(&mut self.mode, SearchMode::Semantic, "语义");
-                ui.selectable_value(&mut self.mode, SearchMode::Hybrid, "混合 RRF");
-                if previous != self.mode {
-                    self.release();
-                }
-            });
-        }
-        let mut search = false;
-        ui.horizontal(|ui| {
-            let width = (ui.available_width() - 94.0).max(100.0);
-            let edit = ui.add_sized(
-                [width, 32.0],
-                egui::TextEdit::singleline(&mut self.query).hint_text("输入正文关键词"),
-            );
-            desktop::limit_text(&mut self.query, 1024);
-            search = ui.button("搜索正文").clicked()
-                || (edit.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)));
-        });
-        if self.active.is_some() || self.pending.is_some() {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label("正在查询正文…");
-                if ui.button("取消查询").clicked() {
-                    self.release();
-                }
-            });
-        }
-        let page = self
-            .results
-            .clone()
-            .and_then(|response| self.show_results(ui, &response));
-        if search || page.is_some() {
-            if let Err(error) = self.search(profile, ui.ctx(), page.unwrap_or(0)) {
-                self.release();
-                self.error = Some(format!("无法查询正文：{error:#}"));
-            }
-        }
         change
     }
 
-    fn show_results(&mut self, ui: &mut egui::Ui, response: &SearchResponse) -> Option<usize> {
-        ui.add_space(8.0);
-        ui.label(format!("索引中匹配 {} 份文档", response.indexed_total));
-        if response.omitted_stale > 0 {
-            ui.label(
-                RichText::new(format!("已省略 {} 条失效结果", response.omitted_stale))
-                    .small()
-                    .color(MUTED),
-            );
-        }
+    pub fn clear_search(&mut self) {
+        self.id = self.id.wrapping_add(1).max(2);
+        self.pending = None;
+        self.keyboard_row = None;
+        self.results = None;
+        self.validation = None;
+        self.error = None;
+    }
+
+    pub fn combined_results(
+        &mut self,
+        ui: &mut egui::Ui,
+        profile: &Path,
+        quick: bool,
+    ) -> Option<String> {
+        let mut open = None;
         let mut next = None;
-        ui.horizontal(|ui| {
-            let unchanged_query =
-                self.query.trim() == self.last_query && self.mode == self.last_mode;
-            if ui
-                .add_enabled(
-                    unchanged_query && self.offset != 0,
-                    egui::Button::new("上一页"),
-                )
-                .clicked()
-            {
-                next = Some(self.offset.saturating_sub(PAGE_SIZE));
+        if let Some(response) = &self.results {
+            if response.indexed_total == 0 {
+                return None;
             }
-            if ui
-                .add_enabled(
-                    unchanged_query && self.offset + PAGE_SIZE < response.indexed_total,
-                    egui::Button::new("下一页"),
-                )
-                .clicked()
-            {
-                next = Some(self.offset + PAGE_SIZE);
-            }
-        });
-        egui::ScrollArea::vertical()
-            .id_salt("content_hits")
-            .max_height(180.0)
-            .show(ui, |ui| {
-                for (row, hit) in response.hits.iter().enumerate() {
-                    let name = Path::new(&hit.path)
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or(&hit.path);
-                    let button = egui::Button::selectable(
-                        self.selected == row,
-                        format!("{name} · {}", location(&hit.location)),
-                    )
-                    .truncate();
-                    if ui
-                        .add_sized([ui.available_width(), 32.0], button)
-                        .on_hover_text(&hit.path)
-                        .clicked()
-                    {
-                        self.selected = row;
-                    }
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new(format!("正文命中 · {} 份", response.indexed_total))
+                        .strong()
+                        .color(ACCENT),
+                );
+                if self.offset > 0 && ui.small_button("上一组").clicked() {
+                    next = Some(self.offset.saturating_sub(self.page_size));
+                }
+                if self.offset + self.page_size < response.indexed_total
+                    && ui.small_button("下一组").clicked()
+                {
+                    next = Some(self.offset + self.page_size);
                 }
             });
-        if let Some(hit) = response.hits.get(self.selected) {
-            ui.add_space(8.0);
-            egui::Frame::new()
-                .fill(BACKGROUND)
-                .inner_margin(14)
-                .show(ui, |ui| {
-                    ui.label(
-                        RichText::new(format!("命中预览 · {}", location(&hit.location))).strong(),
+            for (row, hit) in response.hits.iter().enumerate() {
+                let name = Path::new(&hit.path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(&hit.path);
+                let response = ui
+                    .add(
+                        egui::Button::selectable(
+                            self.keyboard_row == Some(row),
+                            format!("{name}  ·  {}", location(&hit.location)),
+                        )
+                        .truncate(),
+                    )
+                    .on_hover_text(&hit.path);
+                if response.clicked() {
+                    open = Some(hit.path.clone());
+                }
+                if !quick {
+                    ui.add(egui::Label::new(preview(hit)).truncate());
+                } else {
+                    ui.add(
+                        egui::Label::new(RichText::new(&hit.snippet).small().color(MUTED))
+                            .truncate(),
                     );
-                    ui.label(
-                        RichText::new(format!(
-                            "命中依据：{} · 文件身份和授权已校验",
-                            hit.evidence.label()
-                        ))
-                        .small()
-                        .color(MUTED),
-                    );
-                    egui::ScrollArea::vertical()
-                        .id_salt("content_preview")
-                        .show(ui, |ui| {
-                            ui.label(preview(hit));
-                        });
-                });
+                }
+            }
+            ui.separator();
+        } else if self.active.is_some() || self.pending.is_some() {
+            ui.label(RichText::new("正在补充正文命中…").small().color(MUTED));
+        } else if let Some(error) = &self.error {
+            ui.label(RichText::new("正文暂不可用").small().color(MUTED))
+                .on_hover_text(error);
         }
-        next
+        if let Some(offset) = next {
+            if let Err(error) = self.search(profile, ui.ctx(), offset) {
+                self.clear_search();
+                self.error = Some(error.to_string());
+            }
+        }
+        open
+    }
+
+    pub fn open_hit(&self, profile: &Path, path: &str) -> Result<()> {
+        let response = self
+            .results
+            .as_ref()
+            .context("正文结果已更新，请重新选择")?;
+        ensure!(
+            response.hits.iter().any(|hit| hit.path == path),
+            "正文结果已变更"
+        );
+        xs_content::validate_response(profile, response)?;
+        crate::open_path(Path::new(path))
+    }
+
+    pub fn hit_count(&self) -> usize {
+        self.results
+            .as_ref()
+            .map_or(0, |response| response.hits.len())
+    }
+
+    pub fn selected_row(&self) -> Option<usize> {
+        self.keyboard_row
+    }
+
+    pub fn select_row(&mut self, row: Option<usize>) {
+        self.keyboard_row = row;
+    }
+
+    pub fn selected_path(&self) -> Option<&str> {
+        Some(
+            self.results
+                .as_ref()?
+                .hits
+                .get(self.keyboard_row?)?
+                .path
+                .as_str(),
+        )
+    }
+
+    pub fn first_path(&self) -> Option<&str> {
+        self.results
+            .as_ref()?
+            .hits
+            .first()
+            .map(|hit| hit.path.as_str())
+    }
+
+    pub fn sync_background(&mut self, profile: &Path, ctx: &egui::Context, enabled: bool) {
+        if !enabled {
+            if self.automatic_watch {
+                self.cancel_build();
+            }
+        } else if self.build.is_none() && self.next_watch.is_none_or(|next| Instant::now() >= next)
+        {
+            self.next_watch = Some(Instant::now() + Duration::from_secs(10));
+            match self.watch(profile, ctx) {
+                Ok(()) => self.automatic_watch = true,
+                Err(error) => self.error = Some(error.to_string()),
+            }
+            ctx.request_repaint_after(Duration::from_secs(10));
+        }
     }
 }
 

@@ -423,14 +423,14 @@ struct WatchProcess {
 }
 
 impl WatchProcess {
-    fn start(executable: &Path, data_dir: &Path) -> Result<Self> {
+    fn start(executable: &Path, data_dir: &Path, subcommand: &str) -> Result<Self> {
         xs_platform::validate_local_path(executable, false)?;
         let job = configure_job()?;
         let mut child = Command::new(executable)
             .args([
                 OsStr::new("--data-dir"),
                 data_dir.as_os_str(),
-                OsStr::new("watch"),
+                OsStr::new(subcommand),
             ])
             .creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS)
             .stdin(Stdio::null())
@@ -486,6 +486,8 @@ struct Host {
     queries: [String; 2],
     pending_view: Option<View>,
     watch: Option<WatchProcess>,
+    content_watch: Option<WatchProcess>,
+    content_check: Instant,
     watch_paused: bool,
     watch_retry: Instant,
     scan: Option<ScanJob>,
@@ -545,6 +547,7 @@ impl Host {
     fn update(&mut self) -> Result<()> {
         self.update_scan();
         self.update_watch();
+        self.update_content_watch();
         let Some(renderer) = &mut self.renderer else {
             return Ok(());
         };
@@ -682,7 +685,28 @@ impl Host {
             .is_ok_and(|settings| !settings.roots.is_empty())
         {
             let cli = self.executable.with_file_name("xunshu.exe");
-            self.watch = WatchProcess::start(&cli, &self.data_dir).ok();
+            self.watch = WatchProcess::start(&cli, &self.data_dir, "watch").ok();
+        }
+    }
+
+    fn update_content_watch(&mut self) {
+        if Instant::now() < self.content_check {
+            return;
+        }
+        self.content_check = Instant::now() + Duration::from_secs(5);
+        let enabled = xs_core::operations::load_settings(&self.data_dir).is_ok_and(|s| {
+            s.content_enabled && s.content_follows_roots && !s.content_roots.is_empty()
+        });
+        if !enabled {
+            self.content_watch = None;
+        } else if self.content_watch.as_mut().is_none_or(|process| {
+            !process
+                .child
+                .try_wait()
+                .is_ok_and(|status| status.is_none())
+        }) {
+            let cli = self.executable.with_file_name("xunshu.exe");
+            self.content_watch = WatchProcess::start(&cli, &self.data_dir, "content-watch").ok();
         }
     }
 
@@ -1055,6 +1079,8 @@ pub fn run(
         queries,
         pending_view: None,
         watch: None,
+        content_watch: None,
+        content_check: Instant::now(),
         watch_paused: false,
         watch_retry: Instant::now(),
         scan: None,

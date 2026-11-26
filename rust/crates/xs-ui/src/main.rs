@@ -89,7 +89,7 @@ impl Args {
                 Some("--standalone") => mode = DesktopMode::Standalone,
                 Some("--desktop-render") => mode = DesktopMode::Renderer,
                 Some("--help" | "-h") => {
-                    println!("寻枢 Rust 原生界面\n\nxs-ui [--data-dir 绝对路径] [--query 查询文本] [--font 本地字体] [--quick | --content] [--standalone | --background | --smoke-test]\n\n--quick 打开快捷搜索框。\n--content 直接打开正文页。\n--standalone 单独显示窗口，不启动托盘。\n--background 在 Windows 启动常驻托盘，不显示窗口。\n--smoke-test 验证原生窗口，不启动扫描。");
+                    println!("寻枢 Rust 原生界面\n\nxs-ui [--data-dir 绝对路径] [--query 查询文本] [--font 本地字体] [--quick | --content] [--standalone | --background | --smoke-test]\n\n--quick 打开快捷搜索框。\n--content 在冒烟测试中验证正文命中。\n--standalone 单独显示窗口，不启动托盘。\n--background 在 Windows 启动常驻托盘，不显示窗口。\n--smoke-test 验证原生窗口，不启动扫描。");
                     std::process::exit(0);
                 }
                 _ => bail!("无法识别的参数：{}", arg.to_string_lossy()),
@@ -159,6 +159,32 @@ impl Filter {
             Self::Other => "其他",
         }
     }
+    fn body_extensions(self) -> Option<xs_content::ExtensionFilter> {
+        let key = match self {
+            Self::Documents => "doc",
+            Self::Pictures => "pic",
+            Self::Audio => "audio",
+            Self::Video => "video",
+            Self::Archives => "archive",
+            Self::Other => "",
+            _ => return None,
+        };
+        let keys = if key.is_empty() {
+            &["doc", "pic", "audio", "video", "archive"][..]
+        } else {
+            std::slice::from_ref(&key)
+        };
+        Some(xs_content::ExtensionFilter {
+            extensions: keys
+                .iter()
+                .filter_map(|key| xs_query::category_extensions(key))
+                .flatten()
+                .map(|ext| (*ext).to_owned())
+                .collect(),
+            exclude: self == Self::Other,
+        })
+    }
+
     fn query(self, query: &str) -> String {
         // 复用索引查询的分类规则，在计数和分页之前执行筛选。
         let prefix = match self {
@@ -460,6 +486,7 @@ enum Message {
     },
     Activity(std::result::Result<activity::Activity, String>),
     ExternalChange,
+    BodyPublished(bool),
     Progress {
         request: u64,
         progress: ScanProgress,
@@ -611,9 +638,12 @@ struct App {
     connectors: connectors_ui::ConnectorsPane,
     installed_apps: Vec<xs_platform::apps::AppEntry>,
     content_tab: bool,
+    quick_recent_selection: Option<usize>,
+    show_content_settings: bool,
+    body_available: bool,
+    host_manages_body: bool,
     content: content::Pane,
     close_after_content: bool,
-    initial_content_query: Option<String>,
     content_smoke_since: Option<Instant>,
     #[cfg(windows)]
     native_window: Option<windows_sys::Win32::Foundation::HWND>,
@@ -639,9 +669,15 @@ fn monitor_profile(dir: PathBuf, stop: Arc<AtomicBool>, tx: Sender<Message>, ctx
             (scope, generation)
         };
         let mut previous = read();
+        let mut body = xs_content::index_revision(&dir);
         while !stop.load(Ordering::Relaxed) {
             std::thread::sleep(Duration::from_millis(400));
             let current = read();
+            let current_body = xs_content::index_revision(&dir);
+            if current_body != body {
+                body = current_body;
+                send(&tx, &ctx, Message::BodyPublished(body.is_some()));
+            }
             if current != previous {
                 previous = current;
                 send(&tx, &ctx, Message::ExternalChange);
@@ -944,9 +980,6 @@ impl App {
         let brand_icon =
             cc.egui_ctx
                 .load_texture("xunshu_brand", icon, egui::TextureOptions::LINEAR);
-        let initial_content_query = (args.content
-            && !view_queries[View::Main.index()].trim().is_empty())
-        .then(|| view_queries[View::Main.index()].clone());
         let (tx, rx) = mpsc::channel();
         let monitor_stop = Arc::new(AtomicBool::new(false));
         if !args.smoke_test {
@@ -1034,10 +1067,13 @@ impl App {
             diagnostics: diagnostics::Pane::default(),
             connectors: connectors_ui::ConnectorsPane::default(),
             installed_apps: xs_platform::apps::discover_installed_apps(),
-            content_tab: args.content,
+            content_tab: args.content && args.smoke_test,
+            quick_recent_selection: None,
+            show_content_settings: false,
+            body_available: false,
+            host_manages_body: cfg!(windows) && args.mode == DesktopMode::Renderer,
             content: content::Pane::default(),
             close_after_content: false,
-            initial_content_query,
             content_smoke_since: None,
             #[cfg(windows)]
             native_window: desktop::windows::native_window(cc),
@@ -1184,14 +1220,17 @@ impl App {
             } else {
                 self.results.as_ref().map_or(0, |r| r.results.len())
             };
-            let count = apps + connectors + files;
+            let body_start = apps + connectors;
+            let file_start = body_start + self.content.hit_count();
+            let count = file_start + files;
             if count == 0 {
                 return;
             }
             let current = self
                 .selected_app
                 .or_else(|| self.selected_connector.map(|n| n + apps))
-                .or_else(|| self.selected.map(|n| n + apps + connectors));
+                .or_else(|| self.content.selected_row().map(|n| n + body_start))
+                .or_else(|| self.selected.map(|n| n + file_start));
             let next = if down {
                 current.map_or(0, |n| (n + 1).min(count - 1))
             } else {
@@ -1200,8 +1239,12 @@ impl App {
             self.selected_app = (next < apps).then_some(next);
             self.selected_connector =
                 (next >= apps && next < apps + connectors).then_some(next.saturating_sub(apps));
-            self.selected =
-                (next >= apps + connectors).then_some(next.saturating_sub(apps + connectors));
+            self.content.select_row(
+                (body_start..file_start)
+                    .contains(&next)
+                    .then_some(next.saturating_sub(body_start)),
+            );
+            self.selected = (next >= file_start).then_some(next.saturating_sub(file_start));
             return;
         }
         if let Some(count) = self
@@ -1333,6 +1376,8 @@ impl App {
     }
     fn schedule_search(&mut self, immediate: bool) {
         self.cancel_query();
+        self.content.clear_search();
+        self.quick_recent_selection = None;
         self.gate.next();
         self.offset = 0;
         self.budget_ms = 2500;
@@ -1356,6 +1401,7 @@ impl App {
     fn reload(&mut self, ctx: &egui::Context, offer_setup: bool) {
         self.cancel_query();
         self.gate.invalidate_index();
+        self.content.clear_search();
         self.results = None;
         self.selected = None;
         self.preview = None;
@@ -1379,6 +1425,9 @@ impl App {
     }
     fn run_search(&mut self, ctx: &egui::Context) {
         self.search_due = None;
+        if self.offset == 0 {
+            self.run_body_search(ctx);
+        }
         if self.external_only() {
             self.cancel_query();
             self.search_error = None;
@@ -1641,6 +1690,12 @@ impl App {
                     }
                 }
                 Message::ExternalChange => self.reload(ctx, false),
+                Message::BodyPublished(available) => {
+                    self.body_available = available;
+                    if !self.loading {
+                        self.run_body_search(ctx);
+                    }
+                }
                 Message::VolumeCards(volumes) => {
                     if let Some(wizard) = &mut self.wizard {
                         wizard.volumes = Some(volumes);
@@ -1675,13 +1730,9 @@ impl App {
                             if loaded.offer_setup {
                                 self.start_wizard(ctx, true);
                             }
-                            if self.content_tab {
-                                if let Some(query) = self.initial_content_query.take() {
-                                    self.content.start(query, &self.data_dir, ctx);
-                                }
-                            } else {
-                                self.schedule_search(true);
-                            }
+                            self.body_available =
+                                xs_content::index_revision(&self.data_dir).is_some();
+                            self.schedule_search(true);
                         }
                         Err(e) => {
                             self.index = None;
@@ -1808,8 +1859,7 @@ impl App {
                             if !matches!(action, SaveAction::Content) {
                                 self.wizard = None;
                             } else {
-                                self.notice =
-                                    Some("正文范围已保存，更新正文索引后即可搜索。".into());
+                                self.notice = Some("正文收录设置已保存。".into());
                             }
                             if matches!(action, SaveAction::Apply) && !self.close_after_save {
                                 if changed {
@@ -1818,7 +1868,7 @@ impl App {
                                     self.selected = None;
                                 }
                                 self.scan(ctx);
-                            } else if content_changed && !self.content_tab {
+                            } else if content_changed {
                                 self.schedule_search(true);
                             }
                             if let Some(warning) = saved.warning {
@@ -1934,18 +1984,8 @@ impl App {
                         {
                             configure_visuals(ctx, self.high_contrast);
                         }
-                        let was_content = self.content_tab;
-                        ui.selectable_value(&mut self.content_tab, true, "正文");
-                        ui.selectable_value(&mut self.content_tab, false, "文件名");
-                        if was_content != self.content_tab {
-                            if self.content_tab {
-                                self.cancel_query();
-                                self.search_due = None;
-                            } else {
-                                self.content.release();
-                                self.focus_query = true;
-                                self.schedule_search(true);
-                            }
+                        if ui.button("正文收录").clicked() {
+                            self.show_content_settings = true;
                         }
                     });
                 });
@@ -2117,24 +2157,114 @@ impl App {
                 }
             });
     }
-    fn content_panel(&mut self, ctx: &egui::Context) {
-        let candidate = egui::CentralPanel::default()
-            .frame(
-                egui::Frame::new()
-                    .fill(Color32::WHITE)
-                    .inner_margin(egui::Margin::symmetric(28, 24)),
-            )
+    fn content_settings(&mut self, ctx: &egui::Context) {
+        if !self.show_content_settings {
+            return;
+        }
+        let mut open = true;
+        let candidate = egui::Window::new("索引设置")
+            .open(&mut open)
+            .default_width(620.0)
             .show(ctx, |ui| {
                 self.settings
                     .as_ref()
                     .and_then(|settings| self.content.ui(ui, &self.data_dir, settings, self.saving))
             })
-            .inner;
+            .and_then(|result| result.inner)
+            .flatten();
+        self.show_content_settings = open;
         if let Some(candidate) = candidate {
             self.content.release();
             self.save(ctx, candidate, SaveAction::Content);
         }
     }
+
+    fn run_body_search(&mut self, ctx: &egui::Context) {
+        let query = self.query.trim();
+        // 显式字段、通配符和布尔表达式保留文件名查询语义。
+        if self.external_only()
+            || self.filter == Filter::Folders
+            || query.is_empty()
+            || query.starts_with(['!', '-'])
+            || query.contains([':', '：', '/', '\\', '*', '?', '|', '<', '>', '"'])
+            || !self.body_available
+        {
+            self.content.clear_search();
+            return;
+        }
+        if let Some(settings) = self.settings.as_ref().filter(|s| s.content_enabled) {
+            self.content.start(
+                query.to_owned(),
+                &self.data_dir,
+                ctx,
+                self.filter.body_extensions(),
+                self.view == View::Quick,
+                settings.semantic_enabled,
+            );
+        }
+    }
+
+    fn show_body_results(&mut self, ui: &mut egui::Ui, quick: bool) -> bool {
+        if !self.body_available
+            && !self.query.trim().is_empty()
+            && self
+                .settings
+                .as_ref()
+                .is_some_and(|s| s.content_enabled && s.content_follows_roots)
+        {
+            ui.label(
+                RichText::new("正文正在后台收录，文件名可先搜索")
+                    .small()
+                    .color(MUTED),
+            );
+        }
+        if let Some(path) = self.content.combined_results(ui, &self.data_dir, quick) {
+            self.open_body_result(&path, ui.ctx());
+        }
+        self.content.first_path().is_some()
+    }
+
+    fn open_body_result(&mut self, path: &str, ctx: &egui::Context) {
+        match self.content.open_hit(&self.data_dir, path) {
+            Ok(()) => {
+                self.activity_job(ctx, Some(activity::Edit::RecordLaunch(path.to_owned())));
+                if self.view == View::Quick {
+                    self.request_close(ctx);
+                }
+            }
+            Err(error) => self.error = Some(error.to_string()),
+        }
+    }
+
+    fn open_recent(&mut self, recent: &str, ctx: &egui::Context) {
+        let result = (|| -> Result<()> {
+            let settings = operations::load_settings(&self.data_dir)?;
+            let path = Path::new(recent);
+            let in_name_scope = xs_platform::inspect_scoped_entry(
+                &settings,
+                path,
+                std::slice::from_ref(&self.data_dir),
+            )?
+            .is_some_and(|entry| !entry.is_dir);
+            let in_body_scope = settings.allows_content(path, false)?
+                && !xs_platform::local_path_within(path, &self.data_dir)?
+                && xs_platform::validate_local_path(path, false).is_ok()
+                && path.is_file();
+            ensure!(
+                in_name_scope || in_body_scope,
+                "最近文件已移动或超出当前收录范围"
+            );
+            open_path(path)
+        })();
+        match result {
+            Ok(()) => {
+                self.activity_job(ctx, Some(activity::Edit::RecordLaunch(recent.to_owned())));
+                self.request_close(ctx);
+            }
+            Err(error) => self.error = Some(error.to_string()),
+        }
+    }
+
     fn quick_panel(&mut self, ctx: &egui::Context, ime_active: bool) {
         let (down, up, enter, escape) = if ime_active {
             (false, false, false, false)
@@ -2159,6 +2289,56 @@ impl App {
         }
         let mut open = false;
         let mut show_main = false;
+        let mut open_recent = None;
+        let mut recent = Vec::new();
+        if self.query.trim().is_empty() {
+            if let Some(settings) = &self.settings {
+                recent = self
+                    .activity
+                    .frecency
+                    .iter()
+                    .filter(|row| {
+                        let path = Path::new(&row.path);
+                        settings.allows_filename(path, false).unwrap_or(false)
+                            || settings.allows_content(path, false).unwrap_or(false)
+                    })
+                    .take(4)
+                    .cloned()
+                    .collect::<Vec<_>>();
+            }
+        }
+        if !recent.is_empty() {
+            if down {
+                self.quick_recent_selection = Some(
+                    self.quick_recent_selection
+                        .map_or(0, |row| (row + 1).min(recent.len() - 1)),
+                );
+            } else if up {
+                self.quick_recent_selection =
+                    Some(self.quick_recent_selection.unwrap_or(0).saturating_sub(1));
+            } else if enter {
+                open_recent = recent
+                    .get(self.quick_recent_selection.unwrap_or(0))
+                    .map(|item| item.path.clone());
+            }
+        }
+        if !ime_active {
+            ctx.input_mut(|input| {
+                for (row, key) in [
+                    egui::Key::Num1,
+                    egui::Key::Num2,
+                    egui::Key::Num3,
+                    egui::Key::Num4,
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    if input.consume_key(egui::Modifiers::COMMAND, key) {
+                        open_recent = recent.get(row).map(|item| item.path.clone());
+                    }
+                }
+            });
+        }
         let mut changed = false;
         let mut launch_app_row = None;
         let mut open_connector_row = None;
@@ -2172,15 +2352,22 @@ impl App {
                     .inner_margin(egui::Margin::symmetric(16, 9)),
             )
             .show(ctx, |ui| {
-                ui.label(
-                    RichText::new(if self.searching {
-                        "正在搜索…"
-                    } else {
-                        "方向键选择 · 回车打开 · app:/bm:/git:/src:限定来源 · Esc 隐藏"
-                    })
-                    .small()
-                    .color(MUTED),
-                );
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(if self.searching {
+                            "正在搜索…"
+                        } else {
+                            "↑↓ 选择   Enter 打开   Esc 隐藏"
+                        })
+                        .small()
+                        .color(MUTED),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.small_button("打开主窗口 ↗").clicked() {
+                            show_main = true;
+                        }
+                    });
+                });
             });
         egui::CentralPanel::default()
             .frame(
@@ -2190,14 +2377,11 @@ impl App {
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    magnifier(ui, 18.0, ACCENT);
-                    ui.label(RichText::new("快捷搜索").strong().size(16.0).color(INK));
+                    ui.image((self.brand_icon.id(), Vec2::splat(22.0)));
+                    ui.label(RichText::new("寻枢快捷搜索").strong().size(15.0).color(INK));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.small_button("隐藏").clicked() {
                             self.request_close(ctx);
-                        }
-                        if ui.small_button("主窗口").clicked() {
-                            show_main = true;
                         }
                     });
                 });
@@ -2207,7 +2391,7 @@ impl App {
                     egui::TextEdit::singleline(&mut self.query)
                         .id_salt("quick_query")
                         .font(FontId::proportional(18.0))
-                        .hint_text("文件/应用/书签/仓库/来源；app:/bm:/git:/src:"),
+                        .hint_text("搜索文件名、正文或应用"),
                 );
                 if self.focus_query {
                     self.focus_query = false;
@@ -2215,6 +2399,17 @@ impl App {
                 }
                 changed = edit.changed();
                 ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    for filter in Filter::OPTIONS {
+                        if ui
+                            .selectable_label(self.filter == filter, filter.label())
+                            .clicked()
+                        {
+                            self.filter = filter;
+                            self.schedule_search(true);
+                        }
+                    }
+                });
                 ui.separator();
                 if !app_hits.is_empty() {
                     ui.label(RichText::new("本机应用").small().color(ACCENT));
@@ -2231,6 +2426,7 @@ impl App {
                             self.selected_app = Some(row);
                             self.selected_connector = None;
                             self.selected = None;
+                            self.content.select_row(None);
                             edit.request_focus();
                         }
                         if response.double_clicked() {
@@ -2261,6 +2457,7 @@ impl App {
                             self.selected_connector = Some(row);
                             self.selected_app = None;
                             self.selected = None;
+                            self.content.select_row(None);
                             edit.request_focus();
                         }
                         if response.double_clicked() {
@@ -2269,6 +2466,7 @@ impl App {
                     }
                     ui.separator();
                 }
+                let body_hits = self.show_body_results(ui, true);
                 if let Some(error) = self.search_error.as_ref().or(self.error.as_ref()) {
                     ui.colored_label(ERROR, format!("操作未完成：{error}"));
                 } else if external_only {
@@ -2282,17 +2480,70 @@ impl App {
                     }
                 } else if self.loading {
                     empty_state(ui, "正在加载索引", "稍候即可搜索已收录的文件。", true);
-                } else if self.index.is_none() {
+                } else if self.query.trim().is_empty() && !changed && !recent.is_empty() {
+                    ui.label(RichText::new("最近打开").strong().color(INK));
+                    for (row, entry) in recent.iter().enumerate() {
+                        let path = Path::new(&entry.path);
+                        let name = path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .unwrap_or(&entry.path);
+                        let parent = path
+                            .parent()
+                            .map(|path| path.to_string_lossy())
+                            .unwrap_or_default();
+                        let extension = path
+                            .extension()
+                            .and_then(|ext| ext.to_str())
+                            .unwrap_or("文件");
+                        ui.horizontal(|ui| {
+                            let tile = extension.chars().take(4).collect::<String>().to_uppercase();
+                            ui.add_sized(
+                                [42.0, 28.0],
+                                egui::Label::new(
+                                    RichText::new(tile).small().strong().color(ACCENT),
+                                )
+                                .truncate(),
+                            );
+                            ui.vertical(|ui| {
+                                if ui
+                                    .add(
+                                        egui::Button::selectable(
+                                            self.quick_recent_selection == Some(row),
+                                            name,
+                                        )
+                                        .truncate(),
+                                    )
+                                    .on_hover_text(&entry.path)
+                                    .clicked()
+                                {
+                                    open_recent = Some(entry.path.clone());
+                                }
+                                ui.add(
+                                    egui::Label::new(RichText::new(parent).small().color(MUTED))
+                                        .truncate(),
+                                );
+                            });
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        RichText::new(format!("Ctrl+{}", row + 1))
+                                            .small()
+                                            .color(MUTED),
+                                    );
+                                },
+                            );
+                        });
+                    }
+                } else if self.index.is_none() && !body_hits {
                     empty_state(ui, "还没有可用索引", "在主窗口设置范围并扫描文件。", false);
                 } else if self.query.trim().is_empty() {
-                    empty_state(
-                        ui,
-                        "搜索本地文件",
-                        "例如：项目计划、ext:pdf、pinyin:baogao",
-                        false,
-                    );
+                    empty_state(ui, "搜索本地文件", "输入文件名或记得的一段正文。", false);
                 } else if let Some(results) = &self.results {
-                    if results.results.is_empty() {
+                    if results.results.is_empty() && body_hits {
+                        // 正文命中已经在同一个快捷窗口内显示。
+                    } else if results.results.is_empty() {
                         let title = if results.complete {
                             "没有匹配的文件"
                         } else {
@@ -2305,19 +2556,28 @@ impl App {
                             .id_salt("quick_results")
                             .show(ui, |ui| {
                                 for (row, hit) in results.results.iter().enumerate() {
-                                    let title = format!(
-                                        "{}  ·  {}",
-                                        hit.name,
-                                        if hit.is_dir { "文件夹" } else { "文件" }
-                                    );
+                                    let path = Path::new(&hit.path);
+                                    let kind = if hit.is_dir {
+                                        "目录"
+                                    } else {
+                                        path.extension()
+                                            .and_then(|ext| ext.to_str())
+                                            .unwrap_or("文件")
+                                    };
+                                    let parent = path
+                                        .parent()
+                                        .map(|path| path.to_string_lossy())
+                                        .unwrap_or_default();
+                                    let title = format!("{}  ·  {}\n{}", hit.name, kind, parent);
                                     let response = ui
                                         .add_sized(
-                                            [ui.available_width(), 34.0],
+                                            [ui.available_width(), 42.0],
                                             egui::Button::selectable(selected == Some(row), title)
                                                 .truncate(),
                                         )
                                         .on_hover_text(&hit.path);
                                     if response.clicked() {
+                                        self.content.select_row(None);
                                         selected = Some(row);
                                         self.selected_app = None;
                                         self.selected_connector = None;
@@ -2348,10 +2608,17 @@ impl App {
                     }
                 }
             });
+        if let Some(path) = open_recent.filter(|_| !changed) {
+            self.open_recent(&path, ctx);
+        }
         if changed {
             self.query_edited();
             self.schedule_search(false);
         } else if enter && !self.query.trim().is_empty() {
+            if let Some(path) = self.content.selected_path().map(str::to_owned) {
+                self.open_body_result(&path, ctx);
+                return;
+            }
             if self.selected_app.is_none()
                 && self.selected_connector.is_none()
                 && self.selected.is_none()
@@ -2382,7 +2649,11 @@ impl App {
                 || self.selected_app.is_some()
                 || self.selected_connector.is_some();
             if !open && !self.searching {
-                self.schedule_search(true);
+                if let Some(path) = self.content.first_path().map(str::to_owned) {
+                    self.open_body_result(&path, ctx);
+                } else {
+                    self.schedule_search(true);
+                }
             }
         }
         if show_main {
@@ -2424,7 +2695,7 @@ impl App {
                                 egui::TextEdit::singleline(&mut self.query)
                                     .id_salt("main_query")
                                     .font(FontId::proportional(19.0))
-                                    .hint_text("搜索文件名、路径或扩展名")
+                                    .hint_text("搜索文件名、正文或路径")
                                     .frame(false),
                             );
                             changed = edit.changed();
@@ -2552,18 +2823,21 @@ impl App {
                 if let Some(row) = open_item { self.open_connector(row, ctx); }
             }
             ui.add_space(12.0); ui.separator();
+            let body_hits = self.show_body_results(ui, false);
             if self.external_only() {
                 if app_hits.is_empty() && connector_hits.is_empty() {
                     empty_state(ui, "未找到已载入条目", "可在应用启动器与连接器面板刷新应用或明确载入书签、仓库。", false);
                 }
             }
             else if self.loading { empty_state(ui, "正在加载索引", "索引加载在后台进行。", true); }
-            else if self.index.is_none() {
+            else if self.index.is_none() && !body_hits {
                 let configured = self.settings.as_ref().is_some_and(|s|!s.roots.is_empty());
                 empty_state(ui, if configured { "准备建立你的搜索索引" } else { "先选择你想搜索的目录" }, if configured { "首批收录提交后即可搜索，后续范围会继续扫描。" } else { "明确选择本地范围，文件信息保存在本机。" }, self.scan_cancel.is_some());
                 ui.vertical_centered(|ui| { if ui.add_enabled(self.settings.is_some() && self.scan_cancel.is_none(), primary(if configured { "开始扫描" } else { "设置搜索范围" })).clicked() { if configured { self.scan(ctx) } else { self.setup(ctx) } } });
             } else if let Some(result) = &self.results {
-                if result.results.is_empty() {
+                if result.results.is_empty() && body_hits {
+                    // 保留正文结果，省略文件名空状态。
+                } else if result.results.is_empty() {
                     let complete = result.complete;
                     let covered = result.coverage_complete;
                     let (title, description) = if !covered {
@@ -3200,6 +3474,17 @@ impl App {
                                     wizard.stage = WizardStage::Scope;
                                     wizard.error = None;
                                 }
+                                let supported_volumes = match &wizard.volumes {
+                                    Some(Ok(cards)) => cards.iter().filter(|card| card.volume.standard_supported)
+                                        .map(|card| EditableScope::from(&Scope::new(card.volume.root.clone())))
+                                        .collect::<Vec<_>>(),
+                                    _ => Vec::new(),
+                                };
+                                if ui.add_enabled(!supported_volumes.is_empty(), primary("使用全部固定本地磁盘")).clicked() {
+                                    wizard.roots = supported_volumes;
+                                    wizard.stage = WizardStage::Review;
+                                    wizard.error = None;
+                                }
                                 if ui.button("一键使用常用目录直达确认").clicked() {
                                     wizard.roots = xs_platform::suggested_roots().iter()
                                         .filter(|scope| {
@@ -3438,6 +3723,12 @@ impl eframe::App for App {
         }
         self.desktop_messages(ctx);
         self.content.update(&self.data_dir, ctx);
+        if !self.host_manages_body && !self.smoke_test {
+            let enabled = self.settings.as_ref().is_some_and(|s| {
+                s.content_enabled && s.content_follows_roots && !s.content_roots.is_empty()
+            });
+            self.content.sync_background(&self.data_dir, ctx, enabled);
+        }
         // Windows 首帧有时早于桌面合成器接管新窗口，短暂重绘以覆盖首次呈现。
         #[cfg(windows)]
         if self.started.elapsed() < Duration::from_secs(2) {
@@ -3460,16 +3751,13 @@ impl eframe::App for App {
             View::Main => {
                 self.header(ctx);
                 self.footer(ctx);
-                if self.content_tab {
-                    self.content_panel(ctx);
-                } else {
-                    self.search_bar(ctx);
-                    self.sidebar(ctx);
-                    self.main_panel(ctx);
-                    self.activity_panel(ctx);
-                    self.preview_dialog(ctx);
-                    self.connectors.show(ctx, &self.data_dir);
-                }
+                self.search_bar(ctx);
+                self.sidebar(ctx);
+                self.main_panel(ctx);
+                self.activity_panel(ctx);
+                self.preview_dialog(ctx);
+                self.connectors.show(ctx, &self.data_dir);
+                self.content_settings(ctx);
                 self.wizard(ctx);
                 self.utility.show(ctx, &self.data_dir);
                 let can_rebuild = !self.loading

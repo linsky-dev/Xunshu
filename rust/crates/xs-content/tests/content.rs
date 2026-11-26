@@ -916,3 +916,62 @@ fn foreground_content_watch_reconciles_real_filesystem_notification() {
         result.unwrap();
     });
 }
+
+#[test]
+fn automatic_content_publishes_readable_files_and_filters_before_paging() {
+    let tmp = sandbox();
+    let data = tmp.path().join("app");
+    let docs = tmp.path().join("docs");
+    fs::create_dir_all(&docs).unwrap();
+    let mut settings = Settings {
+        roots: vec![Scope::new(docs.to_str().unwrap())],
+        ..Settings::default()
+    };
+    settings.complete_setup();
+    settings.save(data.join("settings.json")).unwrap();
+    let saved = Settings::load(data.join("settings.json")).unwrap();
+    assert!(saved.content_enabled && saved.content_follows_roots);
+    assert_eq!(saved.content_roots, saved.roots);
+    assert!(!saved.ocr_enabled && !saved.semantic_enabled);
+
+    fs::write(docs.join("malformed.docx"), b"invalid archive").unwrap();
+    for n in 0..4 {
+        fs::write(docs.join(format!("{n}.txt")), "quiet orchard").unwrap();
+        fs::write(docs.join(format!("{n}.md")), "quiet orchard").unwrap();
+    }
+    fs::write(docs.join("ignored.bin"), "quiet orchard").unwrap();
+    let cancel = AtomicBool::new(false);
+    let report = xs_content::apply_queued_changes(&data, worker(), &cancel).unwrap();
+    assert!(report.published && report.durable);
+    assert!(!report.complete && !report.scope_reconciled);
+    assert_eq!(report.failed, 1);
+    assert_eq!(report.documents, 8);
+
+    let mut reader = ContentReader::new(&data);
+    let all = reader
+        .search("orchard", &SearchOptions::default(), &cancel)
+        .unwrap();
+    assert_eq!(all.indexed_total, 8);
+    let options = SearchOptions {
+        offset: 2,
+        limit: 2,
+        extension_filter: Some(xs_content::ExtensionFilter {
+            extensions: vec!["md".into()],
+            exclude: false,
+        }),
+    };
+    let page = reader.search("orchard", &options, &cancel).unwrap();
+    assert_eq!(page.indexed_total, 4);
+    assert_eq!(page.hits.len(), 2);
+    assert!(page.hits.iter().all(|hit| hit.path.ends_with(".md")));
+
+    let strict = rebuild(&data, worker(), &cancel).unwrap();
+    assert!(!strict.published);
+    assert_eq!(
+        reader
+            .search("orchard", &SearchOptions::default(), &cancel)
+            .unwrap()
+            .indexed_total,
+        8
+    );
+}

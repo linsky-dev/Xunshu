@@ -3,7 +3,7 @@ use chrono::{DateTime, Datelike, Local, LocalResult, NaiveDate, TimeZone, Utc};
 use std::cmp::Ordering;
 
 /// 寻枢内置分类只比较扩展名，路径和文件内容都不参与分类。
-pub(crate) fn category_extensions(key: &str) -> Option<&'static [&'static str]> {
+pub fn category_extensions(key: &str) -> Option<&'static [&'static str]> {
     match key {
         "audio" => Some(&[
             "aac", "aiff", "alac", "ape", "flac", "m4a", "mid", "mp3", "ogg", "opus", "wav", "wma",
