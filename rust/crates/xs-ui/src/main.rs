@@ -89,7 +89,7 @@ impl Args {
                 Some("--standalone") => mode = DesktopMode::Standalone,
                 Some("--desktop-render") => mode = DesktopMode::Renderer,
                 Some("--help" | "-h") => {
-                    println!("寻枢 Rust 原生界面\n\nxs-ui [--data-dir 绝对路径] [--query 查询文本] [--font 本地字体] [--quick | --content] [--standalone | --background | --smoke-test]\n\n--quick 打开快捷搜索框。\n--content 在冒烟测试中验证正文命中。\n--standalone 单独显示窗口，不启动托盘。\n--background 在 Windows 启动常驻托盘，不显示窗口。\n--smoke-test 验证原生窗口，不启动扫描。");
+                    println!("寻枢 Rust 原生界面\n\nxs-ui [--data-dir 绝对路径] [--query 查询文本] [--font 本地字体] [--quick] [--content] [--standalone | --background | --smoke-test]\n\n--quick 打开快捷搜索框。\n--content 在冒烟测试中验证正文命中。\n--standalone 单独显示窗口，不启动托盘。\n--background 在 Windows 启动常驻托盘，不显示窗口。\n--smoke-test 验证原生窗口，不启动扫描。");
                     std::process::exit(0);
                 }
                 _ => bail!("无法识别的参数：{}", arg.to_string_lossy()),
@@ -100,14 +100,6 @@ impl Args {
             None => operations::default_data_dir()?,
         };
         ensure!(data_dir.is_absolute(), "--data-dir 必须为本地绝对路径");
-        if content {
-            ensure!(
-                view == View::Main
-                    && matches!(mode, DesktopMode::Default | DesktopMode::Standalone),
-                "正文页只能在独立主窗口中直接打开"
-            );
-            mode = DesktopMode::Standalone;
-        }
         desktop::limit_query(&mut query);
         Ok(Self {
             data_dir,
@@ -637,7 +629,7 @@ struct App {
     diagnostics: diagnostics::Pane,
     connectors: connectors_ui::ConnectorsPane,
     installed_apps: Vec<xs_platform::apps::AppEntry>,
-    content_tab: bool,
+    smoke_body: bool,
     quick_recent_selection: Option<usize>,
     show_content_settings: bool,
     body_available: bool,
@@ -1067,7 +1059,7 @@ impl App {
             diagnostics: diagnostics::Pane::default(),
             connectors: connectors_ui::ConnectorsPane::default(),
             installed_apps: xs_platform::apps::discover_installed_apps(),
-            content_tab: args.content && args.smoke_test,
+            smoke_body: args.content && args.smoke_test,
             quick_recent_selection: None,
             show_content_settings: false,
             body_available: false,
@@ -3795,7 +3787,7 @@ impl eframe::App for App {
             ctx.request_repaint_after(delay);
         }
         if self.smoke_test && !self.smoke_exit_requested {
-            if self.content_tab && self.content.first_preview().is_some() {
+            if self.smoke_body && self.content.first_preview().is_some() {
                 let first = self.content_smoke_since.get_or_insert_with(Instant::now);
                 if first.elapsed() >= Duration::from_millis(120) {
                     self.smoke_exit_requested = true;
@@ -3803,10 +3795,10 @@ impl eframe::App for App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             } else if self.started.elapsed()
-                >= Duration::from_secs(if self.content_tab { 15 } else { 5 })
+                >= Duration::from_secs(if self.smoke_body { 15 } else { 5 })
             {
                 self.smoke_exit_requested = true;
-                if self.content_tab {
+                if self.smoke_body {
                     eprintln!(
                         "XS_UI_CONTENT_SMOKE_FAILED: {}",
                         self.content.error().unwrap_or("没有已验证的正文预览")
